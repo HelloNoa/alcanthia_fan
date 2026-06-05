@@ -136,7 +136,8 @@ export async function renderPlanner(view) {
   const apply = (r, c) => {
     const cell = grid[r][c];
     if (mode === "till") {
-      if (cell) grid[r][c] = null;                               // 칸 제거
+      if (cell && cell.p == null && cell.orn == null) grid[r][c] = null; // 빈 흙만 제거
+      else if (cell) return;                                     // 작물·장식물 있는 칸은 보호 (실수 삭제 방지)
       else if (!hasField() || adjField(r, c)) grid[r][c] = { p: null }; // 인접한 경우만 확장
       else return;                                               // 비인접 → 확장 불가
     } else {
