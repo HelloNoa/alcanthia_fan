@@ -1,0 +1,222 @@
+import { gamedata, names } from "./api.js";
+import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
+
+export async function renderCalc(view) {
+  view.innerHTML = `<h2>🧮 계산기</h2>
+    <nav class="subtabs" id="calccats">
+      <button data-k="brew" class="active">⚗️ 양조 조합표</button>
+      <button data-k="time">⏱️ 시간 계산</button>
+      <button data-k="level">🌱 레벨 계산</button>
+    </nav>
+    <div id="calcbody"></div>`;
+  const body = view.querySelector("#calcbody");
+  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix };
+  const sel = (k) => {
+    view.querySelectorAll("#calccats button").forEach((b) => b.classList.toggle("active", b.dataset.k === k));
+    (VIEWS[k] || brewMatrix)(body);
+  };
+  view.querySelectorAll("#calccats button").forEach((b) => b.onclick = () => sel(b.dataset.k));
+  brewMatrix(body);
+}
+
+// ---------- 양조 조합표 (매트릭스) ----------
+async function brewMatrix(body) {
+  const g = await gamedata();
+  const N = await names();
+  const recipes = g.brew_recipes || [];
+  // 재료 등장 순서 유지
+  const ings = [];
+  for (const r of recipes) for (const c of r.inputs) if (!ings.includes(c)) ings.push(c);
+  const map = {};
+  for (const r of recipes) map[[...r.inputs].sort().join("|")] = r.output;
+  const out = (a, b) => map[[a, b].sort().join("|")];
+
+  body.innerHTML = `<p class="muted">재료 두 개의 교차점 = 결과 포션 (셀에 마우스 올리면 이름)</p>
+    <div class="matrix-scroll"><table class="matrix"><thead><tr><th class="corner"></th>${
+      ings.map((c) => `<th><span class="mx-ic" data-ic="${c}" title="${N.items?.[c] || c}"></span></th>`).join("")
+    }</tr></thead><tbody>${
+      ings.map((rc) => `<tr><th class="rowh"><span class="mx-ic" data-ic="${rc}" title="${N.items?.[rc] || rc}"></span><span class="mx-name">${N.items?.[rc] || rc}</span></th>${
+        ings.map((cc) => {
+          const o = out(rc, cc);
+          if (!o) return `<td class="mx-empty"></td>`;
+          return `<td title="${N.items?.[o] || o}"><span class="mx-ic mx-out" data-ic="${o}"></span><span class="mx-cell-name">${N.items?.[o] || o}</span></td>`;
+        }).join("")
+      }</tr>`).join("")
+    }</tbody></table></div>`;
+
+  // 아이콘 주입
+  body.querySelectorAll(".mx-ic[data-ic]").forEach((el) => itemIcon(el, el.dataset.ic, "mxi"));
+}
+
+// ---------- 시간 계산 ----------
+async function timeCalc(body) {
+  const g = await gamedata();
+  const plants = g.plants || {};
+  const potions = Object.entries(g.items || {}).filter(([, it]) => it.type === "potion");
+
+  body.innerHTML = `
+    <div class="calc-grid">
+      <div class="calc-card">
+        <h3>🌱 작물 성장 시간</h3>
+        <div class="calc-row">
+          <select id="crop">${Object.entries(plants)
+            .filter(([id, p]) => !/^aging_/.test(id) && !(p.name || "").includes("시험용"))
+            .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join("")}</select>
+        </div>
+        <div class="calc-row">
+          <label class="lvlabel">토양 숙련 <input id="soil" type="range" min="0" max="10" value="0"><b id="soilv">0</b></label>
+          <label class="lvlabel">씨앗 강화 <input id="seedE" type="range" min="0" max="12" value="0"><b id="seedEv">0</b></label>
+        </div>
+        <div id="cropOut" class="calc-out"></div>
+        <p class="muted">성장시간 × (1 − 0.05×Lv)^(씨앗강화+1)</p>
+      </div>
+      <div class="calc-card">
+        <h3>⚗️ 포션 양조 시간</h3>
+        <div class="calc-row">
+          <select id="pot">${potions.map(([c, it]) => `<option value="${c}">${it.name}</option>`).join("")}</select>
+        </div>
+        <div class="calc-row">
+          <label class="lvlabel">불꽃 숙련 <input id="flame" type="range" min="0" max="10" value="0"><b id="flamev">0</b></label>
+          <label class="lvlabel">가마솥 강화 <input id="cauE" type="range" min="0" max="12" value="0"><b id="cauEv">0</b></label>
+          <label class="lvlabel">만들 포션 <input id="matE" type="range" min="0" max="12" value="0"><b id="matEv">0</b>강</label>
+        </div>
+        <div class="calc-row">
+          <label class="lvlabel">양조 존
+            <select id="zone">
+              <option value="">기타 (×1)</option>
+              <option value="sunset_cliff">석양절벽 (×2)</option>
+              <option value="advanced_volcano">용암협곡 (−5%×지역효과)</option>
+              <option value="beginner_forest">속삭이는 숲 (−10%×지역효과, 동일재료)</option>
+            </select>
+          </label>
+          <label class="lvlabel">낯익은 터 <input id="famG" type="range" min="0" max="10" value="0"><b id="famGv">0</b></label>
+          <label class="chk"><input type="checkbox" id="fog"> 안개 해방</label>
+        </div>
+        <div id="potOut" class="calc-out"></div>
+        <div class="calc-note">💡 N강 포션은 <b>(N−1)강 포션 2개를 합성</b>해 만듭니다.
+        예) 9강을 만들려면 8강 포션 2개가 필요하고, 시간은 8강 기준(2⁸)으로 계산돼요.</div>
+        <p class="muted">시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수</p>
+      </div>
+    </div>`;
+
+  // 포션 → 레시피 재료
+  const recipeOf = {};
+  for (const r of g.brew_recipes || []) recipeOf[r.output] = r.inputs;
+
+  // factor = (1 - rate×Lv)^(enh+1)  — 게임의 vo() 공식
+  const factor = (rate, lv, enh) => Math.pow(Math.max(0, 1 - rate * lv), enh + 1);
+
+  const cropOut = () => {
+    const id = body.querySelector("#crop").value;
+    const lv = +body.querySelector("#soil").value, enh = +body.querySelector("#seedE").value;
+    body.querySelector("#soilv").textContent = lv;
+    body.querySelector("#seedEv").textContent = enh;
+    const base = plants[id]?.growTime_ms;
+    const adj = base != null ? base * factor(0.05, lv, enh) : null;
+    const el = body.querySelector("#cropOut"); el.innerHTML = "";
+    const ic = document.createElement("span"); ic.className = "calc-ic"; plantIcon(ic, plants[id]?.spriteKey || id);
+    el.appendChild(ic);
+    el.insertAdjacentHTML("beforeend",
+      `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>`);
+  };
+  const zoneMult = (zone, cult, sameIng) => {
+    if (zone === "sunset_cliff") return 2;
+    if (zone === "advanced_volcano") return Math.max(0.01, 1 - 0.05 * cult);
+    if (zone === "beginner_forest" && sameIng) return Math.max(0.01, 1 - 0.1 * cult);
+    return 1;
+  };
+  const potOut = () => {
+    const c = body.querySelector("#pot").value;
+    const fl = +body.querySelector("#flame").value, ce = +body.querySelector("#cauE").value;
+    const me = +body.querySelector("#matE").value;
+    const famG = +body.querySelector("#famG").value, fog = body.querySelector("#fog").checked;
+    const zone = body.querySelector("#zone").value;
+    body.querySelector("#flamev").textContent = fl;
+    body.querySelector("#cauEv").textContent = ce;
+    body.querySelector("#matEv").textContent = me;
+    body.querySelector("#famGv").textContent = famG;
+    // 지역 효과 배율 t = 낯익은터×0.1 + 안개해방
+    const t = famG * 0.1 + (fog ? 1 : 0);
+    const ing = recipeOf[c] || [];
+    const sameIng = ing.length === 2 && ing[0] === ing[1];
+    const bd = (x) => g.items[x]?.brewDuration_ms || 0;
+    // 0강: 재료(produce) 2개 양조 = max(재료 brewDur)
+    // N강(≥1): (N-1)강 포션 2개 합성 = 포션 brewDur × 2^(N-1)
+    const produceBase = ing.length === 2 ? Math.max(bd(ing[0]), bd(ing[1])) : bd(c);
+    const base = me === 0 ? produceBase : bd(c) * Math.pow(2, me - 1);
+    const zm = zoneMult(zone, t, sameIng);
+    const adj = base ? base * factor(0.01, fl, ce) * zm : null;
+    const el = body.querySelector("#potOut"); el.innerHTML = "";
+    const ic = document.createElement("span"); ic.className = "calc-ic"; itemIcon(ic, c);
+    el.appendChild(ic);
+    el.insertAdjacentHTML("beforeend",
+      `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>`);
+  };
+  body.querySelectorAll("#crop,#soil,#seedE").forEach((e) => e.oninput = cropOut);
+  body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog").forEach((e) => {
+    e.oninput = potOut; e.onchange = potOut;
+  });
+  cropOut(); potOut();
+}
+
+// ---------- 레벨 계산 ----------
+function levelCalc(body) {
+  // 게임 공식: 레벨 L → L+1 에 2^floor(L/5) exp 필요
+  const expToNext = (L) => 2 ** Math.floor(L / 5);
+  const totalForLevel = (L) => { let s = 0; for (let i = 1; i < L; i++) s += expToNext(i); return s; };
+  const fromExp = (exp) => {
+    let i = 1, s = exp;
+    while (s > 0) { const n = expToNext(i); if (s < n) break; s -= n; i++; }
+    return { level: i, into: s, need: expToNext(i) };
+  };
+  const fmt = (n) => Number(Math.round(n)).toLocaleString();
+
+  body.innerHTML = `
+    <div class="calc-card">
+      <h3>경험치 → 레벨</h3>
+      <label class="lvlabel">경험치 <input id="lc-exp" type="number" min="0" value="0" class="num-in"></label>
+      <div id="lc-out1" class="lc-out"></div>
+    </div>
+    <div class="calc-card">
+      <h3>목표 레벨까지 남은 경험치</h3>
+      <div class="lc-row">
+        <label class="lvlabel">현재 경험치 <input id="lc-cur" type="number" min="0" value="0" class="num-in"></label>
+        <label class="lvlabel">목표 레벨 <input id="lc-tgt" type="number" min="2" value="20" class="num-in"></label>
+      </div>
+      <div id="lc-out2" class="lc-out"></div>
+    </div>
+    <p class="muted">레벨 L → L+1 필요 경험치 = 2^⌊L/5⌋ (5레벨마다 2배) · 성장포션 N강 = 4^N 경험치. 게임 공식 그대로입니다.</p>`;
+
+  const upd1 = () => {
+    const exp = Math.max(0, +body.querySelector("#lc-exp").value || 0);
+    const r = fromExp(exp);
+    const pct = ((r.into / r.need) * 100).toFixed(1);
+    body.querySelector("#lc-out1").innerHTML =
+      `<div class="lc-big">Lv ${r.level}</div>
+       <div class="lc-sub">현재 레벨 진행: ${fmt(r.into)} / ${fmt(r.need)} (${pct}%)<br>
+       다음 레벨까지 <b class="t-adj">${fmt(r.need - r.into)}</b> exp</div>`;
+  };
+  const upd2 = () => {
+    const cur = Math.max(0, +body.querySelector("#lc-cur").value || 0);
+    const tgt = Math.max(2, +body.querySelector("#lc-tgt").value || 2);
+    const total = totalForLevel(tgt);
+    const remain = Math.max(0, total - cur);
+    const curLv = fromExp(cur).level;
+    // 성장포션 N강 = 4^N 경험치 (게임: YP(e)=4^e). 1개로 충분해질 때까지 표시
+    let rows = "";
+    for (let N = 0; N <= 30; N++) {
+      const per = 4 ** N;
+      const cnt = remain > 0 ? Math.ceil(remain / per) : 0;
+      rows += `<tr><td><b>${N}강</b></td><td>${fmt(per)}</td><td class="lc-cnt">${fmt(cnt)}개</td></tr>`;
+      if (cnt <= 1) break; // 더 높은 강화는 1개로 동일 → 생략
+    }
+    body.querySelector("#lc-out2").innerHTML =
+      `Lv ${tgt} 도달 총 경험치: <b>${fmt(total)}</b> exp<br>
+       현재 <b>Lv ${curLv}</b> 에서 남은 경험치: <b class="t-adj">${fmt(remain)}</b> exp
+       <div class="lc-pot-h">필요한 성장포션 (강화별)</div>
+       <table class="lc-pot"><thead><tr><th>성장포션</th><th>회당 exp</th><th>필요 개수</th></tr></thead><tbody>${rows}</tbody></table>`;
+  };
+  body.querySelector("#lc-exp").oninput = upd1;
+  body.querySelectorAll("#lc-cur,#lc-tgt").forEach((e) => e.oninput = upd2);
+  upd1(); upd2();
+}

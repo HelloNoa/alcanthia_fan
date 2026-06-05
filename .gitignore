@@ -1,0 +1,6 @@
+.DS_Store
+.idea/
+node_modules/
+
+# 로컬 데이터 갱신 도구 (추적 안 함)
+regen_names.py
