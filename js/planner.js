@@ -23,6 +23,10 @@ const FLOOR_NAMES = {
   stone_floor: "석판", cobblestone_floor: "조약돌", grass_floor: "잔디",
   grass_stone_floor: "잔디 석판", flower_meadow_floor: "꽃잔디", tilled_soil_floor: "갈아엎은 흙",
 };
+// 공유 인코딩 순서 (모듈 레벨 — decodeGrid가 load 초기에 호출되므로 TDZ 방지)
+const FLOOR_ORDER = Object.keys(FLOOR_NAMES);   // 인덱스+1 = 바닥재 종류
+const FENCE_ORDER = ["rustic_fence", "root_barrier"];
+const SIDES = ["t", "r", "b", "l"];
 
 function multiplier(pid, cond, sameCount, diversity, opt, oneShot) {
   let c = opt.harvest ? 1.5 : 1;
@@ -494,26 +498,33 @@ export async function renderPlanner(view) {
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(grid)); } catch {} }
 
-  // ── 배치 압축 인코딩 (바이너리 → url-safe base64) ──
+  // ── 배치 압축 인코딩 (바이너리 → url-safe base64). v2: 바닥재·울타리 포함 ──
   function encodeGrid() {
     let minR = CANVAS, maxR = -1, minC = CANVAS, maxC = -1;
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) if (grid[r][c]) {
       if (r < minR) minR = r; if (r > maxR) maxR = r; if (c < minC) minC = c; if (c > maxC) maxC = c;
     }
     if (maxR < 0) return "";
-    const h = maxR - minR + 1, w = maxC - minC + 1, pl = [], orn = [], vals = [];
+    const h = maxR - minR + 1, w = maxC - minC + 1, pl = [], orn = [], vals = [], floors = [], fences = [];
+    let hasFloor = false, hasFence = false;
     for (let r = minR; r <= maxR; r++) for (let c = minC; c <= maxC; c++) {
       const z = grid[r][c];
       if (!z) vals.push(0);
       else if (z.orn) { let i = orn.indexOf(z.orn); if (i < 0) { i = orn.length; orn.push(z.orn); } vals.push(200 + i); }
       else if (z.p) { let i = pl.indexOf(z.p); if (i < 0) { i = pl.length; pl.push(z.p); } vals.push(2 + i * 13 + Math.min(12, z.e || 0)); }
       else vals.push(1);
+      const fv = z && z.floor ? FLOOR_ORDER.indexOf(z.floor) + 1 : 0; floors.push(fv); if (fv) hasFloor = true;
+      let fb = 0; if (z && z.fences) SIDES.forEach((s, k) => { if (z.fences[s]) fb |= (FENCE_ORDER.indexOf(z.fences[s]) + 1) << (k * 2); });
+      fences.push(fb); if (fb) hasFence = true;
     }
-    const bytes = [1, minR, minC, h, w, pl.length];
+    const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0);
+    const bytes = [2, minR, minC, h, w, flags, pl.length];
     for (const id of pl) { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); }
     bytes.push(orn.length);
     for (const id of orn) { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); }
     vals.forEach((v) => bytes.push(v));
+    if (hasFloor) floors.forEach((v) => bytes.push(v));
+    if (hasFence) fences.forEach((v) => bytes.push(v));
     let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
     return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
@@ -522,18 +533,28 @@ export async function renderPlanner(view) {
     try { bin = atob(str.replace(/-/g, "+").replace(/_/g, "/")); } catch { return null; }
     const b = []; for (let k = 0; k < bin.length; k++) b.push(bin.charCodeAt(k));
     let i = 0;
-    if (b[i++] !== 1) return null;
-    const minR = b[i++], minC = b[i++], h = b[i++], w = b[i++], pl = [], orn = [];
+    const ver = b[i++];
+    if (ver !== 1 && ver !== 2) return null;
+    const minR = b[i++], minC = b[i++], h = b[i++], w = b[i++];
+    const flags = ver === 2 ? b[i++] : 0;
+    const pl = [], orn = [];
     const rd = (arr) => { const n = b[i++]; for (let k = 0; k < n; k++) { const len = b[i++]; let s = ""; for (let j = 0; j < len; j++) s += String.fromCharCode(b[i++]); arr.push(s); } };
     rd(pl); rd(orn);
-    const g = blank();
+    const g = blank(); const cells = [];
     for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
       const v = b[i++], gr = minR + r, gc = minC + c;
+      cells.push([gr, gc]);
       if (gr >= CANVAS || gc >= CANVAS || v == null || v === 0) continue;
       if (v === 1) g[gr][gc] = { p: null };
       else if (v >= 200) g[gr][gc] = { orn: orn[v - 200] };
       else g[gr][gc] = { p: pl[Math.floor((v - 2) / 13)], e: (v - 2) % 13 };
     }
+    if (flags & 1) cells.forEach(([gr, gc]) => { const fv = b[i++]; if (fv && g[gr] && g[gr][gc]) g[gr][gc].floor = FLOOR_ORDER[fv - 1]; });
+    if (flags & 2) cells.forEach(([gr, gc]) => {
+      const fb = b[i++]; if (!fb || !(g[gr] && g[gr][gc])) return;
+      const f = {}; SIDES.forEach((s, k) => { const sv = (fb >> (k * 2)) & 3; if (sv) f[s] = FENCE_ORDER[sv - 1]; });
+      if (Object.keys(f).length) g[gr][gc].fences = f;
+    });
     return g;
   }
 

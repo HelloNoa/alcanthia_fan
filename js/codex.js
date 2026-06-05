@@ -302,6 +302,9 @@ export async function renderCodex(view) {
         const gem = g.gem_effects?.[code];
         if (gem) card.insertAdjacentHTML("beforeend",
           `<div class="cx-perk">💎 세공효과 · <b>${gem.name}</b><br>${fmtFormula(gem.desc)}</div>`);
+        const skins = g.item_skins?.[code];
+        if (skins) card.insertAdjacentHTML("beforeend",
+          `<div class="cx-source"><b>🎨 외형</b> ${skins.length}종 · ${skins.join(" · ")}</div>`);
         if (it.description) card.insertAdjacentHTML("beforeend", `<div class="cx-flavor">“${it.description}”</div>`);
         grid.appendChild(card);
       });
