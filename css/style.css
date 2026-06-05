@@ -289,6 +289,8 @@ table.matrix thead th { text-align: center; }
 .calc-note b { color: #fff; }
 
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; border-top: 1px solid var(--line); }
+footer .credit-av { width: 20px; height: 20px; border-radius: 50%; object-fit: cover;
+  vertical-align: middle; margin: 0 3px 0 5px; border: 1px solid var(--line); }
 
 /* ───────── 모바일 ───────── */
 @media (max-width: 640px) {
