@@ -520,3 +520,61 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px
 /* 포션 지속시간 배지 */
 .cx-dur { font-style: normal; color: var(--buy); font-size: 12px; margin-left: 4px;
   background: #1c3327; border: 1px solid #2f5a43; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+
+/* 강화 기댓값 결과 */
+.ev-res { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.ev-res span { color: var(--muted); }
+.ev-res b { color: var(--ink); font-weight: 700; }
+.ev-res.big b { color: var(--gold); font-size: 20px; }
+.ev-res:last-child { border-bottom: 0; }
+
+/* 강화 기댓값 원재료 전개 */
+.ev-raw-h { margin-top: 12px; font-size: 14px; font-weight: 600; }
+.ev-raw-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.ev-raw-i { display: flex; align-items: center; gap: 8px; background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.ev-raw-ic { width: 22px; height: 22px; flex: none; }
+.ev-raw-ic img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
+.ev-raw-n { flex: 1; min-width: 0; }
+.ev-raw-i b { color: var(--gold); }
+
+/* 강화 기댓값 - 제작 입력 강화도 필드 */
+.ev-fields-h { margin: 12px 0 6px; font-size: 14px; font-weight: 600; }
+.ev-craft { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; }
+.ev-craft-h { font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ev-craft-in { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ev-finput { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 3px; }
+.ev-enh-in { width: 48px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 5px; padding: 3px 5px; font-size: 12.5px; }
+.ev-fixed { font-size: 12.5px; color: var(--muted); }
+.ev-fixed b, .ev-finput { color: var(--muted); }
+.ev-q { font-size: 12px; padding: 1px 7px; border-radius: 5px; }
+.ev-q.ok { color: var(--buy); background: #1c3327; }
+.ev-q.warn { color: var(--sell); background: #3a1f24; }
+
+/* 배치: 표면 바닥재 + 경계 울타리/장벽 */
+.pl-cell > .pl-cic, .pl-cell > .pl-enhb, .pl-cell > .pl-mult,
+.pl-cell > .pl-floor, .pl-cell > .pl-fences { pointer-events: none; }
+.pl-cic { z-index: 1; }
+.pl-enhb, .pl-mult { z-index: 3; }  /* 배지는 작물 아이콘 위로 */
+/* 바닥재 — 실제 스프라이트(2:1 iso 다이아) → un-project(rotate-45 scaleY2) 해서 평면 사각 타일
+   입체뷰에선 셀 자체 iso 변환이 다시 투영 → iso 타일로 정확히 보임 (그래서 항상 같은 변환) */
+.pl-floor { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.pl-floor img { position: absolute; left: 50%; top: 50%; width: 100%; height: 100%;
+  image-rendering: pixelated; transform: translate(-50%, -50%) scale(1.44) rotate(-45deg) scaleY(2); }
+.pl-fpic { overflow: hidden; }
+.pl-fpic img { transform: scale(1.25) rotate(-45deg) scaleY(1.9); image-rendering: pixelated; }
+/* 울타리(나무) / 장벽(뿌리) — 변에 패턴 막대 */
+.pl-fences { position: absolute; inset: 0; z-index: 6; }
+.pl-fc { position: absolute; border-radius: 2px; box-shadow: 0 0 2px rgba(0,0,0,.7); }
+.pl-fc-t, .pl-fc-b { left: -1px; right: -1px; height: 4px; }
+.pl-fc-l, .pl-fc-r { top: -1px; bottom: -1px; width: 4px; }
+.pl-fc-t { top: -2px; } .pl-fc-b { bottom: -2px; } .pl-fc-l { left: -2px; } .pl-fc-r { right: -2px; }
+/* 나무 울타리: 말뚝 패턴 */
+.pl-fc-t:not(.bar), .pl-fc-b:not(.bar) { background:
+  repeating-linear-gradient(90deg, #8a5a2b 0 1px, #d9a063 1px 2px, #b07b43 2px 5px); }
+.pl-fc-l:not(.bar), .pl-fc-r:not(.bar) { background:
+  repeating-linear-gradient(0deg, #8a5a2b 0 1px, #d9a063 1px 2px, #b07b43 2px 5px); }
+/* 뿌리장벽: 굵은 보라 (지표 효과 차단) */
+.pl-fc.bar { background: linear-gradient(#a48cff, #6f4fe0); box-shadow: 0 0 4px #8c6cff; }

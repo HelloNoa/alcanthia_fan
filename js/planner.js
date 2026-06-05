@@ -14,6 +14,14 @@ const COND_KR = { humid: "습기", sunlit: "햇살", toxic: "중독", anti_magic
 const ORN = {
   witch_scarecrow: "마녀 허수아비", crystal_fountain: "수정 분수", fairy_lantern: "요정 등불",
   flower_trellis_arch: "꽃 트렐리스", star_music_box: "별조각 오르골", telescope: "망원경", town_teleporter: "마을 텔레포터",
+  rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", storage_chest: "차원상자", equipment_pedestal: "장비 전시대",
+};
+// 장식물 부가설명 (기능형)
+const ORN_NOTE = { root_barrier: "지표 효과 차단 (조건 전파 막음)", storage_chest: "아이템 보관", equipment_pedestal: "장비 전시" };
+// 바닥재 종류 (표면 배치, CSS 텍스처)
+const FLOOR_NAMES = {
+  stone_floor: "석판", cobblestone_floor: "조약돌", grass_floor: "잔디",
+  grass_stone_floor: "잔디 석판", flower_meadow_floor: "꽃잔디", tilled_soil_floor: "갈아엎은 흙",
 };
 
 function multiplier(pid, cond, sameCount, diversity, opt, oneShot) {
@@ -110,7 +118,8 @@ export async function renderPlanner(view) {
     if (kind === "eraser") b.innerHTML = `<span class="pl-erase">🚫</span><span>지우개</span>`;
     else {
       const ic = document.createElement("span"); ic.className = "pl-pic";
-      if (kind === "orn") itemIcon(ic, key); else plantIcon(ic, plants[key].spriteKey || key);
+      if (kind === "floor") { ic.className = "pl-pic pl-fpic"; itemIcon(ic, key); }  // 실제 스프라이트(다이아) → CSS로 정렬
+      else if (kind === "orn") itemIcon(ic, key); else plantIcon(ic, plants[key].spriteKey || key);
       b.appendChild(ic);
       b.insertAdjacentHTML("beforeend", `<span>${label}</span>`);
     }
@@ -125,6 +134,8 @@ export async function renderPlanner(view) {
   palette.forEach((k) => palBox.appendChild(palItem(k, plants[k].name, "plant")));
   ornBox.insertAdjacentHTML("beforeend", `<span class="pl-orn-lbl">장식물</span>`);
   Object.entries(ORN).forEach(([k, l]) => ornBox.appendChild(palItem(k, l, "orn")));
+  ornBox.insertAdjacentHTML("beforeend", `<span class="pl-orn-lbl">바닥재</span>`);
+  Object.entries(FLOOR_NAMES).forEach(([k, l]) => ornBox.appendChild(palItem(k, l, "floor")));
 
   const selKind = () => view.querySelector(`.pl-pi.active`)?.dataset.kind || "plant";
 
@@ -132,21 +143,37 @@ export async function renderPlanner(view) {
   const adjField = (r, c) => [[-1, 0], [1, 0], [0, -1], [0, 1]].some(([dy, dx]) => {
     const y = r + dy, x = c + dx; return y >= 0 && y < CANVAS && x >= 0 && x < CANVAS && grid[y][x];
   });
-  const apply = (r, c) => {
+  const FENCES = new Set(["rustic_fence", "root_barrier"]);      // 칸 경계(edge) 배치
+  const keep = (cell) => ({ floor: cell && cell.floor, fences: cell && cell.fences });
+  // 클릭 위치로 가까운 변(상/하/좌/우) 판정 (자식은 pointer-events:none → offset이 셀 기준)
+  const sideOf = (ev) => {
+    const el = ev.currentTarget;
+    const x = ev.offsetX / el.offsetWidth, y = ev.offsetY / el.offsetHeight;
+    const d = { t: y, b: 1 - y, l: x, r: 1 - x };
+    return ["t", "b", "l", "r"].reduce((a, k) => (d[k] < d[a] ? k : a), "t");
+  };
+  const apply = (r, c, ev) => {
     const cell = grid[r][c];
     if (mode === "till") {
-      if (cell && cell.p == null && cell.orn == null) grid[r][c] = null; // 빈 흙만 제거
-      else if (cell) return;                                     // 작물·장식물 있는 칸은 보호 (실수 삭제 방지)
+      if (cell && cell.p == null && cell.orn == null && !cell.floor && !cell.fences) grid[r][c] = null; // 빈 흙만 제거
+      else if (cell) return;                                     // 작물·장식·바닥·울타리 있는 칸 보호
       else if (!hasField() || adjField(r, c)) grid[r][c] = { p: null }; // 인접한 경우만 확장
       else return;                                               // 비인접 → 확장 불가
     } else {
       if (!cell) return;                                         // 미개간 칸엔 심을 수 없음
       const kind = selKind();
-      if (kind === "eraser") { if (cell.p || cell.orn) grid[r][c] = { p: null }; }
-      else if (kind === "orn") grid[r][c] = cell.orn === sel ? { p: null } : { orn: sel }; // 같은 장식물 클릭 → 제거(토글)
+      if (kind === "eraser") { grid[r][c] = { p: null, ...keep(cell) }; } // 작물·장식만 제거(바닥·울타리 유지)
+      else if (FLOOR_NAMES[sel]) { cell.floor = cell.floor === sel ? undefined : sel; } // 표면 바닥재 (작물 유지·종류 변경)
+      else if (FENCES.has(sel)) {                                // 경계 토글 (클릭한 변)
+        const s = ev ? sideOf(ev) : "t";
+        cell.fences = cell.fences || {};
+        if (cell.fences[s] === sel) delete cell.fences[s]; else cell.fences[s] = sel;
+        if (!Object.keys(cell.fences).length) delete cell.fences;
+      }
+      else if (kind === "orn") grid[r][c] = cell.orn === sel ? { p: null, ...keep(cell) } : { orn: sel, ...keep(cell) };
       else {
         const same = cell.p === sel && (cell.e || 0) === enh;
-        grid[r][c] = same ? { p: null } : { p: sel, e: enh };    // 같은 작물+강화 클릭 → 제거(토글)
+        grid[r][c] = same ? { p: null, ...keep(cell) } : { p: sel, e: enh, ...keep(cell) };
       }
     }
     recompute(); save();
@@ -171,7 +198,7 @@ export async function renderPlanner(view) {
     for (let r = w.minR; r <= w.maxR; r++) for (let c = w.minC; c <= w.maxC; c++) {
       const el = document.createElement("div");
       el.className = "pl-cell";
-      el.onclick = () => apply(r, c);              // 클릭만 (드래그 없음)
+      el.onclick = (ev) => apply(r, c, ev);        // 클릭만 (드래그 없음)
       el.onmouseenter = () => showDetail(r, c);    // hover 상세
       cellMap.set(r + ":" + c, el);
       gridBox.appendChild(el);
@@ -260,6 +287,14 @@ export async function renderPlanner(view) {
       const z = grid[r][c];
       if (!z) { if (showSlots && adjField(r, c)) el.classList.add("expand-slot"); continue; }
       el.classList.add("tilled"); tilled++;
+      // 표면 바닥재 (작물 아래) — CSS 석판 텍스처 (스프라이트는 iso라 평면뷰서 회전돼 보임)
+      if (z.floor) { const fl = document.createElement("span"); fl.className = "pl-floor"; itemIcon(fl, z.floor); el.appendChild(fl); }
+      // 경계 울타리/장벽
+      if (z.fences) {
+        const fc = document.createElement("span"); fc.className = "pl-fences";
+        for (const [s, type] of Object.entries(z.fences)) fc.insertAdjacentHTML("beforeend", `<i class="pl-fc pl-fc-${s}${type === "root_barrier" ? " bar" : ""}"></i>`);
+        el.appendChild(fc);
+      }
       // 조건 테두리
       (condMap[r][c] || []).forEach((cc) => el.classList.add("c-" + cc));
       if (poll.has(r * CANVAS + c)) el.classList.add("poll");
@@ -339,7 +374,9 @@ export async function renderPlanner(view) {
     const cell = grid[r][c];
     const orn = ornAt(r, c);
     if (orn) {
-      const eff = EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>` : `<div class="d-row muted">장식 (효과 없음)</div>`;
+      const eff = EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
+        : ORN_NOTE[orn.orn] ? `<div class="d-row">${ORN_NOTE[orn.orn]}</div>`
+        : `<div class="d-row muted">장식 (효과 없음)</div>`;
       detail.innerHTML = `<h3>${ORN[orn.orn]}</h3>${eff}`;
       return;
     }
@@ -512,7 +549,8 @@ export async function renderPlanner(view) {
       : `<p class="muted" style="padding:4px 0">저장된 배치 없음</p>`;
     slotsBox.querySelectorAll("[data-load]").forEach((b) => b.onclick = () => {
       const code = getSlots()[decodeURIComponent(b.dataset.load)];
-      const g0 = decodeGrid(code); if (g0) { grid = g0; recompute(); save(); }
+      let g0; try { g0 = code[0] === "[" ? JSON.parse(code) : decodeGrid(code); } catch { g0 = decodeGrid(code); }
+      if (g0) { grid = g0; recompute(); save(); }
     });
     slotsBox.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => {
       const s2 = getSlots(); delete s2[decodeURIComponent(b.dataset.del)]; setSlots(s2); renderSlots();
@@ -521,7 +559,7 @@ export async function renderPlanner(view) {
   view.querySelector("#pl-save-btn").onclick = () => {
     const inp = view.querySelector("#pl-slotname");
     const name = (inp.value || "").trim() || "배치 " + (Object.keys(getSlots()).length + 1);
-    const s = getSlots(); s[name] = encodeGrid(); setSlots(s); inp.value = ""; renderSlots();
+    const s = getSlots(); s[name] = JSON.stringify(grid); setSlots(s); inp.value = ""; renderSlots(); // JSON(바닥·울타리 보존)
   };
   view.querySelector("#pl-share").onclick = async () => {
     const code = encodeGrid();
