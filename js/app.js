@@ -1,4 +1,4 @@
-import { api, names } from "./api.js";
+import { api, names, gamedata } from "./api.js";
 import { PROXY_BASE, setProxy } from "./config.js";
 import { renderGarden } from "./garden.js";
 import { renderMarket } from "./market.js";
@@ -107,6 +107,7 @@ function relTime(ts) {
 
 async function tabResidents() {
   const N = await names();
+  const g = await gamedata();
   const PAGE = 30;
   // 안개마을(중앙 마을)은 zone_id=null 로 조회 (프록시가 mist_town→null 매핑)
   const opts = `<option value="mist_town">🏘️ 안개마을 (마을)</option>` +
@@ -116,7 +117,35 @@ async function tabResidents() {
       <select id="zone">${opts}</select>
       <label class="chk"><input type="checkbox" id="pub" checked> 공개만</label>
     </div>
+    <div class="zone-fx" id="zone-fx">
+      <div class="zfx-controls">
+        <label class="lvlabel">낯익은 터 <input id="zf-fam" type="range" min="0" max="10" value="0"><b id="zf-famv">0</b></label>
+        <label class="chk"><input type="checkbox" id="zf-fog"> 안개 해방</label>
+        <label class="chk"><input type="checkbox" id="zf-raid"> 습격 방어 보너스</label>
+        <span class="zfx-coeff">지역효과 계수 <b id="zf-coeff">0.00</b></span>
+      </div>
+      <div id="zf-list" class="zfx-list"></div>
+    </div>
     <div id="residents"></div>`;
+
+  // 지역 효과 계산 (계수 e = 낯익은터×0.1 + 안개해방×1 + 습격방어보너스×0.5)
+  const evalTpl = (tpl, e) => tpl.replace(/\$\{([^}]+)\}/g, (_, x) => {
+    try { const v = Number(new Function("e", "Math", "return (" + x + ")")(e, Math)); return isFinite(v) ? v.toFixed(2) : "∞"; }
+    catch { return "?"; }
+  });
+  const renderFx = () => {
+    const fam = +$("#zf-fam").value, fog = $("#zf-fog").checked ? 1 : 0, raid = $("#zf-raid").checked ? 0.5 : 0;
+    const e = fam * 0.1 + fog * 1 + raid;
+    $("#zf-coeff").textContent = e.toFixed(2);
+    const fx = g.zone_effects?.[$("#zone").value];
+    $("#zf-list").innerHTML = fx
+      ? fx.map((t) => `<div class="zfx-item">• ${evalTpl(t, e)}</div>`).join("")
+      : `<div class="muted" style="padding:4px 0">표시할 지역 효과 없음 (안개마을 등)</div>`;
+  };
+  $("#zf-fam").oninput = () => { $("#zf-famv").textContent = $("#zf-fam").value; renderFx(); };
+  $("#zf-fog").onchange = renderFx;
+  $("#zf-raid").onchange = renderFx;
+
   const box = $("#residents");
   let offset = 0;
 
@@ -158,8 +187,9 @@ async function tabResidents() {
     } catch (e) { if (reset) box.innerHTML = `<span class="err">${e.message}</span>`; }
   };
 
-  $("#zone").onchange = () => load(true);
+  $("#zone").onchange = () => { renderFx(); load(true); };
   $("#pub").onchange = () => load(true);
+  renderFx();
   load(true);
 }
 

@@ -479,3 +479,13 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px
 .pl-share-msg { font-size: 12px; padding: 6px 0 0; }
 .pl-share-in { width: 100%; margin-top: 4px; font-size: 11px; padding: 4px; background: var(--panel2);
   color: var(--ink); border: 1px solid var(--line); border-radius: 5px; }
+
+/* 거주민 지역 효과 */
+.zone-fx { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; margin: 4px 0 14px; }
+.zfx-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.zfx-coeff { margin-left: auto; font-size: 13px; color: var(--muted); }
+.zfx-coeff b { color: var(--accent); font-size: 16px; }
+.zfx-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.5; }
+.zfx-item { color: var(--ink); }

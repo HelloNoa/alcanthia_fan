@@ -43,7 +43,6 @@ export async function renderPlanner(view) {
   let enh = 0;
   const opt = { harvest: false, resist: 0, rootDom: 0, vein: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
   let condMap = null;
-  let painting = false;
 
   view.innerHTML = `<h2>🌿 텃밭 배치 테스트</h2>
     <p class="muted">개간으로 흙을 깔고 작물·장식물을 배치 · 인접효과/생산량 실시간 계산</p>
@@ -144,8 +143,11 @@ export async function renderPlanner(view) {
       if (!cell) return;                                         // 미개간 칸엔 심을 수 없음
       const kind = selKind();
       if (kind === "eraser") { if (cell.p || cell.orn) grid[r][c] = { p: null }; }
-      else if (kind === "orn") grid[r][c] = { orn: sel };
-      else grid[r][c] = { p: sel, e: enh };
+      else if (kind === "orn") grid[r][c] = cell.orn === sel ? { p: null } : { orn: sel }; // 같은 장식물 클릭 → 제거(토글)
+      else {
+        const same = cell.p === sel && (cell.e || 0) === enh;
+        grid[r][c] = same ? { p: null } : { p: sel, e: enh };    // 같은 작물+강화 클릭 → 제거(토글)
+      }
     }
     recompute(); save();
   };
@@ -169,13 +171,12 @@ export async function renderPlanner(view) {
     for (let r = w.minR; r <= w.maxR; r++) for (let c = w.minC; c <= w.maxC; c++) {
       const el = document.createElement("div");
       el.className = "pl-cell";
-      el.onmousedown = () => { painting = true; apply(r, c); };
-      el.onmouseenter = () => { if (painting) apply(r, c); showDetail(r, c); };
+      el.onclick = () => apply(r, c);              // 클릭만 (드래그 없음)
+      el.onmouseenter = () => showDetail(r, c);    // hover 상세
       cellMap.set(r + ":" + c, el);
       gridBox.appendChild(el);
     }
   };
-  document.addEventListener("mouseup", () => { const was = painting; painting = false; if (was) recompute(); });
 
   const emitterOf = (cell) => {
     if (!cell) return null;
@@ -249,8 +250,7 @@ export async function renderPlanner(view) {
     buildConds();
     const want = computeWin();
     const changed = !win || win.minR !== want.minR || win.maxR !== want.maxR || win.minC !== want.minC || win.maxC !== want.maxC;
-    // 드래그 중엔 윈도우 고정 (셀 재배치로 옆칸이 지워지는 버그 방지)
-    if (changed && (!win || !painting)) buildWindow(want);
+    if (changed) buildWindow(want);
     const poll = pollSet();
     const totals = {};
     let planted = 0, tilled = 0;
