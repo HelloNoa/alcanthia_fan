@@ -489,3 +489,34 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px
 .zfx-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.5; }
 .zfx-item { color: var(--ink); }
+
+/* 도감 장비 강화 컨트롤 */
+.cx-enh-ctrl { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
+.cx-enh-lbl { color: var(--muted); }
+.cx-enh-btn { width: 24px; height: 24px; padding: 0; background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); cursor: pointer; font-size: 15px; line-height: 1; }
+.cx-enh-btn:hover { border-color: var(--accent); }
+.cx-enh-lv { color: var(--gold); min-width: 24px; text-align: center; }
+.cx-enh-stat { color: var(--accent); font-weight: 600; margin-left: 4px; }
+
+/* 변성 탭 가치표 */
+.tr-note { background: #211f3a; border: 1px solid #4a3d6e; border-radius: 8px;
+  padding: 10px 13px; font-size: 13px; color: #c9bfff; line-height: 1.6; margin: 16px 0 6px; }
+.tr-note b { color: #fff; }
+.tr-vals { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-bottom: 6px; }
+.tr-val { display: flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.tr-vic { width: 22px; height: 22px; flex: none; }
+.tr-vic img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
+.tr-vn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-val b { color: var(--gold); }
+
+/* 도감 획득 출처 */
+.cx-source { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.cx-source b { color: var(--ink); margin-right: 4px; }
+
+/* 포션 지속시간 배지 */
+.cx-dur { font-style: normal; color: var(--buy); font-size: 12px; margin-left: 4px;
+  background: #1c3327; border: 1px solid #2f5a43; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
