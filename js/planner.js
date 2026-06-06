@@ -53,7 +53,7 @@ export async function renderPlanner(view) {
   let sel = palette[0];
   let mode = "plant";
   let enh = 0;
-  const opt = { harvest: false, resist: 0, rootDom: 0, vein: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
+  const opt = { harvest: false, resist: 0, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
   let condMap = null;
 
   view.innerHTML = `<h2>🌿 텃밭 배치 테스트</h2>
@@ -83,6 +83,7 @@ export async function renderPlanner(view) {
           <label class="lvlabel">과밀 저항 <input id="pl-resist" type="range" min="0" max="2" value="0"><b id="pl-resistv">0</b></label>
           <label class="lvlabel">뿌리 지배 <input id="pl-root" type="range" min="0" max="2" value="0"><b id="pl-rootv">0</b></label>
           <label class="chk"><input type="checkbox" id="pl-vein"> 맥읽기 (강화만큼 범위↑)</label>
+          <label class="chk"><input type="checkbox" id="pl-sturdy"> 단단한 줄기 (강화 작물 최대생산 ×(강화+1))</label>
           <div class="pl-sksec">생산 스킬 <span class="muted">(강화 작물에 곱연산)</span></div>
           <label class="lvlabel">시간 숙련 <input id="pl-time" type="range" min="0" max="10" value="0"><b id="pl-timev">0</b></label>
           <label class="lvlabel">토양 숙련 <input id="pl-soil" type="range" min="0" max="10" value="0"><b id="pl-soilv">0</b></label>
@@ -270,11 +271,13 @@ export async function renderPlanner(view) {
     const e1 = (z.e || 0) + 1;
     const intervalEff = (prod?.interval_ms || 0) * Math.pow(Math.max(0, 1 - 0.01 * opt.timeM), e1);
     const growEff = P.growTime_ms * Math.pow(Math.max(0, 1 - 0.05 * opt.soilM), e1);
-    const harvests = (P.maxHarvests == null || !isFinite(P.maxHarvests)) ? 1e9 : P.maxHarvests;
+    const baseH = (P.maxHarvests == null || !isFinite(P.maxHarvests)) ? 1e9 : P.maxHarvests;
+    // 단단한 줄기: 강화 작물(e>0)의 최대생산 ×(강화+1)
+    const harvests = (opt.sturdy && (z.e || 0) > 0 && isFinite(baseH)) ? baseH * ((z.e || 0) + 1) : baseH;
     const cycle = growEff + harvests * intervalEff;
     const yieldMul = m * (1 + 0.05 * opt.plenty) * (opt.uptime / 100); // 풍요의손길 · 가동률
     const perHour = prod && !gated && cycle > 0 ? (harvests / cycle) * 3600000 * yieldMul : 0;
-    return { ...z, P, cond, same, diversity, m, prod, gated, perHour };
+    return { ...z, P, cond, same, diversity, m, prod, gated, perHour, harvests };
   };
 
   const recompute = () => {
@@ -358,7 +361,8 @@ export async function renderPlanner(view) {
         if (tr < 0 || tr >= CANVAS || tc < 0 || tc >= CANVAS || !tcell || tcell.p || tcell.orn) continue; // 너머 빈 흙
         const code = sp.produces[0].itemCode;
         // 풍요의 손길(수확 2배 확률) · 가동률 적용
-        out[code] = (out[code] || 0) + (sp.maxHarvests || 1) * cyclesPerHour * (1 + 0.05 * opt.plenty) * (opt.uptime / 100);
+        const srcH = (sp.maxHarvests || 1) * (opt.sturdy && (src.e || 0) > 0 ? (src.e || 0) + 1 : 1);  // 단단한 줄기
+        out[code] = (out[code] || 0) + srcH * cyclesPerHour * (1 + 0.05 * opt.plenty) * (opt.uptime / 100);
       }
     }
     return out;
@@ -391,9 +395,12 @@ export async function renderPlanner(view) {
       <div class="d-row">같은 이웃 <b>${st.same}</b> · 이웃 종류 <b>${st.diversity}</b>${st.P.oneShot ? ' <span class="muted">(과밀 면제)</span>' : ""}</div>
       <div class="d-row">생산 배율 <b class="${st.m > 1 ? "up" : st.m < 1 ? "down" : ""}">×${st.m.toFixed(2)}</b></div>`;
     if (st.prod) {
+      const inf = st.P.maxHarvests == null || !isFinite(st.P.maxHarvests);
+      const boosted = opt.sturdy && (st.e || 0) > 0 && !inf;
+      const life = inf ? "무한" : `${Math.round(st.harvests)}회${boosted ? ' <span class="up">↑단단</span>' : ""}`;
       lines += st.prod.interval_ms >= 1000
-        ? `<div class="d-row">생산주기 <b>${fmtDuration(st.prod.interval_ms)}</b> · 수명 ${st.P.maxHarvests == null ? "무한" : st.P.maxHarvests + "회"}</div>`
-        : `<div class="d-row">즉시생산 <span class="muted">(성장 ${fmtDuration(st.P.growTime_ms)})</span> · 수명 ${st.P.maxHarvests == null ? "무한" : st.P.maxHarvests + "회"}</div>`;
+        ? `<div class="d-row">생산주기 <b>${fmtDuration(st.prod.interval_ms)}</b> · 수명 ${life}</div>`
+        : `<div class="d-row">즉시생산 <span class="muted">(성장 ${fmtDuration(st.P.growTime_ms)})</span> · 수명 ${life}</div>`;
       lines += st.gated ? `<div class="d-row down">⚠️ 물+중독 필요 (미충족 → 생산 0)</div>`
         : `<div class="d-row">시간당 생산 <b class="up">${st.perHour.toFixed(1)}개</b>${st.P.oneShot ? ' <span class="muted">(성장주기 기준 이론 최대 · 실제는 바람꽃 60초 수분에 제한, 바람꽃당 ~240/h)</span>' : ""}</div>`;
     } else lines += `<div class="d-row muted">생산물 없음 (지원 작물)</div>`;
@@ -426,6 +433,7 @@ export async function renderPlanner(view) {
   view.querySelector("#pl-resist").oninput = (e) => { opt.resist = +e.target.value; view.querySelector("#pl-resistv").textContent = opt.resist; recompute(); };
   view.querySelector("#pl-root").oninput = (e) => { opt.rootDom = +e.target.value; view.querySelector("#pl-rootv").textContent = opt.rootDom; recompute(); };
   view.querySelector("#pl-vein").onchange = (e) => { opt.vein = e.target.checked; recompute(); };
+  view.querySelector("#pl-sturdy").onchange = (e) => { opt.sturdy = e.target.checked; recompute(); };
   view.querySelector("#pl-gust").onchange = (e) => { opt.gust = e.target.checked; recompute(); };
   const skSlider = (id, key) => view.querySelector(id).oninput = (e) => {
     opt[key] = +e.target.value; view.querySelector(id + "v").textContent = e.target.value; recompute();
