@@ -397,7 +397,9 @@ export async function renderPlanner(view) {
     if (st.prod) {
       const inf = st.P.maxHarvests == null || !isFinite(st.P.maxHarvests);
       const boosted = opt.sturdy && (st.e || 0) > 0 && !inf;
-      const life = inf ? "무한" : `${Math.round(st.harvests)}회${boosted ? ' <span class="up">↑단단</span>' : ""}`;
+      const life = inf ? "무한"
+        : boosted ? `${st.P.maxHarvests}회 → <b class="up">${Math.round(st.harvests)}회</b> <span class="muted">(단단한 줄기 ×${(st.e || 0) + 1})</span>`
+        : `${Math.round(st.harvests)}회`;
       lines += st.prod.interval_ms >= 1000
         ? `<div class="d-row">생산주기 <b>${fmtDuration(st.prod.interval_ms)}</b> · 수명 ${life}</div>`
         : `<div class="d-row">즉시생산 <span class="muted">(성장 ${fmtDuration(st.P.growTime_ms)})</span> · 수명 ${life}</div>`;
