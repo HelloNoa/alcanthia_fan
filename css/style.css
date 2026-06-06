@@ -540,6 +540,16 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .ev-raw-ic img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
 .ev-raw-n { flex: 1; min-width: 0; }
 .ev-raw-i b { color: var(--gold); }
+.ev-raw-cost { color: var(--buy); font-size: 12px; min-width: 70px; text-align: right; }
+.ev-cost { color: var(--gold); }
+/* 원재료 가격 입력 */
+.ev-prices-list { display: flex; flex-direction: column; gap: 5px; margin: 8px 0 4px; }
+.ev-price { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.ev-price-ic { width: 20px; height: 20px; flex: none; }
+.ev-price-ic img { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; }
+.ev-price-n { flex: 1; min-width: 0; }
+.ev-price-in { width: 92px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 5px; padding: 3px 7px; font-size: 13px; text-align: right; }
 
 /* 강화 기댓값 - 제작 입력 강화도 필드 */
 .ev-fields-h { margin: 12px 0 6px; font-size: 14px; font-weight: 600; }

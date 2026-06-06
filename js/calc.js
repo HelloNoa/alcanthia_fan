@@ -245,6 +245,9 @@ async function evCalc(body) {
   const nameOf = (c) => g.items?.[c]?.name || c;
   const craftable = Object.keys(recipeOf).filter((c) => g.items?.[c])
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  // 원재료 가격(골드) — 기본값은 게임 가치/판매가, 사용자가 덮어쓰면 priceState
+  const priceState = {};
+  const priceOf = (code) => priceState[code] ?? (g.item_values?.[code] ?? g.sell_price?.[code] ?? 0);
 
   body.innerHTML = `
     <div class="calc-grid">
@@ -256,10 +259,12 @@ async function evCalc(body) {
         <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="40" value="0" class="num-in"></div>
         <div class="calc-row"><label>심지 숙련 Lv</label><input id="ev-wick" type="number" min="0" max="10" value="0" class="num-in"></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-self"> 🔁 도구 솥 자가강화 <span class="muted">(단계마다 도구 솥 강화도↑)</span></label></div>
+        <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-auto" checked> ⚙️ 입력 강화 자동 최소비용 <span class="muted">(끄면 수동 지정)</span></label></div>
         <div class="calc-row"><label>시작 강화도</label><input id="ev-start" type="number" min="0" max="40" value="0" class="num-in"></div>
         <div class="calc-row"><label>최종 강화도</label><input id="ev-target" type="number" min="0" max="40" value="5" class="num-in"></div>
         <div id="ev-out" class="calc-out"></div>
         <div id="ev-fields"></div>
+        <div id="ev-prices"></div>
         <div id="ev-raw"></div>
         <div class="calc-note">💡 강화 = <b>같은 강화도 아이템 2개 합성 → +1</b> (성공률 p). <b>실패 시 1개만 회수</b>(1개 손실).<br>
           성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 필요 ≈ <code>(1+1/p)^(최종−시작)</code><br>
@@ -288,7 +293,7 @@ async function evCalc(body) {
     const memo = {}, assign = {};
     const f = (item, stack) => {
       if (memo[item]) return memo[item];
-      if (leaf(item, stack)) return { dict: { [item]: 1 }, total: 1 };
+      if (leaf(item, stack)) return { dict: { [item]: 1 }, total: priceOf(item) };
       const ns = new Set(stack); ns.add(item);
       const rec = recipeOf[item];
       const parts = rec.in.map((c) => ({ code: c, b: f(c, ns), enh: !isProduce(c) }));
@@ -311,7 +316,7 @@ async function evCalc(body) {
     const memo = {};
     const f = (item, stack) => {
       if (memo[item]) return memo[item];
-      if (leaf(item, stack)) return { dict: { [item]: 1 }, total: 1 };
+      if (leaf(item, stack)) return { dict: { [item]: 1 }, total: priceOf(item) };
       const ns = new Set(stack); ns.add(item);
       const rec = recipeOf[item];
       let sum = 0;
@@ -342,6 +347,22 @@ async function evCalc(body) {
     acc.push({ item, req: rec.req, inputs: rec.in });
     const ns = new Set(stack); ns.add(item);
     for (const c of rec.in) collectCrafts(c, ns, acc, seen);
+  };
+  // 트리의 원재료(잎) 수집 (가격 입력용)
+  const collectLeaves = (item, stack, set) => {
+    if (leaf(item, stack)) { set.add(item); return; }
+    const ns = new Set(stack); ns.add(item);
+    for (const c of recipeOf[item].in) collectLeaves(c, ns, set);
+  };
+  const renderPrices = (item) => {
+    const set = new Set(); collectLeaves(item, new Set(), set);
+    const leaves = [...set].sort((a, b) => priceOf(b) - priceOf(a));
+    q("#ev-prices").innerHTML = `<div class="ev-fields-h">💰 원재료 가격 <span class="muted">(골드/개 · 가장 싼 조합으로 자동 분배)</span></div>` +
+      `<div class="ev-prices-list">${leaves.map((c) =>
+        `<label class="ev-price"><span class="ev-price-ic" data-ic="${c}"></span><span class="ev-price-n">${nameOf(c)}</span><input type="number" min="0" value="${priceOf(c)}" data-pc="${c}" class="ev-price-in"></label>`).join("")}</div>`;
+    q("#ev-prices").querySelectorAll(".ev-price-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
+    q("#ev-prices").querySelectorAll(".ev-price-in").forEach((inp) =>
+      inp.oninput = () => { priceState[inp.dataset.pc] = Math.max(0, +inp.value || 0); calc(); });
   };
   let enhState = {}, lastItem = null;
   const renderFields = (item, em) => {
@@ -378,7 +399,9 @@ async function evCalc(body) {
       <div class="ev-res big"><span>필요한 +${s} ${label} (기댓값)</span><b>${fmt(items)}개</b></div>`;
     const rawEl = q("#ev-raw"), fEl = q("#ev-fields");
     if (item && recipeOf[item]) {
-      if (item !== lastItem) { renderFields(item, em); lastItem = item; }
+      const auto = q("#ev-auto").checked;
+      if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, em); lastItem = item; }
+      if (auto) { const aa = autoAssign(em); aa.f(item, new Set()); enhState = aa.assign; fEl.innerHTML = ""; }  // 가격 기준 최소비용 자동
       const qmap = {};
       const base = manualRaw(em, enhState, qmap)(item, new Set());
       const mult = em(t);
@@ -389,13 +412,18 @@ async function evCalc(body) {
         el.className = "ev-q" + (qv >= 1 ? " ok" : " warn");
       });
       const ent = Object.entries(base.dict).map(([k, v]) => [k, v * mult]).sort((a, b) => b[1] - a[1]);
-      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${t} ${nameOf(item)} 1개 · 원재료부터, 총 ${fmt(base.total * mult)})</span></div>
-        <div class="ev-raw-list">${ent.map(([code, n]) =>
-          `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nameOf(code)}</span><b>${Math.ceil(n).toLocaleString()}개</b></div>`).join("")}</div>`;
+      let totalCost = 0;
+      const rows = ent.map(([code, n]) => {
+        const cnt = Math.ceil(n), cost = cnt * priceOf(code); totalCost += cost;
+        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nameOf(code)}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
+      }).join("");
+      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
+        <div class="ev-raw-list">${rows}</div>`;
       rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
-    } else { rawEl.innerHTML = ""; fEl.innerHTML = ""; lastItem = null; }
+    } else { rawEl.innerHTML = ""; fEl.innerHTML = ""; q("#ev-prices").innerHTML = ""; lastItem = null; }
   };
   body.querySelectorAll("#ev-item, #ev-cauldron, #ev-wick, #ev-start, #ev-target").forEach((i) => i.oninput = calc);
   q("#ev-self").onchange = () => { lastItem = null; calc(); };  // 모델 바뀌면 기본값 재계산
+  q("#ev-auto").onchange = () => { lastItem = null; calc(); };   // 자동/수동 전환
   calc();
 }
