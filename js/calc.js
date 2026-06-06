@@ -243,7 +243,11 @@ async function evCalc(body) {
   for (const c of (g.shop_items || [])) terminal.add(c);
   for (const c of Object.keys(g.dia_shop || {})) terminal.add(c);
   const nameOf = (c) => g.items?.[c]?.name || c;
-  const craftable = Object.keys(recipeOf).filter((c) => g.items?.[c])
+  // 강화 가능 아이템: 수확물(강화불가)·시험용 제외, 레시피 있거나 가치/판매가 있는 것 (각인석 등 원재료 포함)
+  const craftable = Object.keys(g.items || {})
+    .filter((c) => g.items[c] && g.items[c].type !== "produce"
+      && !/^aging_/.test(c) && !(g.items[c].name || "").includes("시험용")
+      && (recipeOf[c] || g.item_values?.[c] != null || g.sell_price?.[c] != null))
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   // 원재료 가격(골드) — 기본값은 게임 가치/판매가, 사용자가 덮어쓰면 priceState
   const priceState = {};
@@ -253,7 +257,7 @@ async function evCalc(body) {
     <div class="calc-grid">
       <div class="calc-card">
         <h3>🎲 강화 기댓값</h3>
-        <div class="calc-row"><label>아이템 <span class="muted">(2차 전개)</span></label>
+        <div class="calc-row"><label>아이템 <span class="muted">(원재료 전개)</span></label>
           <select id="ev-item" class="num-in"><option value="">— 없음 (강화만) —</option>${
             craftable.map((c) => `<option value="${c}">${nameOf(c)}</option>`).join("")}</select></div>
         <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="40" value="0" class="num-in"></div>
@@ -398,7 +402,7 @@ async function evCalc(body) {
       <div class="ev-res"><span>강화 성공률 (1회)</span><b>${rateTxt}</b></div>
       <div class="ev-res big"><span>필요한 +${s} ${label} (기댓값)</span><b>${fmt(items)}개</b></div>`;
     const rawEl = q("#ev-raw"), fEl = q("#ev-fields");
-    if (item && recipeOf[item]) {
+    if (item) {  // 레시피 없는 원재료(각인석 등)도 자기 자신을 원재료로 전개
       const auto = q("#ev-auto").checked;
       if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, em); lastItem = item; }
       if (auto) { const aa = autoAssign(em); aa.f(item, new Set()); enhState = aa.assign; fEl.innerHTML = ""; }  // 가격 기준 최소비용 자동
