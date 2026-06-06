@@ -415,9 +415,9 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-orn-lbl { font-size: 11px; color: var(--muted); width: 100%; margin-bottom: 2px; }
 .pl-cell.isorn { background: #2a2438; }
 .pl-cell.c-anti_magic { box-shadow: inset 0 0 0 2px #9b6cff; }
-.pl-cell.poll::after { content: ""; position: absolute; inset: 0; border-radius: 3px; z-index: 4;
-  background: repeating-linear-gradient(45deg, rgba(124,108,255,.10), rgba(124,108,255,.10) 3px, rgba(170,150,255,.6) 3px, rgba(170,150,255,.6) 6px);
-  box-shadow: inset 0 0 0 2px rgba(150,130,255,.95), 0 0 4px rgba(124,108,255,.6); pointer-events: none; }
+.pl-cell.poll::after { content: ""; position: absolute; inset: 0; border-radius: 3px; z-index: 1;  /* 바닥재 위, 작물 아래 */
+  background: repeating-linear-gradient(45deg, rgba(124,108,255,.10), rgba(124,108,255,.10) 3px, rgba(170,150,255,.55) 3px, rgba(170,150,255,.55) 6px);
+  box-shadow: inset 0 0 0 2px rgba(160,140,255,.95), 0 0 4px rgba(124,108,255,.6); pointer-events: none; }
 .lg.anti { background: #9b6cff; } .lg.poll { background: repeating-linear-gradient(45deg,#4a3d6e,#4a3d6e 2px,#7c6cff 2px,#7c6cff 4px); }
 
 /* 플래너 isometric 보기 */
@@ -563,7 +563,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 /* 배치: 표면 바닥재 + 경계 울타리/장벽 */
 .pl-cell > .pl-cic, .pl-cell > .pl-enhb, .pl-cell > .pl-mult,
 .pl-cell > .pl-floor, .pl-cell > .pl-fences { pointer-events: none; }
-.pl-cic { z-index: 1; }
+.pl-cic { z-index: 2; }  /* 작물은 수분경로(1) 위 */
 .pl-enhb, .pl-mult { z-index: 3; }  /* 배지는 작물 아이콘 위로 */
 /* 바닥재 — 실제 스프라이트(2:1 iso 다이아) → un-project(rotate-45 scaleY2) 해서 평면 사각 타일
    입체뷰에선 셀 자체 iso 변환이 다시 투영 → iso 타일로 정확히 보임 (그래서 항상 같은 변환) */
