@@ -10,6 +10,8 @@ const EMIT = {
   crystal_fountain: "humid", fairy_lantern: "sunlit", witch_scarecrow: "anti_magic",
 };
 const COND_KR = { humid: "습기", sunlit: "햇살", toxic: "중독", anti_magic: "항마" };
+const COND_COLOR = { humid: "#3b6ea5", sunlit: "#d9a92e", toxic: "#6a9f3a", anti_magic: "#9b6cff" };
+const COND_ORDER = ["humid", "sunlit", "toxic", "anti_magic"];  // 중첩 테두리 순서(고정)
 // 설치형 장식물
 const ORN = {
   witch_scarecrow: "마녀 허수아비", crystal_fountain: "수정 분수", fairy_lantern: "요정 등불",
@@ -303,7 +305,14 @@ export async function renderPlanner(view) {
         el.appendChild(fc);
       }
       // 조건 테두리
-      (condMap[r][c] || []).forEach((cc) => el.classList.add("c-" + cc));
+      // 조건 효과: 여러 개면 색 테두리를 중첩(2/4/6/8px)으로 모두 표시 (바닥재 위)
+      const cm = condMap[r][c];
+      const conds = cm && cm.size ? COND_ORDER.filter((cc) => cm.has(cc)) : [];
+      if (conds.length) {
+        const cs = document.createElement("span"); cs.className = "pl-conds";
+        cs.style.boxShadow = conds.map((cc, i) => `inset 0 0 0 ${2 * (i + 1)}px ${COND_COLOR[cc]}`).join(", ");
+        el.appendChild(cs);
+      }
       if (poll.has(r * CANVAS + c)) el.classList.add("poll");
       if (z.orn) {
         const ic = document.createElement("span"); ic.className = "pl-cic"; itemIcon(ic, z.orn); el.appendChild(ic);
