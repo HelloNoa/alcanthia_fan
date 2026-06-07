@@ -591,3 +591,70 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   repeating-linear-gradient(0deg, #8a5a2b 0 1px, #d9a063 1px 2px, #b07b43 2px 5px); }
 /* 뿌리장벽: 굵은 보라 (지표 효과 차단) */
 .pl-fc.bar { background: linear-gradient(#a48cff, #6f4fe0); box-shadow: 0 0 4px #8c6cff; }
+
+/* ⚔️ 모험 전투 시뮬레이터 */
+.adv-sim h3 { margin: 4px 0 12px; }
+.adv-sec { margin-bottom: 14px; }
+.adv-sec-h { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.adv-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.adv-port, .adv-pic { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  background: #1d1c30; border-radius: 6px; overflow: hidden; }
+.adv-port img, .adv-pic img { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
+.adv-pick { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font-size: 13px; }
+.adv-pick.adv-eq { flex: 1; min-width: 120px; }
+.adv-enh { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--muted); }
+.adv-enh-in { width: 48px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; font-size: 13px; text-align: right; }
+.adv-x { background: #2a1f2a; color: var(--sell); border: 1px solid #5a2a2f; border-radius: 6px; cursor: pointer; padding: 4px 9px; font-size: 12px; }
+.adv-add { background: var(--panel2); color: var(--ink); border: 1px dashed var(--line); border-radius: 7px; cursor: pointer; padding: 6px 14px; font-size: 13px; }
+.adv-enemies { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.adv-enemy { display: flex; flex-direction: column; align-items: center; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 9px; padding: 7px 10px; min-width: 78px; }
+.adv-mic { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+.adv-mic img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
+.adv-mn { font-size: 12px; font-weight: 600; margin-top: 2px; }
+.adv-ms { font-size: 10px; color: var(--muted); }
+.adv-run { display: block; width: 100%; background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+  padding: 13px; font-size: 16px; font-weight: 700; cursor: pointer; margin: 8px 0 14px; }
+.adv-run:hover { filter: brightness(1.08); }
+.adv-wr { text-align: center; padding: 16px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--line); }
+.adv-wr.good { background: #16321f; border-color: #2c6b3f; }
+.adv-wr.mid { background: #33301a; border-color: #6b5a2c; }
+.adv-wr.bad { background: #331a1f; border-color: #6b2c33; }
+.adv-wr-pct { font-size: 38px; font-weight: 800; }
+.adv-wr.good .adv-wr-pct { color: var(--buy); } .adv-wr.mid .adv-wr-pct { color: var(--gold); } .adv-wr.bad .adv-wr-pct { color: var(--sell); }
+.adv-wr-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.adv-sample { font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 8px; background: var(--panel); margin-bottom: 8px; }
+.adv-sample.win { color: var(--buy); } .adv-sample.lose { color: var(--sell); }
+.adv-logbox summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 0; }
+.adv-log { max-height: 340px; overflow-y: auto; background: #14131f; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.adv-log-r { font-size: 12.5px; padding: 2px 0; border-bottom: 1px solid #211f33; }
+.adv-log-t { color: var(--accent); font-weight: 700; margin-right: 4px; }
+.adv-log-r.log-ally { color: #9fe0b0; } .adv-log-r.log-bad { color: #e0a0a0; }
+
+/* 모험 추천 파티 */
+.adv-zone-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.adv-zone-row #adv-zone { flex: 1; min-width: 170px; }
+.adv-rec { background: var(--gold); color: #1a1828; border: 0; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.adv-rec:hover { filter: brightness(1.08); }
+.adv-rec-r { margin-top: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+.adv-rec-r.calc { color: var(--muted); }
+.adv-rec-r.ok { background: #16321f; border: 1px solid #2c6b3f; }
+.adv-rec-r.warn { background: #33301a; border: 1px solid #6b5a2c; }
+
+/* 추천 파티 옵션 카드 */
+.adv-rec-h { font-size: 13px; font-weight: 600; margin: 10px 0 6px; }
+.adv-rec-card { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; margin-bottom: 6px; }
+.adv-rec-card.warn { border-color: #6b5a2c; background: #2a2718; }
+.adv-rec-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.adv-rec-top b { font-size: 13px; }
+.adv-rec-apply { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 4px 13px; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
+.adv-rec-apply:hover { filter: brightness(1.1); }
+.adv-rec-mid { font-size: 12.5px; margin: 3px 0; }
+.adv-rec-bot { font-size: 12px; color: var(--muted); }
+.adv-rec-bot .up { color: var(--buy); } .adv-rec-bot .down { color: var(--sell); }
+
+/* 12초(1턴) 클리어 배지 */
+.adv-rec-lbl { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.adv-rec-fast { background: #16321f; color: var(--buy); border: 1px solid #2c6b3f; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; }
+.adv-rec-slow { background: #2a2718; color: var(--gold); border: 1px solid #6b5a2c; border-radius: 6px; padding: 1px 8px; font-size: 12px; }
+.adv-rec-tip { font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; margin-bottom: 8px; line-height: 1.5; }

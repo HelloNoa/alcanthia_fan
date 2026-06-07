@@ -261,7 +261,7 @@ const TABS = {
   rank: { label: "🏆 랭킹", run: tabLeaderboard },
   codex: { label: "📖 도감", run: () => renderCodex(view) },
   skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
-  calc: { label: "🧮 계산기", run: () => renderCalc(view) },
+  calc: { label: "🧮 계산기", run: (sub) => renderCalc(view, sub) },
 };
 function mountTabs() {
   const nav = $("#tabs");
@@ -271,10 +271,11 @@ function mountTabs() {
     b.onclick = () => selectTab(b.dataset.tab));
 }
 function selectTab(key) {
+  const [main, sub] = key.split("/");   // "calc/adv" → 메인 탭 + 서브탭(새로고침 유지)
   location.hash = key;
   $("#tabs").querySelectorAll("button").forEach((b) =>
-    b.classList.toggle("active", b.dataset.tab === key));
-  (TABS[key] || TABS.garden).run();
+    b.classList.toggle("active", b.dataset.tab === main));
+  (TABS[main] || TABS.garden).run(sub);
 }
 
 // 프록시 주소 표시/변경

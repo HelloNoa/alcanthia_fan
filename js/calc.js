@@ -1,23 +1,26 @@
 import { gamedata, names } from "./api.js";
 import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
+import { advSim } from "./adventure.js";
 
-export async function renderCalc(view) {
+export async function renderCalc(view, sub) {
   view.innerHTML = `<h2>🧮 계산기</h2>
     <nav class="subtabs" id="calccats">
       <button data-k="brew" class="active">⚗️ 양조 조합표</button>
       <button data-k="time">⏱️ 시간 계산</button>
       <button data-k="level">🌱 레벨 계산</button>
       <button data-k="ev">🎲 강화 기댓값</button>
+      <button data-k="adv">⚔️ 모험 시뮬</button>
     </nav>
     <div id="calcbody"></div>`;
   const body = view.querySelector("#calcbody");
-  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix, ev: evCalc };
+  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix, ev: evCalc, adv: advSim };
   const sel = (k) => {
+    location.hash = "calc/" + k;   // 새로고침 시 서브탭 유지
     view.querySelectorAll("#calccats button").forEach((b) => b.classList.toggle("active", b.dataset.k === k));
     (VIEWS[k] || brewMatrix)(body);
   };
   view.querySelectorAll("#calccats button").forEach((b) => b.onclick = () => sel(b.dataset.k));
-  brewMatrix(body);
+  sel(VIEWS[sub] ? sub : "brew");   // 해시의 서브탭 복원 (없으면 양조 조합표)
 }
 
 // ---------- 양조 조합표 (매트릭스) ----------
@@ -260,12 +263,12 @@ async function evCalc(body) {
         <div class="calc-row"><label>아이템 <span class="muted">(원재료 전개)</span></label>
           <select id="ev-item" class="num-in"><option value="">— 없음 (강화만) —</option>${
             craftable.map((c) => `<option value="${c}">${nameOf(c)}</option>`).join("")}</select></div>
-        <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="40" value="0" class="num-in"></div>
+        <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="99" value="0" class="num-in"></div>
         <div class="calc-row"><label>심지 숙련 Lv</label><input id="ev-wick" type="number" min="0" max="10" value="0" class="num-in"></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-self"> 🔁 도구 솥 자가강화 <span class="muted">(단계마다 도구 솥 강화도↑)</span></label></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-auto" checked> ⚙️ 입력 강화 자동 최소비용 <span class="muted">(끄면 수동 지정)</span></label></div>
-        <div class="calc-row"><label>시작 강화도</label><input id="ev-start" type="number" min="0" max="40" value="0" class="num-in"></div>
-        <div class="calc-row"><label>최종 강화도</label><input id="ev-target" type="number" min="0" max="40" value="5" class="num-in"></div>
+        <div class="calc-row"><label>시작 강화도</label><input id="ev-start" type="number" min="0" max="99" value="0" class="num-in"></div>
+        <div class="calc-row"><label>최종 강화도</label><input id="ev-target" type="number" min="0" max="99" value="5" class="num-in"></div>
         <div id="ev-out" class="calc-out"></div>
         <div id="ev-fields"></div>
         <div id="ev-prices"></div>
