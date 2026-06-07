@@ -29,8 +29,30 @@ export async function renderCodex(view) {
   // 역인덱스
   const brewByOut = {};
   for (const r of g.brew_recipes || []) brewByOut[r.output] = r.inputs;
+  // 아이템당 레시피 여러 개 가능 (자기참조 업그레이드는 제외)
   const craftByOut = {};
-  for (const r of g.recipes_full || []) if (r.type !== "brew") craftByOut[r.output] = r;
+  for (const r of g.recipes_full || []) {
+    if (r.type === "brew" || !r.output || (r.inputs || []).includes(r.output)) continue;
+    (craftByOut[r.output] ??= []).push(r);
+  }
+  // 실제 제작/양조 시간 = max(재료 brewDuration × 2^재료강화) (게임 Nl 공식, 불꽃숙련 0 기준)
+  // 제작(requiredLevel>0)은 100% 성공에 재료 강화합이 reqLv 필요 → 시간 최소화 분배. 레시피 여러 개면 최소 시간
+  const bdms = (c) => g.items?.[c]?.brewDuration_ms || 0;
+  const recTime = (rec) => {
+    const t = (rec.inputs || []).map(bdms), e = t.map(() => 0), req = rec.requiredLevel || 0;
+    for (let k = 0; k < req; k++) {
+      let mi = 0;
+      for (let j = 1; j < t.length; j++) if (t[j] * 2 ** e[j] < t[mi] * 2 ** e[mi]) mi = j;
+      e[mi]++;
+    }
+    return t.length ? Math.max(...t.map((b, j) => b * 2 ** e[j])) : 0;
+  };
+  const craftTime = (code) => {
+    if (brewByOut[code]) return Math.max(...brewByOut[code].map(bdms));   // 양조: 재료 +0
+    const recs = craftByOut[code];
+    if (recs?.length) return Math.min(...recs.map(recTime));              // 여러 레시피면 최소 제작시간
+    return bdms(code);
+  };
   const monsterZones = {};
   for (const z of Object.values(g.zones || {})) for (const m of (z.monsters || [])) (monsterZones[m] ??= []).push(z.name);
   const TARGET = { self: "자신", enemy_one: "적 단일", enemy_all: "적 전체", ally_one: "아군", ally_all: "아군 전체" };
@@ -159,7 +181,7 @@ export async function renderCodex(view) {
         const enhDep = isEnhDep(useF) || isEnhDep(combatF) || hasDur;
         const txt = (e) => e && (e.base || fmtFormula(e.formula));
         const trans = g.transmute_effects?.[code];
-        const rows = [["양조", fmtDuration(it.brewDuration_ms)]];
+        const rows = [["양조", fmtDuration(craftTime(code))]];
         // 강화 비의존이면 정적으로 행에 표시
         if (!enhDep) {
           if (txt(use)) rows.push(["🧪 사용", txt(use)]);
@@ -278,9 +300,9 @@ export async function renderCodex(view) {
         if (!match(it.name) || isTest(code, it) || it.type === "potion") return;  // 포션은 전용 탭
         const stat = g.equipment_stats?.[code];
         const rows = [["분류", TYPE[it.type] || it.type]];
-        if (it.brewDuration_ms) rows.push(["제작시간", fmtDuration(it.brewDuration_ms)]);
-        const rec = craftByOut[code];
-        if (rec) rows.push(["필요레벨", `Lv ${rec.requiredLevel}`]);
+        if (it.brewDuration_ms) rows.push(["제작시간", fmtDuration(craftTime(code))]);
+        const recs = craftByOut[code] || [];
+        if (recs.length) rows.push(["필요레벨", recs.map((r) => `Lv ${r.requiredLevel || 0}`).join(" / ")]);
         const card = cxCard((ic) => itemIcon(ic, code), it.name, rows);
         // 장비: 강화도 +/- 로 스탯 변화 확인
         if (stat && (stat.atk || stat.def || stat.hp || stat.mp)) {
@@ -297,7 +319,7 @@ export async function renderCodex(view) {
           upd();
           card.appendChild(ctrl);
         }
-        if (rec) ingRow(card, "제작", rec.inputs);
+        recs.forEach((r, idx) => ingRow(card, recs.length > 1 ? `제작 ${idx + 1}` : "제작", r.inputs));
         sourceRow(card, code);
         const gem = g.gem_effects?.[code];
         if (gem) card.insertAdjacentHTML("beforeend",
