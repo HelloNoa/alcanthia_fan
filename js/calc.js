@@ -246,11 +246,11 @@ async function evCalc(body) {
   for (const c of (g.shop_items || [])) terminal.add(c);
   for (const c of Object.keys(g.dia_shop || {})) terminal.add(c);
   const nameOf = (c) => g.items?.[c]?.name || c;
-  // 강화 가능 아이템: 수확물(강화불가)·시험용 제외, 레시피 있거나 가치/판매가 있는 것 (각인석 등 원재료 포함)
+  // 강화 가능 아이템: 수확물(강화불가)·시험용 제외, 레시피/가치/판매가 있거나 장비(다이아 셉터 등)
   const craftable = Object.keys(g.items || {})
     .filter((c) => g.items[c] && g.items[c].type !== "produce"
       && !/^aging_/.test(c) && !(g.items[c].name || "").includes("시험용")
-      && (recipeOf[c] || g.item_values?.[c] != null || g.sell_price?.[c] != null))
+      && (recipeOf[c] || g.item_values?.[c] != null || g.sell_price?.[c] != null || g.equipment_stats?.[c]))
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   // 원재료 가격(골드) — 기본값은 게임 가치/판매가, 사용자가 덮어쓰면 priceState
   const priceState = {};
