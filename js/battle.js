@@ -1,5 +1,5 @@
 // ⚔️ 알칸시아 모험 전투 엔진 — 게임 번들(MI) 충실 포팅
-const RB=30, mb=100, mA=2, RI="mirage_";
+const RB=30, mb=100, mA=2, RI="mirage_", mL=5;   // mL: 형석 세공 형광 임계
 const Ly={confusion:"혼란",stealth:"은신",burn:"화상",regen:"재생",evasion:"회피",atk_buff:"ATK",def_buff:"DEF",taunt:"도발",mp_cost_reduce:"마나절약",poison:"중독",stun:"스턴",sleep:"수면",heal_block:"회복불가",cc_immune:"CC면역",frozen:"빙결",blind:"실명",splash:"스플래시",damage_reflect:"반사",dmg_cap:"피해상한",def_pierce:"관통",heal:"회복"};
 const IB=new Set(["confusion","stun","sleep","frozen"]);
 const AB=Object.freeze({crystalDivination:0,extraLoot:0,potionPreserve:0});

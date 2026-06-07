@@ -40,6 +40,14 @@ export async function advSim(body) {
     `<option value="${c}"${c === sel ? " selected" : ""}>${nm(c)}</option>`).join("");
   const zoneOpts = () => zones.map(([id, z]) =>
     `<option value="${id}"${id === zoneId ? " selected" : ""}>${z.name} (${(z.monsters || []).length}마리, ${z.rule === "enemy_first" ? "적 선공" : "아군 선공"})</option>`).join("");
+  // 전투 세공 3종 (배틀엔진이 코드로 직접 처리)
+  const GEMS = [
+    { code: "refined_amber", label: "호박석 (공격시 스턴)" },
+    { code: "refined_fluorite", label: "형석 (피격누적 반격)" },
+    { code: "refined_crystal", label: "수정 (피격시 MP환원)" },
+  ];
+  const gemOpts = (sel) => `<option value="">세공 없음</option>` + GEMS.map((gm) =>
+    `<option value="${gm.code}"${gm.code === sel ? " selected" : ""}>${gm.label}</option>`).join("");
 
   body.innerHTML = `
     <div class="adv-sim">
@@ -72,6 +80,8 @@ export async function advSim(body) {
         <select class="adv-pick" data-i="${i}" data-f="id">${advOpts(p.id)}</select>
         <select class="adv-pick adv-eq" data-i="${i}" data-f="equip">${equipOpts(p.equip)}</select>
         <label class="adv-enh">+<input type="number" min="0" max="99" value="${p.equipEnh}" data-i="${i}" data-f="equipEnh" class="adv-enh-in"></label>
+        <select class="adv-pick adv-gem" data-i="${i}" data-f="gem">${gemOpts(p.gem)}</select>
+        <label class="adv-enh">+<input type="number" min="0" max="20" value="${p.gemEnh || 0}" data-i="${i}" data-f="gemEnh" class="adv-enh-in" title="세공 강화도"></label>
         <button class="adv-x" data-i="${i}" data-t="p">✕</button>`;
       el.appendChild(row);
       advIcon(row.querySelector(".adv-port"), g.adventurers[p.id]?.spriteKey || "");
@@ -219,12 +229,19 @@ export async function advSim(body) {
       const fastE = rawFast != null && rawFast <= MAXE ? rawFast : null;
       const mkp = (e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: pots, skills: {} });
       const conf = clearE != null ? winRate(mkp(clearE), zid, g, 200) : null;
-      return { label: a.label, note: a.note, ids, equip: eq, potions: pots, clearE, fastE, achievable: clearE != null, rate: conf?.rate, avgTurns: conf?.avgTurnsOnWin };
+      // 세공(호박석 스턴) 포함 버전 — 장비·세공 동일 강화도로 묶어 최소 강화도 탐색
+      const mkg = (e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e, engraved: [{ itemCode: "refined_amber", enhancement: e }] })), potions: pots, skills: {} });
+      let gemClearE = null, gemFastE = null;
+      for (let e = 0; e <= MAXE; e++) { const r = winRate(mkg(e), zid, g, 40); if (gemClearE == null && r.rate >= 0.9) gemClearE = e; if (r.rate >= 0.9 && r.avgTurnsOnWin != null && r.avgTurnsOnWin <= 1.3) { gemFastE = e; break; } }
+      gemClearE = gemClearE != null && gemClearE <= MAXE ? gemClearE : null;
+      gemFastE = gemFastE != null && gemFastE <= MAXE ? gemFastE : null;
+      return { label: a.label, note: a.note, ids, equip: eq, potions: pots, clearE, fastE, gemClearE, gemFastE, achievable: clearE != null, rate: conf?.rate, avgTurns: conf?.avgTurnsOnWin };
     });
   }
   let recOptions = [];
-  const applyRec = (o) => {
-    party = o.ids.map((id, j) => ({ id, equip: o.equip[j], equipEnh: o.clearE ?? 0 }));
+  const applyRec = (o, gem) => {
+    const e = gem ? (o.gemClearE ?? o.clearE ?? 0) : (o.clearE ?? 0);
+    party = o.ids.map((id, j) => ({ id, equip: o.equip[j], equipEnh: e, ...(gem ? { gem: "refined_amber", gemEnh: e } : {}) }));
     pots = (o.potions || []).map((p) => ({ code: p.code, enh: p.enh }));
     renderParty(); renderPots();
   };
@@ -235,7 +252,7 @@ export async function advSim(body) {
     if (t.id === "adv-zone") { zoneId = t.value; renderEnemies(); return; }
     const i = +t.dataset.i;
     if (t.dataset.t === "pot") { pots[i][t.dataset.f] = t.dataset.f === "enh" ? Math.max(0, +t.value || 0) : t.value; renderPots(); }
-    else if (t.dataset.f) { party[i][t.dataset.f] = t.dataset.f === "equipEnh" ? Math.max(0, +t.value || 0) : t.value; if (t.dataset.f === "id") renderParty(); }
+    else if (t.dataset.f) { const num = t.dataset.f === "equipEnh" || t.dataset.f === "gemEnh"; party[i][t.dataset.f] = num ? Math.max(0, +t.value || 0) : t.value; if (t.dataset.f === "id") renderParty(); }
   });
   body.addEventListener("click", (e) => {
     const t = e.target;
@@ -267,20 +284,25 @@ export async function advSim(body) {
             const badge = turns === 1 ? `<span class="adv-rec-fast">⚡ 12초 (1턴)</span>` : `<span class="adv-rec-slow">⏱️ ${time} (${turns}턴)</span>`;
             const fastNote = (o.fastE != null && o.fastE > o.clearE) ? ` · <span class="muted">12초는 +${o.fastE}강</span>` : "";
             const potNames = (o.potions || []).map((p) => nm(p.code)).join(" · ");
+            const gemLine = (o.gemClearE != null)
+              ? `<div class="adv-rec-gem">🔮 호박석 세공 시 클리어 <b>+${o.gemClearE}강</b>${o.gemClearE < o.clearE ? " <span class='up'>↓</span>" : ""}${o.gemFastE != null ? ` · 12초 +${o.gemFastE}강` : ""} <button class="adv-rec-applyg" data-ri="${i}">세공 적용</button></div>`
+              : "";
             return `<div class="adv-rec-card">
               <div class="adv-rec-top"><span class="adv-rec-lbl"><b>${o.label}</b> ${badge}</span><button class="adv-rec-apply" data-ri="${i}">적용</button></div>
               <div class="adv-rec-mid">${pnames}</div>
-              <div class="adv-rec-bot"><span class="muted">${o.note}</span> · 클리어 <b>+${o.clearE}강</b> · 승률 <b class="${o.rate >= 0.85 ? "up" : "down"}">${(o.rate * 100).toFixed(0)}%</b>${fastNote}${potNames ? `<br>🧪 <span class="muted">${potNames} (+${POT_ENH})</span>` : ""}</div>
+              <div class="adv-rec-bot"><span class="muted">${o.note}</span> · 세공X 클리어 <b>+${o.clearE}강</b> · 승률 <b class="${o.rate >= 0.85 ? "up" : "down"}">${(o.rate * 100).toFixed(0)}%</b>${fastNote}${potNames ? `<br>🧪 <span class="muted">${potNames} (+${POT_ENH})</span>` : ""}</div>
+              ${gemLine}
             </div>`;
           }).join("");
       }, 30);
     }
-    else if (t.classList.contains("adv-rec-apply")) { applyRec(recOptions[+t.dataset.ri]); }
+    else if (t.classList.contains("adv-rec-apply")) { applyRec(recOptions[+t.dataset.ri], false); }
+    else if (t.classList.contains("adv-rec-applyg")) { applyRec(recOptions[+t.dataset.ri], true); }
   });
 
   function run() {
     const partyObj = {
-      adventurers: party.map((p) => ({ id: p.id, equip: p.equip || undefined, equipEnh: p.equipEnh })),
+      adventurers: party.map((p) => ({ id: p.id, equip: p.equip || undefined, equipEnh: p.equipEnh, engraved: p.gem ? [{ itemCode: p.gem, enhancement: p.gemEnh || 0 }] : [] })),
       potions: pots.map((p) => ({ code: p.code, enh: p.enh })),
       skills: {},
     };
