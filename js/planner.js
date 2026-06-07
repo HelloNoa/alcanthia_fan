@@ -43,6 +43,9 @@ function multiplier(pid, cond, sameCount, diversity, opt, oneShot) {
 
 export async function renderPlanner(view) {
   const g = await gamedata();
+  // 장비 전시대에 올릴 수 있는 아이템 (장비류)
+  const DISPLAY_ITEMS = Object.keys(g.equipment_stats || {})
+    .map((c) => [c, g.items?.[c]?.name || c]).sort((a, b) => a[1].localeCompare(b[1]));
   const plants = {};
   for (const [k, v] of Object.entries(g.plants || {})) {
     if (k.startsWith("aging") || (v.name || "").includes("시험용")) continue;
@@ -316,6 +319,9 @@ export async function renderPlanner(view) {
       if (poll.has(r * CANVAS + c)) el.classList.add("poll");
       if (z.orn) {
         const ic = document.createElement("span"); ic.className = "pl-cic"; itemIcon(ic, z.orn); el.appendChild(ic);
+        if (z.orn === "equipment_pedestal" && z.display) {   // 전시대 위 아이템
+          const di = document.createElement("span"); di.className = "pl-disp"; itemIcon(di, z.display); el.appendChild(di);
+        }
         el.classList.add("isorn");
         continue;
       }
@@ -394,7 +400,16 @@ export async function renderPlanner(view) {
       const eff = EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
         : ORN_NOTE[orn.orn] ? `<div class="d-row">${ORN_NOTE[orn.orn]}</div>`
         : `<div class="d-row muted">장식 (효과 없음)</div>`;
-      detail.innerHTML = `<h3>${ORN[orn.orn]}</h3>${eff}`;
+      let html = `<h3>${ORN[orn.orn]}</h3>${eff}`;
+      if (orn.orn === "equipment_pedestal") {   // 전시대 위에 올릴 아이템 선택
+        html += `<div class="d-row">전시 아이템 <select id="pl-disp-sel">
+          <option value="">— 없음 —</option>
+          ${DISPLAY_ITEMS.map(([code, name]) => `<option value="${code}"${orn.display === code ? " selected" : ""}>${name}</option>`).join("")}
+        </select></div>`;
+      }
+      detail.innerHTML = html;
+      const sel = detail.querySelector("#pl-disp-sel");
+      if (sel) sel.onchange = (e) => { grid[r][c].display = e.target.value || undefined; recompute(); save(); };
       return;
     }
     const st = stat(r, c);
@@ -517,15 +532,15 @@ export async function renderPlanner(view) {
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(grid)); } catch {} }
 
-  // ── 배치 압축 인코딩 (바이너리 → url-safe base64). v2: 바닥재·울타리 포함 ──
+  // ── 배치 압축 인코딩 (바이너리 → url-safe base64). v2: 바닥재·울타리, v3: 전시대 전시 아이템 ──
   function encodeGrid() {
     let minR = CANVAS, maxR = -1, minC = CANVAS, maxC = -1;
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) if (grid[r][c]) {
       if (r < minR) minR = r; if (r > maxR) maxR = r; if (c < minC) minC = c; if (c > maxC) maxC = c;
     }
     if (maxR < 0) return "";
-    const h = maxR - minR + 1, w = maxC - minC + 1, pl = [], orn = [], vals = [], floors = [], fences = [];
-    let hasFloor = false, hasFence = false;
+    const h = maxR - minR + 1, w = maxC - minC + 1, pl = [], orn = [], disp = [], vals = [], floors = [], fences = [], dispVals = [];
+    let hasFloor = false, hasFence = false, hasDisp = false;
     for (let r = minR; r <= maxR; r++) for (let c = minC; c <= maxC; c++) {
       const z = grid[r][c];
       if (!z) vals.push(0);
@@ -535,15 +550,19 @@ export async function renderPlanner(view) {
       const fv = z && z.floor ? FLOOR_ORDER.indexOf(z.floor) + 1 : 0; floors.push(fv); if (fv) hasFloor = true;
       let fb = 0; if (z && z.fences) SIDES.forEach((s, k) => { if (z.fences[s]) fb |= (FENCE_ORDER.indexOf(z.fences[s]) + 1) << (k * 2); });
       fences.push(fb); if (fb) hasFence = true;
+      let dv = 0; if (z && z.display) { let di = disp.indexOf(z.display); if (di < 0) { di = disp.length; disp.push(z.display); } dv = di + 1; hasDisp = true; }
+      dispVals.push(dv);
     }
-    const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0);
-    const bytes = [2, minR, minC, h, w, flags, pl.length];
-    for (const id of pl) { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); }
-    bytes.push(orn.length);
-    for (const id of orn) { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); }
+    const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0) | (hasDisp ? 4 : 0);
+    const ver = hasDisp ? 3 : 2;
+    const bytes = [ver, minR, minC, h, w, flags, pl.length];
+    const wrStr = (id) => { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); };
+    for (const id of pl) wrStr(id);
+    bytes.push(orn.length); for (const id of orn) wrStr(id);
     vals.forEach((v) => bytes.push(v));
     if (hasFloor) floors.forEach((v) => bytes.push(v));
     if (hasFence) fences.forEach((v) => bytes.push(v));
+    if (hasDisp) { bytes.push(disp.length); for (const id of disp) wrStr(id); dispVals.forEach((v) => bytes.push(v)); }
     let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
     return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
@@ -553,9 +572,9 @@ export async function renderPlanner(view) {
     const b = []; for (let k = 0; k < bin.length; k++) b.push(bin.charCodeAt(k));
     let i = 0;
     const ver = b[i++];
-    if (ver !== 1 && ver !== 2) return null;
+    if (ver < 1 || ver > 3) return null;
     const minR = b[i++], minC = b[i++], h = b[i++], w = b[i++];
-    const flags = ver === 2 ? b[i++] : 0;
+    const flags = ver >= 2 ? b[i++] : 0;
     const pl = [], orn = [];
     const rd = (arr) => { const n = b[i++]; for (let k = 0; k < n; k++) { const len = b[i++]; let s = ""; for (let j = 0; j < len; j++) s += String.fromCharCode(b[i++]); arr.push(s); } };
     rd(pl); rd(orn);
@@ -574,6 +593,10 @@ export async function renderPlanner(view) {
       const f = {}; SIDES.forEach((s, k) => { const sv = (fb >> (k * 2)) & 3; if (sv) f[s] = FENCE_ORDER[sv - 1]; });
       if (Object.keys(f).length) g[gr][gc].fences = f;
     });
+    if (ver === 3 && (flags & 4)) {   // 전시대 전시 아이템
+      const disp = []; rd(disp);
+      cells.forEach(([gr, gc]) => { const dv = b[i++]; if (dv && g[gr] && g[gr][gc]) g[gr][gc].display = disp[dv - 1]; });
+    }
     return g;
   }
 

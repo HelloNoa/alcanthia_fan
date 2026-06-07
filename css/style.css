@@ -663,3 +663,12 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .adv-rec-gem b { color: #d9bfff; }
 .adv-rec-applyg { background: #3a2f5a; color: #d9bfff; border: 1px solid #5a4d8a; border-radius: 6px; padding: 3px 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .adv-rec-applyg:hover { filter: brightness(1.12); }
+
+/* 장비 전시대 위 전시 아이템 */
+.pl-disp { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; }
+.pl-disp img { width: 56%; height: 56%; object-fit: contain; image-rendering: pixelated; transform: translateY(-12%); filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+#pl-disp-sel { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; font-size: 13px; max-width: 160px; }
+
+/* 텃밭 조회: 전시대 위 전시 아이템 */
+.cell-disp { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; }
+.cell-disp img { width: 60%; height: 60%; object-fit: contain; image-rendering: pixelated; transform: translateY(-8%); filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }

@@ -144,16 +144,21 @@ export async function renderGarden(container, profile, label) {
           `체력 ${p.health ?? "-"} · 누적생산 ${fmt(p.totalProduced)}` +
           (cond ? `\n상태: ${cond}` : "");
       } else if (cell.ornament?.items?.length) {
-        const top = cell.ornament.items[cell.ornament.items.length - 1];
-        const code = String(top.itemKey || "").split("+")[0];
-        const sk = (N.itemSprites && N.itemSprites[code]) || code;
-        const nm = (N.items && N.items[code]) || code;
-        // variantId(변형) 우선 → 기본 spriteKey → itemCode (각자 정확한 폴더로)
-        const keys = [...new Set([top.variantId, sk, code].filter(Boolean))];
         el.classList.add("ornament");
-        const img = loadImg(el, keys.flatMap((k) => itemURLs(N, k)), "🏵");
-        img.alt = nm;
-        el.title = nm;
+        const its = cell.ornament.items;
+        const keysOf = (it) => { const code = String(it.itemKey || "").split("+")[0]; const sk = (N.itemSprites && N.itemSprites[code]) || code; return { code, keys: [...new Set([it.variantId, sk, code].filter(Boolean))] }; };
+        // 베이스(전시대/장식) — 전체 크기
+        const b = keysOf(its[0]);
+        const img = loadImg(el, b.keys.flatMap((k) => itemURLs(N, k)), "🏵");
+        img.alt = el.title = (N.items && N.items[b.code]) || b.code;
+        // 전시대 위 전시 아이템(나머지) — 작게 위에
+        for (let di = 1; di < its.length; di++) {
+          const d = keysOf(its[di]);
+          const wrap = document.createElement("span"); wrap.className = "cell-disp";
+          loadImg(wrap, d.keys.flatMap((k) => itemURLs(N, k)), "");
+          wrap.title = (N.items && N.items[d.code]) || d.code;
+          el.appendChild(wrap);
+        }
       } else {
         el.title = (cell.conditions || []).map((c) => CONDITION_KR[c] || c).join(", ") || "빈 경작칸";
       }
