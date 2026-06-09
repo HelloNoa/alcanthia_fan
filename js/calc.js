@@ -288,7 +288,7 @@ async function evCalc(body) {
   const craftable = Object.keys(g.items || {})
     .filter((c) => g.items[c] && g.items[c].type !== "produce"
       && !/^aging_/.test(c) && !(g.items[c].name || "").includes("시험용")
-      && (recipeOf[c] || g.item_values?.[c] != null || g.sell_price?.[c] != null || g.equipment_stats?.[c]))
+      && (recipeOf[c] || g.items[c].brewDuration_ms || g.item_values?.[c] != null || g.sell_price?.[c] != null || g.equipment_stats?.[c]))
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   // 원재료 가격(골드) — 기본값은 게임 가치/판매가, 사용자가 덮어쓰면 priceState
   const priceState = {};
