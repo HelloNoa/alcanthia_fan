@@ -81,15 +81,15 @@ async function timeCalc(body) {
         </div>
         <div class="calc-row">
           <label class="lvlabel">불꽃 숙련 <input id="flame" type="range" min="0" max="10" value="0"><b id="flamev">0</b></label>
-          <label class="lvlabel">가마솥 강화 <input id="cauE" type="range" min="0" max="12" value="0"><b id="cauEv">0</b></label>
-          <label class="lvlabel">만들 포션 <input id="matE" type="range" min="0" max="12" value="0"><b id="matEv">0</b>강</label>
+          <label class="lvlabel">가마솥 강화 <input id="cauE" type="range" min="0" max="20" value="0"><b id="cauEv">0</b></label>
+          <label class="lvlabel">만들 포션 <input id="matE" type="range" min="0" max="20" value="0"><b id="matEv">0</b>강</label>
         </div>
         <div class="calc-row">
           <label class="lvlabel">양조 존
             <select id="zone">
               <option value="">기타 (×1)</option>
               <option value="sunset_cliff">석양절벽 (×2)</option>
-              <option value="advanced_volcano">용암협곡 (−5%×지역효과)</option>
+              <option value="advanced_volcano">용암협곡 (−6%×지역효과)</option>
               <option value="beginner_forest">속삭이는 숲 (−10%×지역효과, 동일재료)</option>
             </select>
           </label>
@@ -125,7 +125,7 @@ async function timeCalc(body) {
   };
   const zoneMult = (zone, cult, sameIng) => {
     if (zone === "sunset_cliff") return 2;
-    if (zone === "advanced_volcano") return Math.max(0.01, 1 - 0.05 * cult);
+    if (zone === "advanced_volcano") return Math.max(0.01, 1 - 0.06 * cult);
     if (zone === "beginner_forest" && sameIng) return Math.max(0.01, 1 - 0.1 * cult);
     return 1;
   };
