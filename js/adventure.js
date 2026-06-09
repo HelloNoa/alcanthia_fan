@@ -158,9 +158,12 @@ export async function advSim(body) {
     let pots = [], cur = evalE([]);
     while (pots.length < 4) {
       let best = null, bestR = cur, bestS = score(cur);
-      for (const c of POT_CANDS) {   // 중복 허용 — 같은 포션 여러 개도 후보(폭딜 포션은 중첩 발동)
+      // 중복 허용(폭딜 포션 중첩). 동점이면 이미 고른 종류를 먼저 평가 → 같은 포션으로 모음(재료 모으기 쉬움)
+      const cands = [...POT_CANDS].sort((a, b) =>
+        (pots.some((p) => p.code === b) ? 1 : 0) - (pots.some((p) => p.code === a) ? 1 : 0));
+      for (const c of cands) {
         const r = evalE([...pots, { code: c, enh: POT_ENH }]);
-        if (score(r) < bestS) { bestS = score(r); best = c; bestR = r; }
+        if (score(r) < bestS) { bestS = score(r); best = c; bestR = r; }   // 첫(=중복 우선) 최저점 유지
       }
       if (!best) break;   // 더 줄이는 포션 없음
       pots.push({ code: best, enh: POT_ENH }); cur = bestR;
