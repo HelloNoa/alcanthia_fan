@@ -158,8 +158,7 @@ export async function advSim(body) {
     let pots = [], cur = evalE([]);
     while (pots.length < 4) {
       let best = null, bestR = cur, bestS = score(cur);
-      for (const c of POT_CANDS) {
-        if (pots.some((p) => p.code === c)) continue;
+      for (const c of POT_CANDS) {   // 중복 허용 — 같은 포션 여러 개도 후보(폭딜 포션은 중첩 발동)
         const r = evalE([...pots, { code: c, enh: POT_ENH }]);
         if (score(r) < bestS) { bestS = score(r); best = c; bestR = r; }
       }
