@@ -274,6 +274,10 @@ async function evCalc(body) {
   for (const r of g.brew_recipes || []) if (r.inputs?.length && !r.inputs.includes(r.output)) recipeOf[r.output] ??= { in: r.inputs, req: 0 };
   for (const r of g.recipes_full || []) if (r.inputs?.length && !r.inputs.includes(r.output)) recipeOf[r.output] ??= { in: r.inputs, req: r.requiredLevel || 0 };
   const isProduce = (c) => g.items?.[c]?.type === "produce";  // 수확물은 강화 불가
+  // 포션 = 양조 산출물 (작물 양조로 강화도 계승 dz). brewOut[code] = 작물 입력(중복 포함)
+  const brewOut = {};
+  for (const r of g.brew_recipes || []) if (r.inputs?.length && !r.inputs.includes(r.output)) brewOut[r.output] ??= r.inputs;
+  const isPotion = (c) => !!brewOut[c];
   // 채집/드롭/상점 아이템 = 원재료(종료점). 레시피가 있어도 더 전개 안 함
   const terminal = new Set();
   for (const z of Object.values(g.zones || {})) for (const c of Object.keys(z.drops || {})) terminal.add(c);
@@ -303,9 +307,11 @@ async function evCalc(body) {
             craftable.map((c) => `<option value="${c}">${nameOf(c)}</option>`).join("")}</select></div>
         <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="99" value="0" class="num-in"></div>
         <div class="calc-row"><label>심지 숙련 Lv</label><input id="ev-wick" type="number" min="0" max="10" value="0" class="num-in"></div>
+        <div class="calc-row"><label>제작 성공률 버프 × <span class="muted">(금빛들판 ≤2.25)</span></label><input id="ev-cbuff" type="number" min="1" step="0.05" value="1" class="num-in"></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-self"> 🔁 도구 솥 자가강화 <span class="muted">(단계마다 도구 솥 강화도↑)</span></label></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-auto" checked> ⚙️ 입력 강화 자동 최소비용 <span class="muted">(끄면 수동 지정)</span></label></div>
-        <div class="calc-row"><label>시작 강화도</label><input id="ev-start" type="number" min="0" max="99" value="0" class="num-in"></div>
+        <div class="calc-row" id="ev-start-row"><label>시작 강화도</label><input id="ev-start" type="number" min="0" max="99" value="0" class="num-in"></div>
+        <div class="calc-row" id="ev-brew-row" style="display:none"><label>양조 작물 강화도 <span class="muted">(0~2)</span></label><input id="ev-brew" type="number" min="0" max="2" value="2" class="num-in"></div>
         <div class="calc-row"><label>최종 강화도</label><input id="ev-target" type="number" min="0" max="99" value="5" class="num-in"></div>
         <div id="ev-out" class="calc-out"></div>
         <div id="ev-fields"></div>
@@ -318,6 +324,7 @@ async function evCalc(body) {
     </div>`;
   const q = (id) => body.querySelector(id);
   const fmt = (n) => n >= 1000 ? Math.round(n).toLocaleString() : n.toFixed(1);
+  const craftBuff = () => Math.max(0.01, +q("#ev-cbuff")?.value || 1);   // 금빛 들판 제작 성공률 배수 (기본 1)
   // reqLevel R을 강화가능 입력들에 분배 (비용 per^e×weight 최소화)
   const bestSplit = (R, w, em) => {
     if (w.length === 0) return [];
@@ -332,7 +339,8 @@ async function evCalc(body) {
     }
     return w.map((_, i) => Math.floor(R / w.length) + (i < R % w.length ? 1 : 0));
   };
-  const leaf = (item, stack) => !recipeOf[item] || (stack.size > 0 && terminal.has(item)) || stack.has(item);
+  // 시작 강화도>0이면 대상 아이템(최상위)을 완제품 leaf로 취급 — +s 아이템을 직접 보유/구매한다고 보고 레시피 분해 안 함
+  const leaf = (item, stack) => (stack.size === 0 && Math.floor(+q("#ev-start")?.value || 0) > 0) || !recipeOf[item] || (stack.size > 0 && terminal.has(item)) || stack.has(item);
   // 자동 최소비용 분배 → 기본 입력강화도(assign) 기록
   const autoAssign = (em) => {
     const memo = {}, assign = {};
@@ -342,7 +350,17 @@ async function evCalc(body) {
       const ns = new Set(stack); ns.add(item);
       const rec = recipeOf[item];
       const parts = rec.in.map((c) => ({ code: c, b: f(c, ns), enh: !isProduce(c) }));
-      const split = bestSplit(rec.req, parts.filter((p) => p.enh).map((p) => p.b.total), em);
+      // 부분 성공까지 비교: sum 0~req 중 (강화 raw × 재시도비용) 최소 분배 선택 (제작버프↑면 부분이 유리)
+      const costs = parts.filter((p) => p.enh).map((p) => p.b.total);
+      let split = bestSplit(rec.req, costs, em), bestC = Infinity;
+      for (let sum = 0; sum <= rec.req; sum++) {
+        const sp = bestSplit(sum, costs, em);
+        let raw = 0, j = 0;
+        for (const p of parts) raw += p.b.total * em(p.enh ? sp[j++] : 0);
+        const qv = Math.min(1, Math.pow(0.25, Math.max(0, rec.req - sum)) * craftBuff());
+        const cost = raw * (0.5 / qv + 0.5);
+        if (cost < bestC) { bestC = cost; split = sp; }
+      }
       const dict = {}; let total = 0, ai = 0;
       for (const p of parts) {
         const e = p.enh ? split[ai++] : 0;
@@ -366,16 +384,17 @@ async function evCalc(body) {
       const rec = recipeOf[item];
       let sum = 0;
       const parts = rec.in.map((c) => {
-        const e = isProduce(c) ? 0 : (enhState[item + "|" + c] ?? 0);
+        const prod = isProduce(c);
+        const e = prod ? Math.min(2, enhState[item + "|" + c] ?? 0) : (enhState[item + "|" + c] ?? 0);   // 작물 최대 +2
         sum += e;
-        return { b: f(c, ns), e };
+        return { b: f(c, ns), e, prod };
       });
-      const qv = Math.min(1, Math.pow(0.25, Math.max(0, rec.req - sum)));
+      const qv = Math.min(1, Math.pow(0.25, Math.max(0, rec.req - sum)) * craftBuff());
       if (qmap) qmap[item] = qv;
       const retry = 0.5 / qv + 0.5;             // 제작 실패 재시도 (입력당)
       const dict = {}; let total = 0;
       for (const p of parts) {
-        const m = em(p.e) * retry;
+        const m = (p.prod ? 1 : em(p.e)) * retry;   // 작물은 합성 불가 → 개수 1 (강화도는 reqLv 기여만)
         for (const [k, v] of Object.entries(p.b.dict)) dict[k] = (dict[k] || 0) + v * m;
         total += p.b.total * m;
       }
@@ -402,38 +421,78 @@ async function evCalc(body) {
   const renderPrices = (item) => {
     const set = new Set(); collectLeaves(item, new Set(), set);
     const leaves = [...set].sort((a, b) => priceOf(b) - priceOf(a));
-    q("#ev-prices").innerHTML = `<div class="ev-fields-h">💰 원재료 가격 <span class="muted">(골드/개 · 가장 싼 조합으로 자동 분배)</span></div>` +
+    // 강화 대상 자신(장비·도구 등)이면 시작 강화도 +s 시세를 입력 — 강화도별 가격 반영
+    const sNow = Math.max(0, Math.floor(+q("#ev-start")?.value || 0));
+    const plabel = (c) => (c === item && sNow > 0 ? `+${sNow} ` : "") + nameOf(c);
+    q("#ev-prices").innerHTML = `<div class="ev-fields-h">💰 원재료 가격 <span class="muted">(골드/개 · 강화 대상은 +s 시세 입력)</span></div>` +
       `<div class="ev-prices-list">${leaves.map((c) =>
-        `<label class="ev-price"><span class="ev-price-ic" data-ic="${c}"></span><span class="ev-price-n">${nameOf(c)}</span><input type="number" min="0" value="${priceOf(c)}" data-pc="${c}" class="ev-price-in"></label>`).join("")}</div>`;
+        `<label class="ev-price"><span class="ev-price-ic" data-ic="${c}"></span><span class="ev-price-n">${plabel(c)}</span><input type="number" min="0" value="${priceOf(c)}" data-pc="${c}" class="ev-price-in"></label>`).join("")}</div>`;
     q("#ev-prices").querySelectorAll(".ev-price-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
     q("#ev-prices").querySelectorAll(".ev-price-in").forEach((inp) =>
       inp.oninput = () => { priceState[inp.dataset.pc] = Math.max(0, +inp.value || 0); calc(); });
   };
-  let enhState = {}, lastItem = null;
+  // 포션 양조 가격칸: 작물 입력을 +baseE 시세로 입력
+  const renderBrewPrices = (item, baseE) => {
+    const inputs = [...new Set(brewOut[item])];
+    q("#ev-prices").innerHTML = `<div class="ev-fields-h">💰 원재료 가격 <span class="muted">(골드/개 · +${baseE} 작물 시세)</span></div>` +
+      `<div class="ev-prices-list">${inputs.map((c) =>
+        `<label class="ev-price"><span class="ev-price-ic" data-ic="${c}"></span><span class="ev-price-n">+${baseE} ${nameOf(c)}</span><input type="number" min="0" value="${priceOf(c)}" data-pc="${c}" class="ev-price-in"></label>`).join("")}</div>`;
+    q("#ev-prices").querySelectorAll(".ev-price-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
+    q("#ev-prices").querySelectorAll(".ev-price-in").forEach((inp) =>
+      inp.oninput = () => { priceState[inp.dataset.pc] = Math.max(0, +inp.value || 0); calc(); });
+  };
+  let enhState = {}, lastItem = null, lastStart = -1, lastBrew = -1;
   const renderFields = (item, em) => {
+    if (leaf(item, new Set())) { q("#ev-fields").innerHTML = ""; enhState = {}; return; }   // 완제품 leaf면 제작 입력 없음
     const aa = autoAssign(em); aa.f(item, new Set());
     enhState = { ...aa.assign };           // 기본값 = 자동 최소비용
     const crafts = []; collectCrafts(item, new Set(), crafts, new Set());
     q("#ev-fields").innerHTML = `<div class="ev-fields-h">🔧 제작 입력 강화도 <span class="muted">(직접 조정 · 합 ≥ reqLv면 100%)</span></div>` +
       crafts.map((cr) => `<div class="ev-craft"><div class="ev-craft-h"><b>${nameOf(cr.item)}</b> <span class="muted">reqLv ${cr.req}</span> <span class="ev-q" data-c="${cr.item}"></span></div>
-        <div class="ev-craft-in">${cr.inputs.map((c) => isProduce(c)
-          ? `<span class="ev-fixed">${nameOf(c)} <b>+0</b></span>`
-          : `<label class="ev-finput">${nameOf(c)} +<input type="number" min="0" max="40" value="${enhState[cr.item + "|" + c] ?? 0}" data-key="${cr.item + "|" + c}" class="ev-enh-in"></label>`).join("")}</div></div>`).join("");
+        <div class="ev-craft-in">${cr.inputs.map((c) => {
+          const mx = isProduce(c) ? 2 : 40;   // 작물(산물)은 최대 +2 (유전/석양 — 합성 불가)
+          return `<label class="ev-finput">${nameOf(c)} +<input type="number" min="0" max="${mx}" value="${enhState[cr.item + "|" + c] ?? 0}" data-key="${cr.item + "|" + c}" class="ev-enh-in"></label>`;
+        }).join("")}</div></div>`).join("");
     q("#ev-fields").querySelectorAll(".ev-enh-in").forEach((inp) =>
       inp.oninput = () => { enhState[inp.dataset.key] = Math.max(0, Math.floor(+inp.value || 0)); calc(); });
   };
   const calc = () => {
     const c = Math.max(0, Math.floor(+q("#ev-cauldron").value || 0));
     const w = Math.max(0, Math.min(10, Math.floor(+q("#ev-wick").value || 0)));
-    const s = Math.max(0, Math.floor(+q("#ev-start").value || 0));
-    const t = Math.max(s, Math.floor(+q("#ev-target").value ?? s));
     const item = q("#ev-item").value;
     const self = q("#ev-self").checked;
+    const potion = !!item && isPotion(item);
+    q("#ev-brew-row").style.display = potion ? "" : "none";
+    q("#ev-start-row").style.display = potion ? "none" : "";   // 포션은 양조 작물 강화도가 시작점 → 시작 강화도 숨김
     // 단계 k(→k+1) 성공률. 자가강화면 도구 솥 강화도 = max(솥강화도, k)
     const pAt = (k) => { const tool = self ? Math.max(c, k) : c; return Math.min(0.75, 0.5 * (2 - Math.pow(1 - 0.005 * w, tool + 1))); };
     // em(e) = +0→+e 강화 누적 비용 (단계별 (1+1/p) 곱)
     const emCache = [1];
     const em = (e) => { while (emCache.length <= e) emCache.push(emCache[emCache.length - 1] * (1 + 1 / pAt(emCache.length - 1))); return emCache[e]; };
+    const rawEl = q("#ev-raw"), fEl = q("#ev-fields");
+    if (potion) {   // 포션: 강화 작물 양조 계승(dz) — +baseE 작물 양조 → 목표까지 합성
+      const t = Math.max(0, Math.floor(+q("#ev-target").value || 0));
+      const k = Math.max(0, Math.min(2, Math.floor(+q("#ev-brew").value ?? 2)));
+      const baseE = Math.min(t, k), brews = em(t) / em(baseE);
+      if (item !== lastItem || baseE !== lastBrew) { renderBrewPrices(item, baseE); lastItem = item; lastBrew = baseE; }
+      fEl.innerHTML = "";
+      const dict = {};
+      for (const ic of brewOut[item]) dict[ic] = (dict[ic] || 0) + brews;   // 양조 1번당 작물 1개씩 (중복 포함)
+      q("#ev-out").innerHTML = `
+        <div class="ev-res"><span>합성 성공률 (1회)</span><b>${(pAt(baseE) * 100).toFixed(1)}%</b></div>
+        <div class="ev-res big"><span>${nameOf(item)} +${t} <span class="muted">· +${baseE} 작물 양조 후 합성</span></span><b>양조 ${fmt(brews)}번</b></div>`;
+      let totalCost = 0;
+      const rows = Object.entries(dict).sort((a, b) => b[1] - a[1]).map(([code, n]) => {
+        const cnt = Math.ceil(n), cost = cnt * priceOf(code); totalCost += cost;
+        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">+${baseE} ${nameOf(code)}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
+      }).join("");
+      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${baseE} 작물 양조 → +${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
+        <div class="ev-raw-list">${rows}</div>`;
+      rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
+      return;
+    }
+    const s = Math.max(0, Math.floor(+q("#ev-start").value || 0));
+    const t = Math.max(s, Math.floor(+q("#ev-target").value ?? s));
     const levels = t - s;
     const items = em(t) / em(s);
     const pS = pAt(s), pT1 = pAt(Math.max(s, t - 1));
@@ -442,14 +501,14 @@ async function evCalc(body) {
     q("#ev-out").innerHTML = `
       <div class="ev-res"><span>강화 성공률 (1회)</span><b>${rateTxt}</b></div>
       <div class="ev-res big"><span>필요한 +${s} ${label} (기댓값)</span><b>${fmt(items)}개</b></div>`;
-    const rawEl = q("#ev-raw"), fEl = q("#ev-fields");
     if (item) {  // 레시피 없는 원재료(각인석 등)도 자기 자신을 원재료로 전개
       const auto = q("#ev-auto").checked;
-      if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, em); lastItem = item; }
+      if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, em); lastItem = item; lastStart = s; }
+      else if (s !== lastStart) { renderPrices(item); if (!auto) renderFields(item, em); lastStart = s; }   // 시작 강화도 바뀌면 +s 라벨·완제품 leaf 갱신
       if (auto) { const aa = autoAssign(em); aa.f(item, new Set()); enhState = aa.assign; fEl.innerHTML = ""; }  // 가격 기준 최소비용 자동
       const qmap = {};
       const base = manualRaw(em, enhState, qmap)(item, new Set());
-      const mult = em(t);
+      const mult = items;   // 시작 강화도 반영: +s 아이템 기준 개수 = em(t)/em(s) (s=0이면 em(t))
       // 제작 성공률 표시
       fEl.querySelectorAll(".ev-q[data-c]").forEach((el) => {
         const qv = qmap[el.dataset.c]; if (qv == null) return;
@@ -460,14 +519,16 @@ async function evCalc(body) {
       let totalCost = 0;
       const rows = ent.map(([code, n]) => {
         const cnt = Math.ceil(n), cost = cnt * priceOf(code); totalCost += cost;
-        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nameOf(code)}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
+        // 강화 대상 자신이 재료(장비·도구 등 leaf)면 시작 강화도 +s를 명시 — 필요 개수 줄과 일관
+        const nm = code === item ? `+${s} ${nameOf(code)}` : nameOf(code);
+        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nm}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
       }).join("");
-      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
+      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${s}→+${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
         <div class="ev-raw-list">${rows}</div>`;
       rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
     } else { rawEl.innerHTML = ""; fEl.innerHTML = ""; q("#ev-prices").innerHTML = ""; lastItem = null; }
   };
-  body.querySelectorAll("#ev-item, #ev-cauldron, #ev-wick, #ev-start, #ev-target").forEach((i) => i.oninput = calc);
+  body.querySelectorAll("#ev-item, #ev-cauldron, #ev-wick, #ev-start, #ev-target, #ev-brew, #ev-cbuff").forEach((i) => i.oninput = calc);
   q("#ev-self").onchange = () => { lastItem = null; calc(); };  // 모델 바뀌면 기본값 재계산
   q("#ev-auto").onchange = () => { lastItem = null; calc(); };   // 자동/수동 전환
   calc();
