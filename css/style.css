@@ -676,3 +676,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 /* 레벨별 경험치 표 스크롤 */
 .lc-table-wrap { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
 .lc-table-wrap .lc-pot thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+
+/* 쿠팡 파트너스 광고 (푸터) */
+.coupang-ad { overflow-x: auto; text-align: center; max-width: 100%; margin: 0 auto 6px; }
+.coupang-disc { font-size: 11px; opacity: 0.55; margin: 0 0 10px; }
