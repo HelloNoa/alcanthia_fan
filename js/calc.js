@@ -182,6 +182,14 @@ function levelCalc(body) {
       <div id="lc-out1" class="lc-out"></div>
     </div>
     <div class="calc-card">
+      <h3>게임 표기값 → 총 경험치</h3>
+      <div class="lc-row">
+        <label class="lvlabel">현재 레벨 <input id="lc-lv" type="number" min="1" value="1" class="num-in"></label>
+        <label class="lvlabel">레벨 내 경험치 <input id="lc-into" type="number" min="0" value="0" class="num-in"></label>
+      </div>
+      <div id="lc-out3" class="lc-out"></div>
+    </div>
+    <div class="calc-card">
       <h3>목표 레벨까지 남은 경험치</h3>
       <div class="lc-row">
         <label class="lvlabel">현재 경험치 <input id="lc-cur" type="number" min="0" value="0" class="num-in"></label>
@@ -189,7 +197,12 @@ function levelCalc(body) {
       </div>
       <div id="lc-out2" class="lc-out"></div>
     </div>
-    <p class="muted">레벨 L → L+1 필요 경험치 = 2^⌊L/5⌋ (5레벨마다 2배) · 성장포션 N강 = 4^N 경험치. 게임 공식 그대로입니다.</p>`;
+    <div class="calc-card">
+      <h3>레벨별 경험치 표</h3>
+      <label class="lvlabel">표 최대 레벨 <input id="lc-tblmax" type="number" min="2" value="30" class="num-in"></label>
+      <div id="lc-out4" class="lc-out"></div>
+    </div>
+    <p class="muted">레벨 L → L+1 필요 경험치 = 2^⌊L/5⌋ (5레벨마다 2배) · 성장포션 N강 = 4^N 경험치. 게임 공식 그대로입니다.<br>인게임은 <b>구간 경험치</b>만 표시해요 — <b>누적 총 경험치</b>는 위 "게임 표기값 → 총 경험치" / "레벨별 표"에서 확인하세요.</p>`;
 
   const upd1 = () => {
     const exp = Math.max(0, +body.querySelector("#lc-exp").value || 0);
@@ -220,9 +233,34 @@ function levelCalc(body) {
        <div class="lc-pot-h">필요한 성장포션 (강화별)</div>
        <table class="lc-pot"><thead><tr><th>성장포션</th><th>회당 exp</th><th>필요 개수</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
+  // 게임 표기값(현재 레벨 + 레벨 내 경험치) → 누적 총 경험치
+  const upd3 = () => {
+    const lv = Math.max(1, +body.querySelector("#lc-lv").value || 1);
+    const into = Math.max(0, +body.querySelector("#lc-into").value || 0);
+    const bracket = expToNext(lv), base = totalForLevel(lv), total = base + into;
+    const over = into >= bracket
+      ? `<br><span class="t-adj">⚠ 레벨 내 경험치가 구간(${fmt(bracket)})을 초과 — 입력 확인</span>` : "";
+    body.querySelector("#lc-out3").innerHTML =
+      `<div class="lc-big">${fmt(total)} exp</div>
+       <div class="lc-sub">Lv ${lv} 도달 누적 ${fmt(base)} + 레벨 내 ${fmt(into)}<br>
+       이 레벨 구간: ${fmt(bracket)} exp${over}</div>`;
+  };
+  // 레벨별 [구간 경험치 / 누적 총 경험치] 표
+  const upd4 = () => {
+    const max = Math.min(100, Math.max(2, +body.querySelector("#lc-tblmax").value || 30));
+    let rows = "", cum = 0;
+    for (let L = 1; L <= max; L++) {
+      rows += `<tr><td><b>Lv ${L}</b></td><td>${fmt(expToNext(L))}</td><td>${fmt(cum)}</td></tr>`;
+      cum += expToNext(L); // 다음 행의 누적 = totalForLevel(L+1)
+    }
+    body.querySelector("#lc-out4").innerHTML =
+      `<div class="lc-table-wrap"><table class="lc-pot"><thead><tr><th>레벨</th><th>구간 exp</th><th>누적 총 exp</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
   body.querySelector("#lc-exp").oninput = upd1;
   body.querySelectorAll("#lc-cur,#lc-tgt").forEach((e) => e.oninput = upd2);
-  upd1(); upd2();
+  body.querySelectorAll("#lc-lv,#lc-into").forEach((e) => e.oninput = upd3);
+  body.querySelector("#lc-tblmax").oninput = upd4;
+  upd1(); upd2(); upd3(); upd4();
 }
 
 // ---------- 강화 기댓값 ----------

@@ -672,3 +672,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 /* 텃밭 조회: 전시대 위 전시 아이템 */
 .cell-disp { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; }
 .cell-disp img { width: 60%; height: 60%; object-fit: contain; image-rendering: pixelated; transform: translateY(-8%); filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+
+/* 레벨별 경험치 표 스크롤 */
+.lc-table-wrap { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.lc-table-wrap .lc-pot thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
