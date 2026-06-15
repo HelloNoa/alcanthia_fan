@@ -267,7 +267,7 @@ table.matrix thead th { text-align: center; }
 .lvlabel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .lvlabel input[type=range] { width: 110px; accent-color: var(--accent); }
 .lvlabel b { color: var(--accent); min-width: 18px; text-align: center; }
-.calc-out { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.calc-out { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .calc-ic { width: 40px; height: 40px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   background: #15131f; border-radius: 9px; }
 .calc-ic img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
@@ -288,6 +288,7 @@ table.matrix thead th { text-align: center; }
 .calc-note { background: #211f3a; border: 1px solid #4a3d6e; border-radius: 8px;
   padding: 8px 12px; font-size: 12.5px; color: #c9bfff; margin-top: 12px; line-height: 1.5; }
 .calc-note b { color: #fff; }
+.calc-note-inline { color: var(--muted); font-size: 12px; }
 
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; border-top: 1px solid var(--line); }
 footer .credit-av { width: 20px; height: 20px; border-radius: 50%; object-fit: cover;

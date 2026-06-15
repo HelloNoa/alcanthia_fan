@@ -35,6 +35,13 @@ export async function renderCodex(view) {
     if (r.type === "brew" || !r.output || (r.inputs || []).includes(r.output)) continue;
     (craftByOut[r.output] ??= []).push(r);
   }
+  const useByIn = {};
+  const addUse = (input, output, kind) => (useByIn[input] ??= []).push({ output, kind });
+  for (const r of g.brew_recipes || []) for (const input of r.inputs || []) addUse(input, r.output, "양조");
+  for (const r of g.recipes_full || []) {
+    if (r.type === "brew" || !r.output || (r.inputs || []).includes(r.output)) continue;
+    for (const input of r.inputs || []) addUse(input, r.output, "제작");
+  }
   // 실제 제작/양조 시간 = max(재료 brewDuration × 2^재료강화) (게임 Nl 공식, 불꽃숙련 0 기준)
   // 제작(requiredLevel>0)은 100% 성공에 재료 강화합이 reqLv 필요 → 시간 최소화 분배. 레시피 여러 개면 최소 시간
   const bdms = (c) => g.items?.[c]?.brewDuration_ms || 0;
@@ -303,6 +310,10 @@ export async function renderCodex(view) {
         if (it.brewDuration_ms) rows.push(["제작시간", fmtDuration(craftTime(code))]);
         const recs = craftByOut[code] || [];
         if (recs.length) rows.push(["필요레벨", recs.map((r) => `Lv ${r.requiredLevel || 0}`).join(" / ")]);
+        const uses = (useByIn[code] || [])
+          .filter((u, i, a) => a.findIndex((x) => x.output === u.output && x.kind === u.kind) === i)
+          .slice(0, 8);
+        if (uses.length) rows.push(["사용처", uses.map((u) => `${u.kind} ${N.items?.[u.output] || u.output}`).join(" · ")]);
         const card = cxCard((ic) => itemIcon(ic, code), it.name, rows);
         // 장비: 강화도 +/- 로 스탯 변화 확인
         if (stat && (stat.atk || stat.def || stat.hp || stat.mp)) {
@@ -321,6 +332,7 @@ export async function renderCodex(view) {
         }
         recs.forEach((r, idx) => ingRow(card, recs.length > 1 ? `제작 ${idx + 1}` : "제작", r.inputs));
         sourceRow(card, code);
+        if (it.perk) card.insertAdjacentHTML("beforeend", `<div class="cx-perk">✨ ${fmtFormula(it.perk)}</div>`);
         const gem = g.gem_effects?.[code];
         if (gem) card.insertAdjacentHTML("beforeend",
           `<div class="cx-perk">💎 세공효과 · <b>${gem.name}</b><br>${fmtFormula(gem.desc)}</div>`);

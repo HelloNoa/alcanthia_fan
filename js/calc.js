@@ -96,10 +96,14 @@ async function timeCalc(body) {
           <label class="lvlabel">낯익은 터 <input id="famG" type="range" min="0" max="10" value="0"><b id="famGv">0</b></label>
           <label class="chk"><input type="checkbox" id="fog"> 안개 해방</label>
         </div>
+        <div class="calc-row">
+          <label class="chk"><input type="checkbox" id="firePot"> 화염포션 적용</label>
+          <label class="lvlabel">화염포션 강화 <input id="fireE" type="range" min="0" max="20" value="0"><b id="fireEv">0</b>강</label>
+        </div>
         <div id="potOut" class="calc-out"></div>
         <div class="calc-note">💡 N강 포션은 <b>(N−1)강 포션 2개를 합성</b>해 만듭니다.
         예) 9강을 만들려면 8강 포션 2개가 필요하고, 시간은 8강 기준(2⁸)으로 계산돼요.</div>
-        <p class="muted">시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수</p>
+        <p class="muted">시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수 × 화염포션(선택)</p>
       </div>
     </div>`;
 
@@ -135,10 +139,12 @@ async function timeCalc(body) {
     const me = +body.querySelector("#matE").value;
     const famG = +body.querySelector("#famG").value, fog = body.querySelector("#fog").checked;
     const zone = body.querySelector("#zone").value;
+    const fireOn = body.querySelector("#firePot").checked, fireE = +body.querySelector("#fireE").value;
     body.querySelector("#flamev").textContent = fl;
     body.querySelector("#cauEv").textContent = ce;
     body.querySelector("#matEv").textContent = me;
     body.querySelector("#famGv").textContent = famG;
+    body.querySelector("#fireEv").textContent = fireE;
     // 지역 효과 배율 t = 낯익은터×0.1 + 안개해방
     const t = famG * 0.1 + (fog ? 1 : 0);
     const ing = recipeOf[c] || [];
@@ -149,15 +155,18 @@ async function timeCalc(body) {
     const produceBase = ing.length === 2 ? Math.max(bd(ing[0]), bd(ing[1])) : bd(c);
     const base = me === 0 ? produceBase : bd(c) * Math.pow(2, me - 1);
     const zm = zoneMult(zone, t, sameIng);
-    const adj = base ? base * factor(0.01, fl, ce) * zm : null;
+    const fireMult = fireOn ? Math.pow(0.9, fireE + 1) : 1;
+    const adj = base ? base * factor(0.01, fl, ce) * zm * fireMult : null;
     const el = body.querySelector("#potOut"); el.innerHTML = "";
     const ic = document.createElement("span"); ic.className = "calc-ic"; itemIcon(ic, c);
     el.appendChild(ic);
     el.insertAdjacentHTML("beforeend",
       `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>`);
+    if (fireOn) el.insertAdjacentHTML("beforeend",
+      `<span class="calc-note-inline">화염포션 ×${fireMult.toFixed(2)}</span>`);
   };
   body.querySelectorAll("#crop,#soil,#seedE").forEach((e) => e.oninput = cropOut);
-  body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog").forEach((e) => {
+  body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog,#firePot,#fireE").forEach((e) => {
     e.oninput = potOut; e.onchange = potOut;
   });
   cropOut(); potOut();
