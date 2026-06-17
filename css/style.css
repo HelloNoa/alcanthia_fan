@@ -478,6 +478,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   color: var(--ink); cursor: pointer; font-size: 12px; padding: 3px 8px; }
 .pl-slot button:hover { border-color: var(--accent); }
 .pl-slot-del { color: var(--sell) !important; }
+.pl-share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .pl-share-btn { width: 100%; }
 .pl-share-msg { font-size: 12px; padding: 6px 0 0; }
 .pl-share-in { width: 100%; margin-top: 4px; font-size: 11px; padding: 4px; background: var(--panel2);
@@ -623,7 +624,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .adv-wr.bad { background: #331a1f; border-color: #6b2c33; }
 .adv-wr-pct { font-size: 38px; font-weight: 800; }
 .adv-wr.good .adv-wr-pct { color: var(--buy); } .adv-wr.mid .adv-wr-pct { color: var(--gold); } .adv-wr.bad .adv-wr-pct { color: var(--sell); }
-.adv-wr-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.adv-wr-sub { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
 .adv-sample { font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 8px; background: var(--panel); margin-bottom: 8px; }
 .adv-sample.win { color: var(--buy); } .adv-sample.lose { color: var(--sell); }
 .adv-logbox summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 0; }

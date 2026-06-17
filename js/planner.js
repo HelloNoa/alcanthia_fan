@@ -108,7 +108,10 @@ export async function renderPlanner(view) {
           <h3>💾 저장 · 공유</h3>
           <div class="pl-save-row"><input id="pl-slotname" placeholder="배치 이름" maxlength="20"><button class="chip" id="pl-save-btn">저장</button></div>
           <div id="pl-slots" class="pl-slots"></div>
-          <button class="chip pl-share-btn" id="pl-share">🔗 공유 링크 복사</button>
+          <div class="pl-share-actions">
+            <button class="chip pl-share-btn" id="pl-share-url">🔗 URL 복사</button>
+            <button class="chip pl-share-btn" id="pl-share-discord">💬 Discord 복사</button>
+          </div>
           <div id="pl-share-msg" class="muted pl-share-msg"></div>
         </div>
       </div>
@@ -624,13 +627,21 @@ export async function renderPlanner(view) {
     const name = (inp.value || "").trim() || "배치 " + (Object.keys(getSlots()).length + 1);
     const s = getSlots(); s[name] = JSON.stringify(grid); setSlots(s); inp.value = ""; renderSlots(); // JSON(바닥·울타리 보존)
   };
-  view.querySelector("#pl-share").onclick = async () => {
+  const shareUrl = () => {
     const code = encodeGrid();
-    const url = location.origin + location.pathname + "?plan=" + code + "#planner";
+    return location.origin + location.pathname + "?plan=" + code + "#planner";
+  };
+  const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const copyShare = async (text, okText) => {
     const msg = view.querySelector("#pl-share-msg");
-    try { await navigator.clipboard.writeText(url); msg.textContent = "✅ 링크 복사됨! (붙여넣기로 공유)"; }
-    catch { msg.innerHTML = `복사 실패 — 아래 주소 복사:<br><input class="pl-share-in" value="${url}" readonly onclick="this.select()">`; }
+    try { await navigator.clipboard.writeText(text); msg.textContent = okText; }
+    catch { msg.innerHTML = `복사 실패 — 아래 내용 복사:<br><input class="pl-share-in" value="${escAttr(text)}" readonly onclick="this.select()">`; }
     setTimeout(() => { if (msg.textContent.startsWith("✅")) msg.textContent = ""; }, 4000);
+  };
+  view.querySelector("#pl-share-url").onclick = () => copyShare(shareUrl(), "✅ URL 복사됨! (붙여넣기로 공유)");
+  view.querySelector("#pl-share-discord").onclick = () => {
+    const url = shareUrl();
+    copyShare(`[알칸시아 배치 보기](${url})`, "✅ Discord용 링크 복사됨!");
   };
   renderSlots();
 }

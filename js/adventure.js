@@ -3,6 +3,8 @@ import { gamedata } from "./api.js";
 import { itemIcon, monsterIcon, CDN } from "./sprites.js";
 import { simulate, winRate } from "./battle.js";
 
+const ADV_STORE = "alc_adv_sim_v1";
+
 function advIcon(el, spriteKey) {
   const img = document.createElement("img");
   img.loading = "lazy"; img.className = "ic";
@@ -25,11 +27,6 @@ export async function advSim(body) {
   const advSec = (turns) => (turns + 1) * 6;
   const fmtSec = (s) => { s = Math.round(s); const m = Math.floor(s / 60); return m ? `${m}분 ${s % 60}초` : `${s}초`; };
 
-  // 상태: 파티 / 포션 / 존 (기본 4명, 최대 4)
-  let party = advs.slice(0, 4).map(([id]) => ({ id, equip: "", equipEnh: 0 }));
-  let pots = [];
-  let zoneId = zones[0][0];
-
   const advOpts = (sel) => advs.map(([id, a]) =>
     `<option value="${id}"${id === sel ? " selected" : ""}>${a.name} · ${a.title} (${a.type === "dealer" ? "딜" : a.type === "tank" ? "탱" : a.type === "healer" ? "힐" : a.type}·★${a.grade})</option>`).join("");
   const equipOpts = (sel) => `<option value="">장비 없음</option>` + equips.map((c) => {
@@ -48,6 +45,42 @@ export async function advSim(body) {
   ];
   const gemOpts = (sel) => `<option value="">세공 없음</option>` + GEMS.map((gm) =>
     `<option value="${gm.code}"${gm.code === sel ? " selected" : ""}>${gm.label}</option>`).join("");
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, Number.isFinite(+n) ? +n : min));
+  const advSet = new Set(advs.map(([id]) => id));
+  const eqSet = new Set(equips);
+  const potSet = new Set(potions);
+  const gemSet = new Set(GEMS.map((gm) => gm.code));
+  const zoneSet = new Set(zones.map(([id]) => id));
+  const defaultParty = () => advs.slice(0, 4).map(([id]) => ({ id, equip: "", equipEnh: 0 }));
+  const loadSettings = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(ADV_STORE) || "null");
+      if (!raw || typeof raw !== "object") throw new Error("empty");
+      const savedParty = Array.isArray(raw.party) ? raw.party.slice(0, 4).filter((p) => p && advSet.has(p.id)).map((p) => ({
+        id: p.id,
+        equip: eqSet.has(p.equip) ? p.equip : "",
+        equipEnh: clamp(p.equipEnh, 0, 99),
+        ...(gemSet.has(p.gem) ? { gem: p.gem, gemEnh: clamp(p.gemEnh, 0, 20) } : {}),
+      })) : [];
+      const savedPots = Array.isArray(raw.pots) ? raw.pots.slice(0, 4).filter((p) => p && potSet.has(p.code)).map((p) => ({
+        code: p.code,
+        enh: clamp(p.enh, 0, 40),
+      })) : [];
+      return {
+        party: savedParty.length ? savedParty : defaultParty(),
+        pots: savedPots,
+        zoneId: zoneSet.has(raw.zoneId) ? raw.zoneId : zones[0][0],
+      };
+    } catch {
+      return { party: defaultParty(), pots: [], zoneId: zones[0][0] };
+    }
+  };
+
+  // 상태: 파티 / 포션 / 존 (기본 4명, 최대 4)
+  let { party, pots, zoneId } = loadSettings();
+  const saveSettings = () => {
+    try { localStorage.setItem(ADV_STORE, JSON.stringify({ party, pots, zoneId })); } catch {}
+  };
 
   body.innerHTML = `
     <div class="adv-sim">
@@ -66,7 +99,8 @@ export async function advSim(body) {
       <button id="adv-run" class="adv-run">⚔️ 출정 (200회 시뮬)</button>
       <div id="adv-result"></div>
       <div class="calc-note">💡 데미지 = max(1, ATK×스킬계수×100/(100+DEF)) · 최대 30턴 · 적 전멸 시 승리.
-        스마트 유닛(아군)은 우선순위로 스킬 선택, 멍청한 몬스터는 랜덤. 시드 결정론적이라 200회 다른 시드로 돌려 승률을 냅니다.</div>
+        스마트 유닛(아군)은 우선순위로 스킬 선택, 멍청한 몬스터는 랜덤. 승률은 200개 가상 시드 평균입니다.
+        예지포션은 현재 계정의 다음 모험 시드 1개를 보여주므로, 같은 편성·같은 휴대 포션이면 반복 사용해도 같은 결과가 나올 수 있습니다.</div>
     </div>`;
 
   const q = (s) => body.querySelector(s);
@@ -245,25 +279,30 @@ export async function advSim(body) {
     const e = gem ? (o.gemClearE ?? o.clearE ?? 0) : (o.clearE ?? 0);
     party = o.ids.map((id, j) => ({ id, equip: o.equip[j], equipEnh: e, ...(gem ? { gem: "refined_amber", gemEnh: e } : {}) }));
     pots = (o.potions || []).map((p) => ({ code: p.code, enh: p.enh }));
-    renderParty(); renderPots();
+    saveSettings(); renderParty(); renderPots();
   };
 
   // 입력 바인딩 (위임)
   body.addEventListener("change", (e) => {
     const t = e.target;
-    if (t.id === "adv-zone") { zoneId = t.value; renderEnemies(); return; }
+    if (t.id === "adv-zone") { zoneId = t.value; saveSettings(); renderEnemies(); return; }
     const i = +t.dataset.i;
-    if (t.dataset.t === "pot") { pots[i][t.dataset.f] = t.dataset.f === "enh" ? Math.max(0, +t.value || 0) : t.value; renderPots(); }
-    else if (t.dataset.f) { const num = t.dataset.f === "equipEnh" || t.dataset.f === "gemEnh"; party[i][t.dataset.f] = num ? Math.max(0, +t.value || 0) : t.value; if (t.dataset.f === "id") renderParty(); }
+    if (t.dataset.t === "pot") { pots[i][t.dataset.f] = t.dataset.f === "enh" ? Math.max(0, +t.value || 0) : t.value; saveSettings(); renderPots(); }
+    else if (t.dataset.f) {
+      const num = t.dataset.f === "equipEnh" || t.dataset.f === "gemEnh";
+      party[i][t.dataset.f] = num ? Math.max(0, +t.value || 0) : t.value;
+      saveSettings();
+      if (t.dataset.f === "id") renderParty();
+    }
   });
   body.addEventListener("click", (e) => {
     const t = e.target;
-    if (t.id === "adv-addp") { if (party.length < 4) { party.push({ id: advs[0][0], equip: "", equipEnh: 0 }); renderParty(); } }
-    else if (t.id === "adv-addpot") { if (pots.length < 4) { pots.push({ code: potions[0], enh: 0 }); renderPots(); } }
+    if (t.id === "adv-addp") { if (party.length < 4) { party.push({ id: advs[0][0], equip: "", equipEnh: 0 }); saveSettings(); renderParty(); } }
+    else if (t.id === "adv-addpot") { if (pots.length < 4) { pots.push({ code: potions[0], enh: 0 }); saveSettings(); renderPots(); } }
     else if (t.classList.contains("adv-x")) {
       const i = +t.dataset.i;
-      if (t.dataset.t === "pot") { pots.splice(i, 1); renderPots(); }
-      else if (party.length > 1) { party.splice(i, 1); renderParty(); }
+      if (t.dataset.t === "pot") { pots.splice(i, 1); saveSettings(); renderPots(); }
+      else if (party.length > 1) { party.splice(i, 1); saveSettings(); renderParty(); }
     }
     else if (t.id === "adv-run") run();
     else if (t.id === "adv-rec") {
@@ -319,10 +358,14 @@ export async function advSim(body) {
       const cl = /승리|회복|\+/.test(e.text) ? "log-ally" : /패배|쓰러|사망/.test(e.text) ? "log-bad" : "";
       return `<div class="adv-log-r ${cl}"><span class="adv-log-t">${e.turn}T</span> ${e.text}</div>`;
     }).join("");
+    const winAvg = wr.avgTurnsOnWin ? `${wr.avgTurnsOnWin.toFixed(1)}턴 (≈${fmtSec(advSec(wr.avgTurnsOnWin))})` : "-";
+    const lossInfo = wr.losses > 0
+      ? ` · 패배 ${wr.losses}/${wr.trials} · 패배 시 평균 ${wr.avgTurnsOnLoss.toFixed(1)}턴 (≈${fmtSec(advSec(wr.avgTurnsOnLoss))})`
+      : " · 패배 없음";
     q("#adv-result").innerHTML = `
       <div class="adv-wr ${cls}">
         <div class="adv-wr-pct">${pct}%</div>
-        <div class="adv-wr-sub">승률 (${wr.wins}/${wr.trials}) · 승리 시 평균 ${wr.avgTurnsOnWin ? `${wr.avgTurnsOnWin.toFixed(1)}턴 (≈${fmtSec(advSec(wr.avgTurnsOnWin))})` : "-"}</div>
+        <div class="adv-wr-sub">가상 시드 승률 (${wr.wins}/${wr.trials}) · 승리 시 평균 ${winAvg}${lossInfo}</div>
       </div>
       <div class="adv-sample ${sample.victory ? "win" : "lose"}">대표 전투: ${sample.victory ? "⚔️ 승리" : "💀 패배"} (${sample.totalTurns}턴 · ⏱️ ${fmtSec(advSec(sample.totalTurns))})</div>
       <details class="adv-logbox"><summary>전투 로그 (${sample.events.filter((e) => e.text).length}줄)</summary>
