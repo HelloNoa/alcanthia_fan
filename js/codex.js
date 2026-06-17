@@ -14,6 +14,7 @@ export async function renderCodex(view) {
     { key: "skills", label: "🔮 스킬" },
     { key: "monsters", label: "🐺 몬스터" },
     { key: "items", label: "📦 아이템" },
+    { key: "achievements", label: "🏅 업적" },
     { key: "transmute", label: "🔀 변성" },
   ];
   view.innerHTML = `<h2>📖 도감</h2>
@@ -340,6 +341,18 @@ export async function renderCodex(view) {
         if (skins) card.insertAdjacentHTML("beforeend",
           `<div class="cx-source"><b>🎨 외형</b> ${skins.length}종 · ${skins.join(" · ")}</div>`);
         if (it.description) card.insertAdjacentHTML("beforeend", `<div class="cx-flavor">“${it.description}”</div>`);
+        grid.appendChild(card);
+      });
+    } else if (key === "achievements") {
+      (g.achievements || []).forEach((a) => {
+        const hidden = a.hidden || a.secret;
+        const title = hidden ? "???" : (a.modifier || a.id);
+        const desc = hidden ? "???" : (a.description || "—");
+        if (q && !match(title) && !match(desc)) return;
+        const rows = [["조건", desc]];
+        if (!hidden && a.progressLabel) rows.push(["진행도", a.progressLabel]);
+        const card = cxCard((ic) => { ic.textContent = a.icon || "🏅"; }, title, rows);
+        if (!hidden && a.note) card.insertAdjacentHTML("beforeend", `<div class="cx-sub">${a.note}</div>`);
         grid.appendChild(card);
       });
     } else if (key === "transmute") {

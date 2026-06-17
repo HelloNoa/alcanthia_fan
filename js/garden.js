@@ -146,7 +146,12 @@ export async function renderGarden(container, profile, label) {
       } else if (cell.ornament?.items?.length) {
         el.classList.add("ornament");
         const its = cell.ornament.items;
-        const keysOf = (it) => { const code = String(it.itemKey || "").split("+")[0]; const sk = (N.itemSprites && N.itemSprites[code]) || code; return { code, keys: [...new Set([it.variantId, sk, code].filter(Boolean))] }; };
+        const keysOf = (it) => {
+          const code = String(it.itemKey || "").split("+")[0];
+          const sk = (N.itemSprites && N.itemSprites[code]) || code;
+          const variantSk = it.variantId && N.itemVariantSprites?.[it.variantId];
+          return { code, keys: [...new Set([variantSk, it.variantId, sk, code].filter(Boolean))] };
+        };
         // 베이스(전시대/장식) — 전체 크기
         const b = keysOf(its[0]);
         const img = loadImg(el, b.keys.flatMap((k) => itemURLs(N, k)), "🏵");

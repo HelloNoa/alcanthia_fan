@@ -170,6 +170,7 @@
 "fairy_lantern": "요정 등불",
 "crystal_fountain": "수정 분수",
 "witch_scarecrow": "마녀 허수아비",
+"warding_stone": "경계석",
 "star_music_box": "별조각 오르골",
 "pedestal": "전시대",
 "telescope": "망원경",
@@ -180,6 +181,7 @@
 "rustic_fence": "낡은 울타리",
 "root_barrier": "뿌리장벽",
 "stone_floor": "석판 바닥재",
+"water_channel": "물길",
 "magic_glass": "마법 유리",
 "engraving_stone": "각인석",
 "levitation_core": "부유핵",
@@ -216,6 +218,7 @@
 "record_fragment_4": "기록 조각 4",
 "record_fragment_5": "기록 조각 5",
 "record_fragment_6": "기록 조각 6",
+"time_wheel": "시간의 수레바퀴",
 "dia_box_30": "구리 다이아 상자",
 "dia_box_200": "은제 다이아 상자",
 "dia_box_700": "금제 다이아 상자",
@@ -317,12 +320,18 @@
 "forgotten_fortress": "잊힌 성터",
 "crystal_mine": "수정 갱도",
 "sleeping_roots": "잠든 뿌리",
-"dried_spring": "메마른 샘"
+"dried_spring": "메마른 샘",
+"default": "기본",
+"cherry_blossom": "벚꽃",
+"night_sky": "밤하늘",
+"tropical_cove": "열대 해변"
 },
 "skins": {
 "red_flower_blue_petal": "red_flower_blue_petal",
 "red_flower_yellow_petal": "red_flower_yellow_petal",
 "herb_golden_petal": "herb_golden_petal",
+"herb_summer_mint": "herb_summer_mint",
+"red_flower_hibiscus": "red_flower_hibiscus",
 "red_flower_starlit": "red_flower_starlit",
 "red_flower_runic": "red_flower_runic",
 "herb_starlit": "herb_starlit",
@@ -350,6 +359,7 @@
 "wind_blossom_starlit": "wind_blossom_starlit",
 "wind_blossom_runic": "wind_blossom_runic",
 "sunlight_flower_starlit": "sunlight_flower_starlit",
+"sunlight_flower_tropical_sun": "sunlight_flower_tropical_sun",
 "sunlight_flower_runic": "sunlight_flower_runic",
 "illusion_fern_golden": "illusion_fern_golden",
 "illusion_fern_starlit": "illusion_fern_starlit",
@@ -366,6 +376,148 @@
 "star_flower_planter": "star_flower_planter",
 "herb_potted": "herb_potted",
 "moonlight_mushroom_potted": "moonlight_mushroom_potted"
+},
+"itemVariantSprites": {
+"fairy_lantern:acorn": "fairy_lantern_acorn",
+"witch_scarecrow:fearstalk": "witch_scarecrow_fearstalk",
+"witch_scarecrow:parasol": "witch_scarecrow_parasol",
+"working_shelf:study_desk": "study_desk",
+"stone_floor:cobblestone": "cobblestone_floor",
+"stone_floor:grass": "grass_floor",
+"stone_floor:grass_stone": "grass_stone_floor",
+"rustic_fence:stone_pillar": "rustic_fence_stone_pillar",
+"rustic_fence:stone_wall": "stone_wall_edge",
+"rustic_fence:rose_vine": "rose_vine_fence",
+"stone_floor:flower_meadow": "flower_meadow_floor",
+"stone_floor:tilled_soil": "tilled_soil_floor",
+"water_channel:edge_lower_left": "water_channel_edge_lower_left",
+"water_channel:edge_lower_right": "water_channel_edge_lower_right",
+"water_channel:edge_upper_right": "water_channel_edge_upper_right",
+"water_channel:edge_upper_left": "water_channel_edge_upper_left",
+"crystal_fountain:garden_stone": "garden_stone_fountain",
+"storage_chest:sword": "storage_chest_sword",
+"storage_chest:grass": "storage_chest_grass",
+"storage_chest:star": "storage_chest_star",
+"storage_chest:pink": "storage_chest_pink",
+"storage_chest:blue": "storage_chest_blue",
+"town_teleporter:cottage_well": "town_teleporter_cottage"
+},
+"itemVariants": {
+"fairy_lantern:acorn": {
+"itemCode": "fairy_lantern",
+"name": "도토리등불",
+"sprite": "fairy_lantern_acorn"
+},
+"witch_scarecrow:fearstalk": {
+"itemCode": "witch_scarecrow",
+"name": "공포 허수아비",
+"sprite": "witch_scarecrow_fearstalk"
+},
+"witch_scarecrow:parasol": {
+"itemCode": "witch_scarecrow",
+"name": "비치 파라솔",
+"sprite": "witch_scarecrow_parasol"
+},
+"working_shelf:study_desk": {
+"itemCode": "working_shelf",
+"name": "책상",
+"sprite": "study_desk"
+},
+"stone_floor:cobblestone": {
+"itemCode": "stone_floor",
+"name": "조약돌",
+"sprite": "cobblestone_floor"
+},
+"stone_floor:grass": {
+"itemCode": "stone_floor",
+"name": "잔디",
+"sprite": "grass_floor"
+},
+"stone_floor:grass_stone": {
+"itemCode": "stone_floor",
+"name": "잔디 석판",
+"sprite": "grass_stone_floor"
+},
+"rustic_fence:stone_pillar": {
+"itemCode": "rustic_fence",
+"name": "신전 돌울타리",
+"sprite": "rustic_fence_stone_pillar"
+},
+"rustic_fence:stone_wall": {
+"itemCode": "rustic_fence",
+"name": "돌벽",
+"sprite": "stone_wall_edge"
+},
+"rustic_fence:rose_vine": {
+"itemCode": "rustic_fence",
+"name": "꽃덩굴 울타리",
+"sprite": "rose_vine_fence"
+},
+"stone_floor:flower_meadow": {
+"itemCode": "stone_floor",
+"name": "꽃잔디",
+"sprite": "flower_meadow_floor"
+},
+"stone_floor:tilled_soil": {
+"itemCode": "stone_floor",
+"name": "갈아엎은 흙",
+"sprite": "tilled_soil_floor"
+},
+"water_channel:edge_lower_left": {
+"itemCode": "water_channel",
+"name": "좌하 물결",
+"sprite": "water_channel_edge_lower_left"
+},
+"water_channel:edge_lower_right": {
+"itemCode": "water_channel",
+"name": "우하 물결",
+"sprite": "water_channel_edge_lower_right"
+},
+"water_channel:edge_upper_right": {
+"itemCode": "water_channel",
+"name": "우상 물결",
+"sprite": "water_channel_edge_upper_right"
+},
+"water_channel:edge_upper_left": {
+"itemCode": "water_channel",
+"name": "좌상 물결",
+"sprite": "water_channel_edge_upper_left"
+},
+"crystal_fountain:garden_stone": {
+"itemCode": "crystal_fountain",
+"name": "석조 분수",
+"sprite": "garden_stone_fountain"
+},
+"storage_chest:sword": {
+"itemCode": "storage_chest",
+"name": "검 문양",
+"sprite": "storage_chest_sword"
+},
+"storage_chest:grass": {
+"itemCode": "storage_chest",
+"name": "풀 문양",
+"sprite": "storage_chest_grass"
+},
+"storage_chest:star": {
+"itemCode": "storage_chest",
+"name": "별 문양",
+"sprite": "storage_chest_star"
+},
+"storage_chest:pink": {
+"itemCode": "storage_chest",
+"name": "분홍빛",
+"sprite": "storage_chest_pink"
+},
+"storage_chest:blue": {
+"itemCode": "storage_chest",
+"name": "파란빛",
+"sprite": "storage_chest_blue"
+},
+"town_teleporter:cottage_well": {
+"itemCode": "town_teleporter",
+"name": "오솔길 우물",
+"sprite": "town_teleporter_cottage"
+}
 },
 "adventurers": {
 "kai": "카이",
@@ -490,6 +642,7 @@
 "fairy_lantern": "fairy_lantern",
 "crystal_fountain": "crystal_fountain",
 "witch_scarecrow": "witch_scarecrow",
+"warding_stone": "warding_stone",
 "star_music_box": "star_music_box",
 "pedestal": "equipment_pedestal",
 "telescope": "telescope",
@@ -500,6 +653,7 @@
 "rustic_fence": "rustic_fence",
 "root_barrier": "root_barrier",
 "stone_floor": "stone_floor",
+"water_channel": "water_channel",
 "magic_glass": "magic_glass",
 "engraving_stone": "engraving_stone",
 "levitation_core": "levitation_core",
@@ -536,6 +690,7 @@
 "record_fragment_4": "record_fragment",
 "record_fragment_5": "record_fragment",
 "record_fragment_6": "record_fragment",
+"time_wheel": "time_wheel",
 "dia_box_30": "dia_box_30",
 "dia_box_200": "dia_box_200",
 "dia_box_700": "dia_box_700",
@@ -669,6 +824,7 @@
 "fairy_lantern": "items/ornament",
 "crystal_fountain": "items/ornament",
 "witch_scarecrow": "items/ornament",
+"warding_stone": "items/ornament",
 "star_music_box": "items/ornament",
 "equipment_pedestal": "items/ornament",
 "telescope": "items/ornament",
@@ -679,6 +835,7 @@
 "rustic_fence": "items/ornament",
 "root_barrier": "items/ornament",
 "stone_floor": "items/ornament",
+"water_channel": "items/ornament",
 "magic_glass": "items/materials",
 "engraving_stone": "items/materials",
 "levitation_core": "items/materials",
@@ -710,6 +867,7 @@
 "shattered_tablet": "items/materials",
 "rusted_plate": "items/materials",
 "record_fragment": "items/materials",
+"time_wheel": "items/tools",
 "dia_box_30": "items/tools",
 "dia_box_200": "items/tools",
 "dia_box_700": "items/tools",
@@ -744,6 +902,29 @@
 "dia_plate": "items/equipment",
 "tablet_shield": "items/equipment",
 "default_cauldron": "items/cauldrons",
-"lucky_cauldron": "items/cauldrons"
+"lucky_cauldron": "items/cauldrons",
+"fairy_lantern_acorn": "items/ornament",
+"witch_scarecrow_fearstalk": "items/ornament",
+"witch_scarecrow_parasol": "items/ornament",
+"study_desk": "items/ornament",
+"cobblestone_floor": "items/ornament",
+"grass_floor": "items/ornament",
+"grass_stone_floor": "items/ornament",
+"rustic_fence_stone_pillar": "items/ornament",
+"stone_wall_edge": "items/ornament",
+"rose_vine_fence": "items/ornament",
+"flower_meadow_floor": "items/ornament",
+"tilled_soil_floor": "items/ornament",
+"water_channel_edge_lower_left": "items/ornament",
+"water_channel_edge_lower_right": "items/ornament",
+"water_channel_edge_upper_right": "items/ornament",
+"water_channel_edge_upper_left": "items/ornament",
+"garden_stone_fountain": "items/ornament",
+"storage_chest_sword": "items/ornament",
+"storage_chest_grass": "items/ornament",
+"storage_chest_star": "items/ornament",
+"storage_chest_pink": "items/ornament",
+"storage_chest_blue": "items/ornament",
+"town_teleporter_cottage": "items/ornament"
 }
 }
