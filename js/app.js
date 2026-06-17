@@ -260,7 +260,7 @@ const TABS = {
   market: { label: "💹 거래소", run: tabMarket },
   residents: { label: "🗺️ 거주민", run: tabResidents },
   rank: { label: "🏆 랭킹", run: tabLeaderboard },
-  codex: { label: "📖 도감", run: () => renderCodex(view) },
+  codex: { label: "📖 도감", run: (sub) => renderCodex(view, sub) },
   skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
   calc: { label: "🧮 계산기", run: (sub) => renderCalc(view, sub) },
 };

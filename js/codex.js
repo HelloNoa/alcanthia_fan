@@ -1,11 +1,11 @@
 import { gamedata, names } from "./api.js";
-import { itemIcon, plantIcon, skillIcon, monsterIcon, fmtDuration } from "./sprites.js";
+import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, fmtDuration } from "./sprites.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
 export const isTestPlant = (id, name) => /^aging_/.test(id) || (name || "").includes("시험용");
 
-export async function renderCodex(view) {
+export async function renderCodex(view, sub) {
   const g = await gamedata();
   const N = await names();
   const CATS = [
@@ -13,19 +13,21 @@ export async function renderCodex(view) {
     { key: "potions", label: "🧪 포션" },
     { key: "skills", label: "🔮 스킬" },
     { key: "monsters", label: "🐺 몬스터" },
+    { key: "adventurers", label: "🧭 모험가" },
     { key: "items", label: "📦 아이템" },
     { key: "achievements", label: "🏅 업적" },
     { key: "transmute", label: "🔀 변성" },
   ];
+  const initialCat = CATS.some((c) => c.key === sub) ? sub : "plants";
   view.innerHTML = `<h2>📖 도감</h2>
-    <nav class="subtabs" id="cxcats">${CATS.map((c, i) =>
-      `<button data-k="${c.key}" class="${i === 0 ? "active" : ""}">${c.label}</button>`).join("")}</nav>
+    <nav class="subtabs" id="cxcats">${CATS.map((c) =>
+      `<button data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</button>`).join("")}</nav>
     <input id="cxq" class="filter-input" placeholder="이름 검색…">
     <div id="cxbody"></div>`;
 
   const body = view.querySelector("#cxbody");
   const qInput = view.querySelector("#cxq");
-  let cur = "plants";
+  let cur = initialCat;
 
   // 역인덱스
   const brewByOut = {};
@@ -293,6 +295,50 @@ export async function renderCodex(view) {
       renderGroup("기타 (특수)", other);
       if (!any) body.innerHTML = "<p class='muted'>결과 없음</p>";
       return;
+    } else if (key === "adventurers") {
+      const ROLE = { dealer: "딜러", nuker: "마법 딜러", tank: "탱커", support: "서포터", healer: "힐러" };
+      const roleRank = { tank: 0, dealer: 1, nuker: 2, support: 3, healer: 4 };
+      const TYPE = {
+        attack: "공격", attack_aoe: "전체 공격", attack_aoe_mp_burn: "전체 공격",
+        status: "상태", heal: "회복", heal_aoe: "전체 회복", resurrect_one: "부활",
+      };
+      const costText = (cost) => {
+        if (!cost || cost.amount == null) return "-";
+        if (cost.type === "gold") return `${fmt(cost.amount)}G`;
+        if (cost.type === "dia") return `${fmt(cost.amount)} 다이아`;
+        return `${fmt(cost.amount)} ${cost.type || ""}`.trim();
+      };
+      Object.entries(g.adventurers || {})
+        .sort(([, a], [, b]) => (a.grade || 0) - (b.grade || 0)
+          || (roleRank[a.type] ?? 99) - (roleRank[b.type] ?? 99)
+          || (a.name || "").localeCompare(b.name || ""))
+        .forEach(([id, a]) => {
+          const role = ROLE[a.type] || a.type || "-";
+          const hay = [a.name, a.title, role, ...(a.skills || []).map((s) => s.name)].join(" ");
+          if (!match(hay)) return;
+          const rows = [
+            ["역할", `${role} · ★${a.grade || "-"}`],
+            ["최초 고용비", costText(a.cost)],
+            ["스탯", `ATK ${fmt(a.atk)} · DEF ${fmt(a.def)} · HP ${fmt(a.hp)} · MP ${fmt(a.mp)}`],
+          ];
+          if (a.personality) rows.push(["성격", a.personality]);
+          const card = cxCard(
+            (ic) => adventurerIcon(ic, a.spriteKey || id),
+            `${a.name} <small>${a.title || ""}</small>`,
+            rows,
+          );
+          (a.skills || []).forEach((sk) => {
+            const meta = [];
+            if (sk.type) meta.push(TYPE[sk.type] || sk.type);
+            if (sk.coefficient) meta.push(`계수 ${sk.coefficient}`);
+            if (sk.mpCost) meta.push(`MP ${sk.mpCost}`);
+            if (sk.cooldown) meta.push(`쿨 ${sk.cooldown}`);
+            card.insertAdjacentHTML("beforeend",
+              `<div class="mon-skill"><b>${sk.name}</b> ${sk.description || ""}${meta.length ? ` <span class="sk-meta">${meta.join(" · ")}</span>` : ""}</div>`);
+          });
+          if (a.introduction) card.insertAdjacentHTML("beforeend", `<div class="cx-flavor">“${a.introduction}”</div>`);
+          grid.appendChild(card);
+        });
     } else if (key === "items") {
       const TYPE = { seed: "씨앗", produce: "수확물", potion: "포션", equipment: "장비", tool: "도구", general: "일반" };
       // 장비 스탯 = base × (강화+1)
@@ -406,7 +452,9 @@ export async function renderCodex(view) {
   view.querySelectorAll("#cxcats button").forEach((b) => {
     b.onclick = () => {
       view.querySelectorAll("#cxcats button").forEach((x) => x.classList.toggle("active", x === b));
-      cur = b.dataset.k; render(cur, qInput.value);
+      cur = b.dataset.k;
+      location.hash = `codex/${cur}`;
+      render(cur, qInput.value);
     };
   });
   qInput.oninput = () => render(cur, qInput.value);
