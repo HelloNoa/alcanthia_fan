@@ -4,6 +4,8 @@ import { plantIcon, itemIcon, fmtDuration } from "./sprites.js";
 const CANVAS = 27;
 const CENTER = (CANVAS - 1) / 2; // 13
 const STORE = "alc_planner_v3";
+const PEDESTAL = "pedestal";
+const LEGACY_PEDESTAL = "equipment_pedestal";
 // 조건 부여원 (작물 perk + 장식물)
 const EMIT = {
   dew_root: "humid", sunlight_flower: "sunlit", poison_flower: "toxic",
@@ -16,10 +18,11 @@ const COND_ORDER = ["humid", "sunlit", "toxic", "anti_magic"];  // 중첩 테두
 const ORN = {
   witch_scarecrow: "마녀 허수아비", crystal_fountain: "수정 분수", fairy_lantern: "요정 등불",
   flower_trellis_arch: "꽃 트렐리스", star_music_box: "별조각 오르골", telescope: "망원경", town_teleporter: "마을 텔레포터",
-  rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", storage_chest: "차원상자", equipment_pedestal: "장비 전시대",
+  campfire: "모닥불",
+  rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", storage_chest: "차원상자", pedestal: "전시대",
 };
 // 장식물 부가설명 (기능형)
-const ORN_NOTE = { root_barrier: "지표 효과 차단 (조건 전파 막음)", storage_chest: "아이템 보관", equipment_pedestal: "장비 전시" };
+const ORN_NOTE = { root_barrier: "지표 효과 차단 (조건 전파 막음)", storage_chest: "아이템 보관", pedestal: "장비 전시" };
 // 바닥재 종류 (표면 배치, CSS 텍스처)
 const FLOOR_NAMES = {
   stone_floor: "석판", cobblestone_floor: "조약돌", grass_floor: "잔디",
@@ -322,7 +325,7 @@ export async function renderPlanner(view) {
       if (poll.has(r * CANVAS + c)) el.classList.add("poll");
       if (z.orn) {
         const ic = document.createElement("span"); ic.className = "pl-cic"; itemIcon(ic, z.orn); el.appendChild(ic);
-        if (z.orn === "equipment_pedestal" && z.display) {   // 전시대 위 아이템
+        if (z.orn === PEDESTAL && z.display) {   // 전시대 위 아이템
           const di = document.createElement("span"); di.className = "pl-disp"; itemIcon(di, z.display); el.appendChild(di);
         }
         el.classList.add("isorn");
@@ -404,7 +407,7 @@ export async function renderPlanner(view) {
         : ORN_NOTE[orn.orn] ? `<div class="d-row">${ORN_NOTE[orn.orn]}</div>`
         : `<div class="d-row muted">장식 (효과 없음)</div>`;
       let html = `<h3>${ORN[orn.orn]}</h3>${eff}`;
-      if (orn.orn === "equipment_pedestal") {   // 전시대 위에 올릴 아이템 선택
+      if (orn.orn === PEDESTAL) {   // 전시대 위에 올릴 아이템 선택
         html += `<div class="d-row">전시 아이템 <select id="pl-disp-sel">
           <option value="">— 없음 —</option>
           ${DISPLAY_ITEMS.map(([code, name]) => `<option value="${code}"${orn.display === code ? " selected" : ""}>${name}</option>`).join("")}
@@ -529,11 +532,15 @@ export async function renderPlanner(view) {
   }
   function load() {
     const p = new URLSearchParams(location.search).get("plan");
-    if (p) { const g0 = decodeGrid(p); if (g0) return g0; }     // 공유 링크
-    try { const a = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(a) && a.length === CANVAS) return a; } catch {}
+    if (p) { const g0 = decodeGrid(p); if (g0) return normalizeGrid(g0); }     // 공유 링크
+    try { const a = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(a) && a.length === CANVAS) return normalizeGrid(a); } catch {}
     return defaultGrid();
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(grid)); } catch {} }
+  function normalizeGrid(g) {
+    for (const row of g) for (const cell of row || []) if (cell?.orn === LEGACY_PEDESTAL) cell.orn = PEDESTAL;
+    return g;
+  }
 
   // ── 배치 압축 인코딩 (바이너리 → url-safe base64). v2: 바닥재·울타리, v3: 전시대 전시 아이템 ──
   function encodeGrid() {
@@ -616,7 +623,7 @@ export async function renderPlanner(view) {
     slotsBox.querySelectorAll("[data-load]").forEach((b) => b.onclick = () => {
       const code = getSlots()[decodeURIComponent(b.dataset.load)];
       let g0; try { g0 = code[0] === "[" ? JSON.parse(code) : decodeGrid(code); } catch { g0 = decodeGrid(code); }
-      if (g0) { grid = g0; recompute(); save(); }
+      if (g0) { grid = normalizeGrid(g0); recompute(); save(); }
     });
     slotsBox.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => {
       const s2 = getSlots(); delete s2[decodeURIComponent(b.dataset.del)]; setSlots(s2); renderSlots();
