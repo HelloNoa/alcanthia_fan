@@ -70,6 +70,7 @@ export async function renderCodex(view, sub) {
   // 테스트/미사용 아이템 (도감 제외)
   const testSet = new Set(g.test_items || []);
   const isTest = (code, it) => testSet.has(code) || (it?.name || "").includes("시험용");
+  const ITEM_TAB_POTIONS = new Set(["condensing_flask"]);
 
   // 포션 강화(e) 효과 평가 — 게임 헬퍼 그대로 (wn=e+1, gi=⌊(e+2)/2⌋, Jt=4(e+1), YP=4^e, Oh=e×2, uy=25)
   const PHF = { wn: (e) => e + 1, ku: (e) => e + 1, gi: (e) => Math.floor((e + 2) / 2), Jt: (e) => 4 * (e + 1), YP: (e) => 4 ** e, Oh: (e) => e * 2, uy: () => 25 };
@@ -181,7 +182,7 @@ export async function renderCodex(view, sub) {
         grid.appendChild(card);
       });
     } else if (key === "potions") {
-      Object.entries(g.items || {}).filter(([, it]) => it.type === "potion").forEach(([code, it]) => {
+      Object.entries(g.items || {}).filter(([code, it]) => it.type === "potion" && !ITEM_TAB_POTIONS.has(code)).forEach(([code, it]) => {
         if (!match(it.name) || isTest(code, it)) return;
         const combat = g.potion_effects?.[code];
         const use = g.potion_use_effects?.[code];
@@ -351,9 +352,9 @@ export async function renderCodex(view, sub) {
         return p.join(" · ") || "스탯 없음";
       };
       Object.entries(g.items || {}).forEach(([code, it]) => {
-        if (!match(it.name) || isTest(code, it) || it.type === "potion") return;  // 포션은 전용 탭
+        if (!match(it.name) || isTest(code, it) || (it.type === "potion" && !ITEM_TAB_POTIONS.has(code))) return;  // 포션은 전용 탭
         const stat = g.equipment_stats?.[code];
-        const rows = [["분류", TYPE[it.type] || it.type]];
+        const rows = [["분류", ITEM_TAB_POTIONS.has(code) ? "변성 도구" : TYPE[it.type] || it.type]];
         if (it.brewDuration_ms) rows.push(["제작시간", fmtDuration(craftTime(code))]);
         const recs = craftByOut[code] || [];
         if (recs.length) rows.push(["필요레벨", recs.map((r) => `Lv ${r.requiredLevel || 0}`).join(" / ")]);

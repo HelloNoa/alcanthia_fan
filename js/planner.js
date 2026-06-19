@@ -11,9 +11,9 @@ const EMIT = {
   dew_root: "humid", sunlight_flower: "sunlit", poison_flower: "toxic",
   crystal_fountain: "humid", fairy_lantern: "sunlit", witch_scarecrow: "anti_magic",
 };
-const COND_KR = { humid: "습기", sunlit: "햇살", toxic: "중독", anti_magic: "항마" };
-const COND_COLOR = { humid: "#3b6ea5", sunlit: "#d9a92e", toxic: "#6a9f3a", anti_magic: "#9b6cff" };
-const COND_ORDER = ["humid", "sunlit", "toxic", "anti_magic"];  // 중첩 테두리 순서(고정)
+const COND_KR = { humid: "습기", sunlit: "햇살", toxic: "중독", anti_magic: "항마", arid: "사막화" };
+const COND_COLOR = { humid: "#3b6ea5", sunlit: "#d9a92e", toxic: "#6a9f3a", anti_magic: "#9b6cff", arid: "#c26b2c" };
+const COND_ORDER = ["humid", "sunlit", "toxic", "anti_magic", "arid"];  // 중첩 테두리 순서(고정)
 // 설치형 장식물
 const ORN = {
   witch_scarecrow: "마녀 허수아비", crystal_fountain: "수정 분수", fairy_lantern: "요정 등불",
@@ -27,6 +27,7 @@ const ORN_NOTE = { root_barrier: "지표 효과 차단 (조건 전파 막음)", 
 const FLOOR_NAMES = {
   stone_floor: "석판", cobblestone_floor: "조약돌", grass_floor: "잔디",
   grass_stone_floor: "잔디 석판", flower_meadow_floor: "꽃잔디", tilled_soil_floor: "갈아엎은 흙",
+  water_channel: "물길", lava_channel: "용암길",
 };
 // 공유 인코딩 순서 (모듈 레벨 — decodeGrid가 load 초기에 호출되므로 TDZ 방지)
 const FLOOR_ORDER = Object.keys(FLOOR_NAMES);   // 인덱스+1 = 바닥재 종류
@@ -82,6 +83,7 @@ export async function renderPlanner(view) {
         <div class="pl-legend">
           <span><i class="lg humid"></i>습기</span><span><i class="lg sunlit"></i>햇살</span>
           <span><i class="lg toxic"></i>중독</span><span><i class="lg anti"></i>항마</span>
+          <span><i class="lg arid"></i>사막화</span>
           <span><i class="lg soil"></i>흙</span><span><i class="lg poll"></i>수분 경로</span>
         </div>
       </div>
@@ -243,6 +245,14 @@ export async function renderPlanner(view) {
         const y = r + dr, x = c + dc;
         if (y < 0 || y >= CANVAS || x < 0 || x >= CANVAS) continue;
         condMap[y][x].add(em.emit);
+      }
+    }
+    for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) {
+      const floor = grid[r][c]?.floor;
+      if (floor === "water_channel") condMap[r][c].add("humid");
+      else if (floor === "lava_channel") {
+        condMap[r][c].delete("humid");
+        condMap[r][c].add("arid");
       }
     }
   };

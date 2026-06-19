@@ -253,7 +253,8 @@
 "beast_horn": "짐승뿔",
 "dia_scepter": "다이아 셉터",
 "dia_plate": "다이아 플레이트",
-"tablet_shield": "석판 방패"
+"tablet_shield": "석판 방패",
+"lava_channel": "용암길"
 },
 "skills": {
 "magic_scythe": "혼령낫",
@@ -402,7 +403,11 @@
 "storage_chest:star": "storage_chest_star",
 "storage_chest:pink": "storage_chest_pink",
 "storage_chest:blue": "storage_chest_blue",
-"town_teleporter:cottage_well": "town_teleporter_cottage"
+"town_teleporter:cottage_well": "town_teleporter_cottage",
+"lava_channel:lower_left": "lava_channel_lower_left",
+"lava_channel:lower_right": "lava_channel_lower_right",
+"lava_channel:upper_right": "lava_channel_upper_right",
+"lava_channel:upper_left": "lava_channel_upper_left"
 },
 "itemVariants": {
 "fairy_lantern:acorn": {
@@ -519,6 +524,26 @@
 "itemCode": "town_teleporter",
 "name": "오솔길 우물",
 "sprite": "town_teleporter_cottage"
+},
+"lava_channel:lower_left": {
+"itemCode": "lava_channel",
+"name": "좌하 용암길",
+"sprite": "lava_channel_lower_left"
+},
+"lava_channel:lower_right": {
+"itemCode": "lava_channel",
+"name": "우하 용암길",
+"sprite": "lava_channel_lower_right"
+},
+"lava_channel:upper_right": {
+"itemCode": "lava_channel",
+"name": "우상 용암길",
+"sprite": "lava_channel_upper_right"
+},
+"lava_channel:upper_left": {
+"itemCode": "lava_channel",
+"name": "좌상 용암길",
+"sprite": "lava_channel_upper_left"
 }
 },
 "adventurers": {
@@ -727,7 +752,8 @@
 "beast_horn": "beast_horn",
 "dia_scepter": "dia_scepter",
 "dia_plate": "dia_plate",
-"tablet_shield": "tablet_shield"
+"tablet_shield": "tablet_shield",
+"lava_channel": "lava_channel"
 },
 "itemFolders": {
 "herb_seed": "plants/seeds",
@@ -931,6 +957,11 @@
 "storage_chest_star": "items/ornament",
 "storage_chest_pink": "items/ornament",
 "storage_chest_blue": "items/ornament",
-"town_teleporter_cottage": "items/ornament"
+"town_teleporter_cottage": "items/ornament",
+"lava_channel": "items/ornament",
+"lava_channel_lower_left": "items/ornament",
+"lava_channel_lower_right": "items/ornament",
+"lava_channel_upper_right": "items/ornament",
+"lava_channel_upper_left": "items/ornament"
 }
 }
