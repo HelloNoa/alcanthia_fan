@@ -182,94 +182,134 @@ function levelCalc(body) {
     while (s > 0) { const n = expToNext(i); if (s < n) break; s -= n; i++; }
     return { level: i, into: s, need: expToNext(i) };
   };
+  const potionExp = (enh) => 4 ** enh;
   const fmt = (n) => Number(Math.round(n)).toLocaleString();
+  const fmtShort = (n) => {
+    const v = Number(Math.round(n));
+    if (v >= 1e12) return `${(v / 1e12).toLocaleString(undefined, { maximumFractionDigits: 1 })}조`;
+    if (v >= 1e8) return `${(v / 1e8).toLocaleString(undefined, { maximumFractionDigits: 1 })}억`;
+    if (v >= 1e4) return `${(v / 1e4).toLocaleString(undefined, { maximumFractionDigits: 1 })}만`;
+    return fmt(v);
+  };
+  const expTxt = (n) => `<span title="${fmt(n)} exp">${fmtShort(n)}</span>`;
+  const current = () => {
+    const lv = Math.max(1, Math.floor(+body.querySelector("#lc-lv").value || 1));
+    const into = Math.max(0, +body.querySelector("#lc-into").value || 0);
+    const need = expToNext(lv);
+    return { lv, into, need, total: totalForLevel(lv) + into };
+  };
 
   body.innerHTML = `
-    <div class="calc-card">
-      <h3>경험치 → 레벨</h3>
-      <label class="lvlabel">경험치 <input id="lc-exp" type="number" min="0" value="0" class="num-in"></label>
-      <div id="lc-out1" class="lc-out"></div>
-    </div>
-    <div class="calc-card">
-      <h3>게임 표기값 → 총 경험치</h3>
-      <div class="lc-row">
-        <label class="lvlabel">현재 레벨 <input id="lc-lv" type="number" min="1" value="1" class="num-in"></label>
-        <label class="lvlabel">레벨 내 경험치 <input id="lc-into" type="number" min="0" value="0" class="num-in"></label>
+    <div class="calc-grid">
+      <div class="calc-card lc-main">
+        <h3>성장포션 사용 결과</h3>
+        <div class="lc-row">
+          <label class="lvlabel">현재 레벨 <input id="lc-lv" type="number" min="1" value="1" class="num-in"></label>
+          <label class="lvlabel">레벨 내 경험치 <input id="lc-into" type="number" min="0" value="0" class="num-in"></label>
+        </div>
+        <div class="lc-row">
+          <label class="lvlabel">성장포션 강화도 <input id="lc-pot-e" type="number" min="0" max="30" value="17" class="num-in"></label>
+          <label class="lvlabel">마실 개수 <input id="lc-pot-count" type="number" min="1" value="1" class="num-in"></label>
+        </div>
+        <div id="lc-out-use" class="lc-out"></div>
       </div>
-      <div id="lc-out3" class="lc-out"></div>
-    </div>
-    <div class="calc-card">
-      <h3>목표 레벨까지 남은 경험치</h3>
-      <div class="lc-row">
-        <label class="lvlabel">현재 경험치 <input id="lc-cur" type="number" min="0" value="0" class="num-in"></label>
-        <label class="lvlabel">목표 레벨 <input id="lc-tgt" type="number" min="2" value="20" class="num-in"></label>
+      <div class="calc-card">
+        <h3>목표까지 필요한 성장포션</h3>
+        <div class="lc-row">
+          <label class="lvlabel">목표 레벨 <input id="lc-tgt" type="number" min="2" value="20" class="num-in"></label>
+        </div>
+        <div id="lc-out-target" class="lc-out"></div>
       </div>
-      <div id="lc-out2" class="lc-out"></div>
+      <div class="calc-card">
+        <h3>총 경험치 직접 입력</h3>
+        <label class="lvlabel">총 경험치 <input id="lc-exp" type="number" min="0" value="0" class="num-in"></label>
+        <div id="lc-out-exp" class="lc-out"></div>
+      </div>
+      <div class="calc-card">
+        <details class="lc-details">
+          <summary>레벨별 경험치 표</summary>
+          <label class="lvlabel">표 최대 레벨 <input id="lc-tblmax" type="number" min="2" value="30" class="num-in"></label>
+          <div id="lc-out-table" class="lc-out"></div>
+        </details>
+      </div>
     </div>
-    <div class="calc-card">
-      <h3>레벨별 경험치 표</h3>
-      <label class="lvlabel">표 최대 레벨 <input id="lc-tblmax" type="number" min="2" value="30" class="num-in"></label>
-      <div id="lc-out4" class="lc-out"></div>
-    </div>
-    <p class="muted">레벨 L → L+1 필요 경험치 = 2^⌊L/5⌋ (5레벨마다 2배) · 성장포션 N강 = 4^N 경험치. 게임 공식 그대로입니다.<br>인게임은 <b>구간 경험치</b>만 표시해요 — <b>누적 총 경험치</b>는 위 "게임 표기값 → 총 경험치" / "레벨별 표"에서 확인하세요.</p>`;
+    <p class="muted">레벨 L → L+1 필요 경험치 = 2^⌊L/5⌋ (5레벨마다 2배) · 성장포션 N강 = 4^N 경험치. 게임 공식 그대로입니다.<br>인게임은 <b>구간 경험치</b>만 표시하므로 현재 레벨과 레벨 내 경험치를 그대로 입력하면 됩니다.</p>`;
 
-  const upd1 = () => {
+  const updUse = () => {
+    const cur = current();
+    const enh = Math.max(0, Math.min(30, Math.floor(+body.querySelector("#lc-pot-e").value || 0)));
+    const count = Math.max(1, Math.floor(+body.querySelector("#lc-pot-count").value || 1));
+    const gain = potionExp(enh) * count;
+    const after = fromExp(cur.total + gain);
+    const pct = Math.min(100, (after.into / after.need) * 100);
+    const lvGain = after.level - cur.lv;
+    const over = cur.into >= cur.need
+      ? `<div class="lc-warn">레벨 내 경험치가 현재 구간(${fmt(cur.need)})을 넘어서 입력값 기준 실제 레벨로 계산했어요.</div>` : "";
+    body.querySelector("#lc-out-use").innerHTML =
+      `<div class="lc-big">Lv ${after.level}</div>
+       <div class="lc-sub">+${enh} 성장포션 ${fmt(count)}개 = <b class="t-adj">${expTxt(gain)}</b> exp · ${lvGain > 0 ? `+${lvGain}레벨` : "레벨 유지"}<br>
+       현재 총 경험치 ${expTxt(cur.total)} → ${expTxt(cur.total + gain)}<br>
+       Lv ${after.level} 진행: ${expTxt(after.into)} / ${expTxt(after.need)}</div>
+       <div class="lc-progress"><span style="width:${pct}%"></span></div>${over}`;
+  };
+  const updTarget = () => {
+    const cur = current();
+    const tgt = Math.max(2, Math.floor(+body.querySelector("#lc-tgt").value || 2));
+    const selectedEnh = Math.max(0, Math.min(30, Math.floor(+body.querySelector("#lc-pot-e").value || 0)));
+    const total = totalForLevel(tgt);
+    const remain = Math.max(0, total - cur.total);
+    const selectedPer = potionExp(selectedEnh);
+    const selectedCnt = remain > 0 ? Math.ceil(remain / selectedPer) : 0;
+    let oneEnh = 0;
+    while (oneEnh < 30 && potionExp(oneEnh) < remain) oneEnh++;
+    const rowSet = new Set([selectedEnh]);
+    const addNear = (center, radius) => {
+      for (let n = Math.max(0, center - radius); n <= Math.min(30, center + radius); n++) rowSet.add(n);
+    };
+    addNear(oneEnh, 3);
+    addNear(selectedEnh, 1);
+    if (remain < 100000) for (let n = 0; n <= 5; n++) rowSet.add(n);
+    const rows = [...rowSet].sort((a, b) => a - b).map((n) => {
+      const per = potionExp(n);
+      const cnt = remain > 0 ? Math.ceil(remain / per) : 0;
+      const klass = n === selectedEnh ? ` class="lc-pick"` : "";
+      return `<tr${klass}><td><b>${n}강</b></td><td>${expTxt(per)}</td><td class="lc-cnt">${fmt(cnt)}개</td></tr>`;
+    }).join("");
+    body.querySelector("#lc-out-target").innerHTML = remain <= 0
+      ? `<div class="lc-big">도달 완료</div><div class="lc-sub">현재 입력값이 이미 Lv ${tgt} 이상입니다.</div>`
+      : `<div class="lc-big">${selectedEnh}강 ${fmt(selectedCnt)}개</div>
+         <div class="lc-sub">Lv ${tgt}까지 남은 경험치: <b class="t-adj">${expTxt(remain)}</b><br>
+         1개로 끝내려면 <b>${oneEnh}강 이상</b></div>
+         <div class="lc-pot-h">가까운 성장포션 강화도</div>
+         <table class="lc-pot"><thead><tr><th>성장포션</th><th>회당 exp</th><th>필요 개수</th></tr></thead><tbody>${rows}</tbody></table>`;
+  };
+  const updExp = () => {
     const exp = Math.max(0, +body.querySelector("#lc-exp").value || 0);
     const r = fromExp(exp);
     const pct = ((r.into / r.need) * 100).toFixed(1);
-    body.querySelector("#lc-out1").innerHTML =
+    body.querySelector("#lc-out-exp").innerHTML =
       `<div class="lc-big">Lv ${r.level}</div>
-       <div class="lc-sub">현재 레벨 진행: ${fmt(r.into)} / ${fmt(r.need)} (${pct}%)<br>
-       다음 레벨까지 <b class="t-adj">${fmt(r.need - r.into)}</b> exp</div>`;
-  };
-  const upd2 = () => {
-    const cur = Math.max(0, +body.querySelector("#lc-cur").value || 0);
-    const tgt = Math.max(2, +body.querySelector("#lc-tgt").value || 2);
-    const total = totalForLevel(tgt);
-    const remain = Math.max(0, total - cur);
-    const curLv = fromExp(cur).level;
-    // 성장포션 N강 = 4^N 경험치 (게임: YP(e)=4^e). 1개로 충분해질 때까지 표시
-    let rows = "";
-    for (let N = 0; N <= 30; N++) {
-      const per = 4 ** N;
-      const cnt = remain > 0 ? Math.ceil(remain / per) : 0;
-      rows += `<tr><td><b>${N}강</b></td><td>${fmt(per)}</td><td class="lc-cnt">${fmt(cnt)}개</td></tr>`;
-      if (cnt <= 1) break; // 더 높은 강화는 1개로 동일 → 생략
-    }
-    body.querySelector("#lc-out2").innerHTML =
-      `Lv ${tgt} 도달 총 경험치: <b>${fmt(total)}</b> exp<br>
-       현재 <b>Lv ${curLv}</b> 에서 남은 경험치: <b class="t-adj">${fmt(remain)}</b> exp
-       <div class="lc-pot-h">필요한 성장포션 (강화별)</div>
-       <table class="lc-pot"><thead><tr><th>성장포션</th><th>회당 exp</th><th>필요 개수</th></tr></thead><tbody>${rows}</tbody></table>`;
-  };
-  // 게임 표기값(현재 레벨 + 레벨 내 경험치) → 누적 총 경험치
-  const upd3 = () => {
-    const lv = Math.max(1, +body.querySelector("#lc-lv").value || 1);
-    const into = Math.max(0, +body.querySelector("#lc-into").value || 0);
-    const bracket = expToNext(lv), base = totalForLevel(lv), total = base + into;
-    const over = into >= bracket
-      ? `<br><span class="t-adj">⚠ 레벨 내 경험치가 구간(${fmt(bracket)})을 초과 — 입력 확인</span>` : "";
-    body.querySelector("#lc-out3").innerHTML =
-      `<div class="lc-big">${fmt(total)} exp</div>
-       <div class="lc-sub">Lv ${lv} 도달 누적 ${fmt(base)} + 레벨 내 ${fmt(into)}<br>
-       이 레벨 구간: ${fmt(bracket)} exp${over}</div>`;
+       <div class="lc-sub">현재 레벨 진행: ${expTxt(r.into)} / ${expTxt(r.need)} (${pct}%)<br>
+       다음 레벨까지 <b class="t-adj">${expTxt(r.need - r.into)}</b> exp</div>`;
   };
   // 레벨별 [구간 경험치 / 누적 총 경험치] 표
-  const upd4 = () => {
+  const updTable = () => {
     const max = Math.min(100, Math.max(2, +body.querySelector("#lc-tblmax").value || 30));
     let rows = "", cum = 0;
     for (let L = 1; L <= max; L++) {
-      rows += `<tr><td><b>Lv ${L}</b></td><td>${fmt(expToNext(L))}</td><td>${fmt(cum)}</td></tr>`;
+      rows += `<tr><td><b>Lv ${L}</b></td><td>${expTxt(expToNext(L))}</td><td>${expTxt(cum)}</td></tr>`;
       cum += expToNext(L); // 다음 행의 누적 = totalForLevel(L+1)
     }
-    body.querySelector("#lc-out4").innerHTML =
+    body.querySelector("#lc-out-table").innerHTML =
       `<div class="lc-table-wrap"><table class="lc-pot"><thead><tr><th>레벨</th><th>구간 exp</th><th>누적 총 exp</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   };
-  body.querySelector("#lc-exp").oninput = upd1;
-  body.querySelectorAll("#lc-cur,#lc-tgt").forEach((e) => e.oninput = upd2);
-  body.querySelectorAll("#lc-lv,#lc-into").forEach((e) => e.oninput = upd3);
-  body.querySelector("#lc-tblmax").oninput = upd4;
-  upd1(); upd2(); upd3(); upd4();
+  body.querySelectorAll("#lc-lv,#lc-into,#lc-pot-e,#lc-pot-count").forEach((e) => {
+    e.oninput = () => { updUse(); updTarget(); };
+  });
+  body.querySelector("#lc-tgt").oninput = updTarget;
+  body.querySelector("#lc-exp").oninput = updExp;
+  body.querySelector("#lc-tblmax").oninput = updTable;
+  updUse(); updTarget(); updExp(); updTable();
 }
 
 // ---------- 강화 기댓값 ----------

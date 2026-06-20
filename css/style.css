@@ -280,11 +280,19 @@ table.matrix thead th { text-align: center; }
 .lc-out { margin-top: 12px; }
 .lc-big { font-size: 30px; font-weight: 800; color: var(--accent); }
 .lc-sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; line-height: 1.6; }
+.lc-main { border-color: #5a4d8a; background: #1c1930; }
+.lc-progress { width: 100%; height: 9px; border: 1px solid var(--line); border-radius: 999px; background: #12101a; overflow: hidden; margin-top: 10px; }
+.lc-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--gold)); border-radius: inherit; }
+.lc-warn { margin-top: 8px; color: var(--gold); font-size: 12.5px; line-height: 1.45; }
+.lc-details summary { cursor: pointer; color: var(--ink); font-weight: 700; margin-bottom: 10px; }
 .lc-pot-h { margin: 14px 0 6px; font-size: 13px; color: var(--ink); font-weight: 600; }
 .lc-pot { border-collapse: collapse; font-size: 13px; min-width: 280px; }
 .lc-pot th, .lc-pot td { padding: 5px 14px 5px 0; text-align: left; border-bottom: 1px solid var(--line); }
 .lc-pot th { color: var(--muted); font-weight: 600; }
 .lc-pot .lc-cnt { color: var(--gold); font-weight: 700; }
+.lc-pot tr.lc-pick td { background: #24203a; }
+.lc-pot tr.lc-pick td:first-child { border-radius: 6px 0 0 6px; color: var(--accent); }
+.lc-pot tr.lc-pick td:last-child { border-radius: 0 6px 6px 0; }
 .calc-note { background: #211f3a; border: 1px solid #4a3d6e; border-radius: 8px;
   padding: 8px 12px; font-size: 12.5px; color: #c9bfff; margin-top: 12px; line-height: 1.5; }
 .calc-note b { color: #fff; }
