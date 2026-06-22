@@ -300,6 +300,7 @@ export async function renderPlanner(view) {
     const perHour = prod && !gated && cycle > 0 ? (harvests / cycle) * 3600000 * yieldMul : 0;
     return { ...z, P, cond, same, diversity, m, prod, gated, perHour, harvests };
   };
+  const autoHarvestBlocked = (st) => st?.cond?.has("anti_magic");
 
   const recompute = () => {
     buildConds();
@@ -309,6 +310,7 @@ export async function renderPlanner(view) {
     const poll = pollSet();
     const totals = {};
     let planted = 0, tilled = 0;
+    let blockedProduction = 0;
     const showSlots = mode === "till" && hasField();
     for (let r = win.minR; r <= win.maxR; r++) for (let c = win.minC; c <= win.maxC; c++) {
       const el = cellMap.get(r + ":" + c); el.className = "pl-cell"; el.innerHTML = "";
@@ -349,19 +351,25 @@ export async function renderPlanner(view) {
       if (z.e > 0) el.insertAdjacentHTML("beforeend", `<span class="pl-enhb">+${z.e}</span>`);
       if (st.m !== 1 && st.prod) el.insertAdjacentHTML("beforeend",
         `<span class="pl-mult ${st.m > 1 ? "up" : "down"}">×${st.m.toFixed(st.m < 10 ? 1 : 0)}</span>`);
-      if (st.perHour > 0) totals[st.prod.itemCode] = (totals[st.prod.itemCode] || 0) + st.perHour;
+      if (st.perHour > 0) {
+        if (autoHarvestBlocked(st)) blockedProduction++;
+        else totals[st.prod.itemCode] = (totals[st.prod.itemCode] || 0) + st.perHour;
+      }
     }
-    renderSummary(totals, planted, tilled);
+    renderSummary(totals, planted, tilled, blockedProduction);
     renderPollSum();
   };
 
-  const renderSummary = (totals, planted, tilled) => {
+  const renderSummary = (totals, planted, tilled, blockedProduction = 0) => {
     const ent = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    let html = `<h3>생산 요약 <small>(개간 ${tilled} · 작물 ${planted} · 시간당)</small></h3>`;
+    let html = `<h3>생산 요약 <small>(개간 ${tilled} · 작물 ${planted} · 자동수확 기준 · 시간당)</small></h3>`;
     if (!ent.length) html += `<p class="muted">생산물 없음</p>`;
     else html += `<div class="pl-sum-list">${ent.map(([code, n]) =>
       `<div class="pl-sum"><span class="pl-sic" data-ic="${code}"></span>
         <span class="pl-sname">${g.items?.[code]?.name || code}</span><b>${n.toFixed(1)}/시간</b></div>`).join("")}</div>`;
+    if (blockedProduction > 0) {
+      html += `<p class="muted">항마가 깔린 작물 ${blockedProduction}칸은 자동수확 제외로 생산 요약에서 뺐습니다.</p>`;
+    }
     summary.innerHTML = html;
     summary.querySelectorAll(".pl-sic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
   };
@@ -435,6 +443,7 @@ export async function renderPlanner(view) {
       <div class="d-row">같은 이웃 <b>${st.same}</b> · 이웃 종류 <b>${st.diversity}</b>${st.P.oneShot ? ' <span class="muted">(과밀 면제)</span>' : ""}</div>
       <div class="d-row">생산 배율 <b class="${st.m > 1 ? "up" : st.m < 1 ? "down" : ""}">×${st.m.toFixed(2)}</b></div>`;
     if (st.prod) {
+      const blocked = autoHarvestBlocked(st);
       const inf = st.P.maxHarvests == null || !isFinite(st.P.maxHarvests);
       const boosted = opt.sturdy && (st.e || 0) > 0 && !inf;
       const life = inf ? "무한"
@@ -444,7 +453,10 @@ export async function renderPlanner(view) {
         ? `<div class="d-row">생산주기 <b>${fmtDuration(st.prod.interval_ms)}</b> · 수명 ${life}</div>`
         : `<div class="d-row">즉시생산 <span class="muted">(성장 ${fmtDuration(st.P.growTime_ms)})</span> · 수명 ${life}</div>`;
       lines += st.gated ? `<div class="d-row down">⚠️ 물+중독 필요 (미충족 → 생산 0)</div>`
-        : `<div class="d-row">시간당 생산 <b class="up">${st.perHour.toFixed(1)}개</b>${st.P.oneShot ? ' <span class="muted">(성장주기 기준 이론 최대 · 실제는 바람꽃 60초 수분에 제한, 바람꽃당 ~240/h)</span>' : ""}</div>`;
+        : blocked
+          ? `<div class="d-row">항마 보호 <b class="down">자동수확 제외 · 생산요약 미포함</b></div>
+             <div class="d-row">수동 기준 이론값 <b>${st.perHour.toFixed(1)}개/시간</b></div>`
+          : `<div class="d-row">시간당 생산 <b class="up">${st.perHour.toFixed(1)}개</b>${st.P.oneShot ? ' <span class="muted">(성장주기 기준 이론 최대 · 실제는 바람꽃 60초 수분에 제한, 바람꽃당 ~240/h)</span>' : ""}</div>`;
     } else lines += `<div class="d-row muted">생산물 없음 (지원 작물)</div>`;
     detail.innerHTML = `<h3>${st.P.name}${st.e > 0 ? ` <span class="pl-enhb-inl">+${st.e}</span>` : ""}</h3>${lines}`;
   };
