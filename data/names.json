@@ -175,6 +175,7 @@
 "pedestal": "전시대",
 "telescope": "망원경",
 "working_shelf": "작업 선반",
+"hourglass": "모래시계",
 "storage_chest": "차원상자",
 "town_teleporter": "마을 텔레포터",
 "campfire": "모닥불",
@@ -183,7 +184,9 @@
 "root_barrier": "뿌리장벽",
 "stone_floor": "석판 바닥재",
 "water_channel": "물길",
+"lava_channel": "용암길",
 "magic_glass": "마법 유리",
+"magic_sand": "마법모래",
 "engraving_stone": "각인석",
 "levitation_core": "부유핵",
 "polishing_powder": "연마 가루",
@@ -253,8 +256,7 @@
 "beast_horn": "짐승뿔",
 "dia_scepter": "다이아 셉터",
 "dia_plate": "다이아 플레이트",
-"tablet_shield": "석판 방패",
-"lava_channel": "용암길"
+"tablet_shield": "석판 방패"
 },
 "skills": {
 "magic_scythe": "혼령낫",
@@ -303,6 +305,7 @@
 "extra_loot": "까마귀 길잡이",
 "relic_mastery": "유물 숙련",
 "potion_preserve": "차원 교차",
+"puppet": "꼭두각시",
 "overflow_discard": "무소유",
 "unlock_guild": "혈맹",
 "mail_delivery": "바람길",
@@ -395,19 +398,19 @@
 "stone_floor:tilled_soil": "tilled_soil_floor",
 "water_channel:edge_lower_left": "water_channel_edge_lower_left",
 "water_channel:edge_lower_right": "water_channel_edge_lower_right",
+"lava_channel:lower_left": "lava_channel_lower_left",
+"lava_channel:lower_right": "lava_channel_lower_right",
 "water_channel:edge_upper_right": "water_channel_edge_upper_right",
+"lava_channel:upper_right": "lava_channel_upper_right",
 "water_channel:edge_upper_left": "water_channel_edge_upper_left",
+"lava_channel:upper_left": "lava_channel_upper_left",
 "crystal_fountain:garden_stone": "garden_stone_fountain",
 "storage_chest:sword": "storage_chest_sword",
 "storage_chest:grass": "storage_chest_grass",
 "storage_chest:star": "storage_chest_star",
 "storage_chest:pink": "storage_chest_pink",
 "storage_chest:blue": "storage_chest_blue",
-"town_teleporter:cottage_well": "town_teleporter_cottage",
-"lava_channel:lower_left": "lava_channel_lower_left",
-"lava_channel:lower_right": "lava_channel_lower_right",
-"lava_channel:upper_right": "lava_channel_upper_right",
-"lava_channel:upper_left": "lava_channel_upper_left"
+"town_teleporter:cottage_well": "town_teleporter_cottage"
 },
 "itemVariants": {
 "fairy_lantern:acorn": {
@@ -480,15 +483,35 @@
 "name": "우하 물결",
 "sprite": "water_channel_edge_lower_right"
 },
+"lava_channel:lower_left": {
+"itemCode": "lava_channel",
+"name": "좌하 용암길",
+"sprite": "lava_channel_lower_left"
+},
+"lava_channel:lower_right": {
+"itemCode": "lava_channel",
+"name": "우하 용암길",
+"sprite": "lava_channel_lower_right"
+},
 "water_channel:edge_upper_right": {
 "itemCode": "water_channel",
 "name": "우상 물결",
 "sprite": "water_channel_edge_upper_right"
 },
+"lava_channel:upper_right": {
+"itemCode": "lava_channel",
+"name": "우상 용암길",
+"sprite": "lava_channel_upper_right"
+},
 "water_channel:edge_upper_left": {
 "itemCode": "water_channel",
 "name": "좌상 물결",
 "sprite": "water_channel_edge_upper_left"
+},
+"lava_channel:upper_left": {
+"itemCode": "lava_channel",
+"name": "좌상 용암길",
+"sprite": "lava_channel_upper_left"
 },
 "crystal_fountain:garden_stone": {
 "itemCode": "crystal_fountain",
@@ -524,26 +547,6 @@
 "itemCode": "town_teleporter",
 "name": "오솔길 우물",
 "sprite": "town_teleporter_cottage"
-},
-"lava_channel:lower_left": {
-"itemCode": "lava_channel",
-"name": "좌하 용암길",
-"sprite": "lava_channel_lower_left"
-},
-"lava_channel:lower_right": {
-"itemCode": "lava_channel",
-"name": "우하 용암길",
-"sprite": "lava_channel_lower_right"
-},
-"lava_channel:upper_right": {
-"itemCode": "lava_channel",
-"name": "우상 용암길",
-"sprite": "lava_channel_upper_right"
-},
-"lava_channel:upper_left": {
-"itemCode": "lava_channel",
-"name": "좌상 용암길",
-"sprite": "lava_channel_upper_left"
 }
 },
 "adventurers": {
@@ -674,6 +677,7 @@
 "pedestal": "equipment_pedestal",
 "telescope": "telescope",
 "working_shelf": "working_shelf",
+"hourglass": "hourglass",
 "storage_chest": "storage_chest",
 "town_teleporter": "town_teleporter",
 "campfire": "campfire",
@@ -682,7 +686,9 @@
 "root_barrier": "root_barrier",
 "stone_floor": "stone_floor",
 "water_channel": "water_channel",
+"lava_channel": "lava_channel",
 "magic_glass": "magic_glass",
+"magic_sand": "magic_sand",
 "engraving_stone": "engraving_stone",
 "levitation_core": "levitation_core",
 "polishing_powder": "polishing_powder",
@@ -752,8 +758,7 @@
 "beast_horn": "beast_horn",
 "dia_scepter": "dia_scepter",
 "dia_plate": "dia_plate",
-"tablet_shield": "tablet_shield",
-"lava_channel": "lava_channel"
+"tablet_shield": "tablet_shield"
 },
 "itemFolders": {
 "herb_seed": "plants/seeds",
@@ -859,6 +864,7 @@
 "equipment_pedestal": "items/ornament",
 "telescope": "items/ornament",
 "working_shelf": "items/ornament",
+"hourglass": "items/ornament",
 "storage_chest": "items/ornament",
 "town_teleporter": "items/ornament",
 "campfire": "items/ornament",
@@ -867,7 +873,9 @@
 "root_barrier": "items/ornament",
 "stone_floor": "items/ornament",
 "water_channel": "items/ornament",
+"lava_channel": "items/ornament",
 "magic_glass": "items/materials",
+"magic_sand": "items/materials",
 "engraving_stone": "items/materials",
 "levitation_core": "items/materials",
 "polishing_powder": "items/materials",
@@ -949,19 +957,18 @@
 "tilled_soil_floor": "items/ornament",
 "water_channel_edge_lower_left": "items/ornament",
 "water_channel_edge_lower_right": "items/ornament",
+"lava_channel_lower_left": "items/ornament",
+"lava_channel_lower_right": "items/ornament",
 "water_channel_edge_upper_right": "items/ornament",
+"lava_channel_upper_right": "items/ornament",
 "water_channel_edge_upper_left": "items/ornament",
+"lava_channel_upper_left": "items/ornament",
 "garden_stone_fountain": "items/ornament",
 "storage_chest_sword": "items/ornament",
 "storage_chest_grass": "items/ornament",
 "storage_chest_star": "items/ornament",
 "storage_chest_pink": "items/ornament",
 "storage_chest_blue": "items/ornament",
-"town_teleporter_cottage": "items/ornament",
-"lava_channel": "items/ornament",
-"lava_channel_lower_left": "items/ornament",
-"lava_channel_lower_right": "items/ornament",
-"lava_channel_upper_right": "items/ornament",
-"lava_channel_upper_left": "items/ornament"
+"town_teleporter_cottage": "items/ornament"
 }
 }
