@@ -501,6 +501,12 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .zfx-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.5; }
 .zfx-item { color: var(--ink); }
+.zfx-cost { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+.zfx-cost-title { color: var(--gold); font-weight: 700; }
+.zfx-cost-row { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+.zfx-cost-ic { width: 20px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.zfx-cost-ic img { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; }
 
 /* 도감 장비 강화 컨트롤 */
 .cx-enh-ctrl { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px;

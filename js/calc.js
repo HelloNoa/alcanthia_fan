@@ -88,13 +88,14 @@ async function timeCalc(body) {
           <label class="lvlabel">양조 존
             <select id="zone">
               <option value="">기타 (×1)</option>
-              <option value="sunset_cliff">석양절벽 (×2)</option>
-              <option value="advanced_volcano">용암협곡 (−6%×지역효과)</option>
-              <option value="beginner_forest">속삭이는 숲 (−10%×지역효과, 동일재료)</option>
+              <option value="sunset_cliff">석양절벽 (시간×2 · 결과+1)</option>
+              <option value="advanced_volcano">용암협곡 (−6%×계수)</option>
+              <option value="beginner_forest">속삭이는 숲 (−10%×계수, 동일재료)</option>
             </select>
           </label>
           <label class="lvlabel">낯익은 터 <input id="famG" type="range" min="0" max="10" value="0"><b id="famGv">0</b></label>
           <label class="chk"><input type="checkbox" id="fog"> 안개 해방</label>
+          <label class="chk"><input type="checkbox" id="zoneBuff"> 지역효과 버프</label>
         </div>
         <div class="calc-row">
           <label class="chk"><input type="checkbox" id="firePot"> 화염포션 적용</label>
@@ -103,7 +104,8 @@ async function timeCalc(body) {
         <div id="potOut" class="calc-out"></div>
         <div class="calc-note">💡 N강 포션은 <b>(N−1)강 포션 2개를 합성</b>해 만듭니다.
         예) 9강을 만들려면 8강 포션 2개가 필요하고, 시간은 8강 기준(2⁸)으로 계산돼요.</div>
-        <p class="muted">시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수 × 화염포션(선택)</p>
+        <p class="muted">지역효과 계수 = 낯익은 터×0.1 + 안개 해방 + 지역효과 버프×0.5.<br>
+        시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수 × 화염포션(선택)</p>
       </div>
     </div>`;
 
@@ -133,11 +135,13 @@ async function timeCalc(body) {
     if (zone === "beginner_forest" && sameIng) return Math.max(0.01, 1 - 0.1 * cult);
     return 1;
   };
+  const pct = (v) => `${(v * 100).toFixed(v * 100 % 1 ? 1 : 0)}%`;
   const potOut = () => {
     const c = body.querySelector("#pot").value;
     const fl = +body.querySelector("#flame").value, ce = +body.querySelector("#cauE").value;
     const me = +body.querySelector("#matE").value;
     const famG = +body.querySelector("#famG").value, fog = body.querySelector("#fog").checked;
+    const zoneBuff = body.querySelector("#zoneBuff").checked;
     const zone = body.querySelector("#zone").value;
     const fireOn = body.querySelector("#firePot").checked, fireE = +body.querySelector("#fireE").value;
     body.querySelector("#flamev").textContent = fl;
@@ -145,8 +149,8 @@ async function timeCalc(body) {
     body.querySelector("#matEv").textContent = me;
     body.querySelector("#famGv").textContent = famG;
     body.querySelector("#fireEv").textContent = fireE;
-    // 지역 효과 배율 t = 낯익은터×0.1 + 안개해방
-    const t = famG * 0.1 + (fog ? 1 : 0);
+    // 게임의 Xe 공식: 낯익은 터×0.1 + 안개 해방×1 + 지역효과 버프×0.5
+    const t = famG * 0.1 + (fog ? 1 : 0) + (zoneBuff ? 0.5 : 0);
     const ing = recipeOf[c] || [];
     const sameIng = ing.length === 2 && ing[0] === ing[1];
     const bd = (x) => g.items[x]?.brewDuration_ms || 0;
@@ -164,9 +168,17 @@ async function timeCalc(body) {
       `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>`);
     if (fireOn) el.insertAdjacentHTML("beforeend",
       `<span class="calc-note-inline">화염포션 ×${fireMult.toFixed(2)}</span>`);
+    if (zone === "sunset_cliff") {
+      const plusRate = Math.min(1, 0.05 * t);
+      el.insertAdjacentHTML("beforeend",
+        `<span class="calc-note-inline">석양절벽: 연성 시간 ×2 고정 · 양조/강화/제작 결과 +1 ${pct(plusRate)}</span>`);
+    } else if (zone === "advanced_volcano" || zone === "beginner_forest") {
+      el.insertAdjacentHTML("beforeend",
+        `<span class="calc-note-inline">지역효과 계수 ${t.toFixed(1)}</span>`);
+    }
   };
   body.querySelectorAll("#crop,#soil,#seedE").forEach((e) => e.oninput = cropOut);
-  body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog,#firePot,#fireE").forEach((e) => {
+  body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog,#zoneBuff,#firePot,#fireE").forEach((e) => {
     e.oninput = potOut; e.onchange = potOut;
   });
   cropOut(); potOut();
@@ -368,7 +380,8 @@ async function evCalc(body) {
         <div id="ev-raw"></div>
         <div class="calc-note">💡 강화 = <b>같은 강화도 아이템 2개 합성 → +1</b> (성공률 p). <b>실패 시 1개만 회수</b>(1개 손실).<br>
           성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 필요 ≈ <code>(1+1/p)^(최종−시작)</code><br>
-          <b>2차 전개</b>: 제작은 항상 +0 산출, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.</div>
+          <b>2차 전개</b>: 제작은 항상 +0 산출, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.<br>
+          석양절벽의 결과 +1 확률은 성공한 양조·강화·제작에 별도로 붙으며, 이 기댓값 계산에는 아직 자동 반영하지 않습니다.</div>
       </div>
     </div>`;
   const q = (id) => body.querySelector(id);

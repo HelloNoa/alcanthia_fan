@@ -7,6 +7,7 @@ import { renderCodex } from "./codex.js";
 import { renderSkillTree } from "./skilltree.js";
 import { renderCalc } from "./calc.js";
 import { renderPlanner } from "./planner.js";
+import { itemIcon } from "./sprites.js";
 
 const view = document.getElementById("view");
 const $ = (s, r = document) => r.querySelector(s);
@@ -96,6 +97,23 @@ const ZONES = ["beginner_forest", "misty_swamp", "poison_jungle", "mid_cave",
   "starlight_plateau", "advanced_volcano", "wind_corridor", "golden_fields",
   "twilight_valley", "sunset_cliff", "forgotten_fortress", "crystal_mine",
   "sleeping_roots", "dried_spring"];
+const RELOCATION_MATERIALS = {
+  mist_town: "mana_crystal",
+  beginner_forest: "growth_potion",
+  misty_swamp: "vitality_elixir",
+  poison_jungle: "slime_potion",
+  mid_cave: "silver_crystal",
+  starlight_plateau: "star_crystal",
+  advanced_volcano: "resistance_potion",
+  wind_corridor: "gale_potion",
+  golden_fields: "golden_crystal",
+  twilight_valley: "refraction_potion",
+  sunset_cliff: "sunset_glow_potion",
+  forgotten_fortress: "forgetting_potion",
+  crystal_mine: "refined_crystal",
+  sleeping_roots: "dream_potion",
+  dried_spring: "mana_potion",
+};
 function relTime(ts) {
   if (!ts) return "";
   const d = (Date.now() - new Date(ts).getTime()) / 1000;
@@ -126,6 +144,7 @@ async function tabResidents() {
         <span class="zfx-coeff">지역효과 계수 <b id="zf-coeff">0.00</b></span>
       </div>
       <div id="zf-list" class="zfx-list"></div>
+      <div id="zf-cost" class="zfx-cost"></div>
     </div>
     <div id="residents"></div>`;
 
@@ -135,13 +154,31 @@ async function tabResidents() {
     catch { return "?"; }
   });
   const renderFx = () => {
+    const zone = $("#zone").value;
     const fam = +$("#zf-fam").value, fog = $("#zf-fog").checked ? 1 : 0, raid = $("#zf-raid").checked ? 0.5 : 0;
     const e = fam * 0.1 + fog * 1 + raid;
     $("#zf-coeff").textContent = e.toFixed(2);
-    const fx = g.zone_effects?.[$("#zone").value];
+    const fx = g.zone_effects?.[zone];
     $("#zf-list").innerHTML = fx
       ? fx.map((t) => `<div class="zfx-item">• ${evalTpl(t, e)}</div>`).join("")
       : `<div class="muted" style="padding:4px 0">표시할 지역 효과 없음 (안개마을 등)</div>`;
+    const mat = RELOCATION_MATERIALS[zone];
+    const cost = $("#zf-cost");
+    cost.innerHTML = `
+      <div class="zfx-cost-title">이주 비용</div>
+      <div class="zfx-cost-row">
+        <span class="zfx-cost-ic" data-ic="engraving_stone"></span>
+        <span>확장: 텃밭 각 칸의 강화도와 같은 각인석 1개씩</span>
+      </div>
+      ${mat ? `<div class="zfx-cost-row">
+        <span class="zfx-cost-ic" data-ic="${mat}"></span>
+        <span>개간: 텃밭 각 칸의 강화도와 같은 ${N.items?.[mat] || mat} 1개씩</span>
+      </div>` : ""}
+      <div class="zfx-cost-row muted">
+        <span class="zfx-cost-ic" data-ic="levitation_core"></span>
+        <span>대체: 최고 필요 강화도 이상 부유핵 1개</span>
+      </div>`;
+    cost.querySelectorAll(".zfx-cost-ic[data-ic]").forEach((el) => itemIcon(el, el.dataset.ic));
   };
   $("#zf-fam").oninput = () => { $("#zf-famv").textContent = $("#zf-fam").value; renderFx(); };
   $("#zf-fog").onchange = renderFx;
