@@ -165,6 +165,7 @@
 "contagion_potion": "전염포션",
 "curse_potion": "저주포션",
 "aquifer_potion": "수맥포션",
+"reversion_potion": "환원포션",
 "dissolution_potion": "용해포션",
 "forgetting_potion": "망각포션",
 "fairy_lantern": "요정 등불",
@@ -360,6 +361,7 @@
 "fire_vine_golden": "fire_vine_golden",
 "fire_vine_starlit": "fire_vine_starlit",
 "fire_vine_runic": "fire_vine_runic",
+"sprawling_vine_pink_bloom": "sprawling_vine_pink_bloom",
 "wind_blossom_golden": "wind_blossom_golden",
 "wind_blossom_spiral_bloom": "wind_blossom_spiral_bloom",
 "wind_blossom_starlit": "wind_blossom_starlit",
@@ -396,20 +398,21 @@
 "rustic_fence:rose_vine": "rose_vine_fence",
 "stone_floor:flower_meadow": "flower_meadow_floor",
 "stone_floor:tilled_soil": "tilled_soil_floor",
+"water_channel:edge_upper_left": "water_channel_edge_upper_left",
+"water_channel:edge_upper_right": "water_channel_edge_upper_right",
 "water_channel:edge_lower_left": "water_channel_edge_lower_left",
 "water_channel:edge_lower_right": "water_channel_edge_lower_right",
+"lava_channel:upper_left": "lava_channel_upper_left",
+"lava_channel:upper_right": "lava_channel_upper_right",
 "lava_channel:lower_left": "lava_channel_lower_left",
 "lava_channel:lower_right": "lava_channel_lower_right",
-"water_channel:edge_upper_right": "water_channel_edge_upper_right",
-"lava_channel:upper_right": "lava_channel_upper_right",
-"water_channel:edge_upper_left": "water_channel_edge_upper_left",
-"lava_channel:upper_left": "lava_channel_upper_left",
 "crystal_fountain:garden_stone": "garden_stone_fountain",
 "storage_chest:sword": "storage_chest_sword",
 "storage_chest:grass": "storage_chest_grass",
 "storage_chest:star": "storage_chest_star",
 "storage_chest:pink": "storage_chest_pink",
 "storage_chest:blue": "storage_chest_blue",
+"hourglass:crystal_orb": "hourglass_crystal_orb",
 "town_teleporter:cottage_well": "town_teleporter_cottage"
 },
 "itemVariants": {
@@ -473,6 +476,16 @@
 "name": "갈아엎은 흙",
 "sprite": "tilled_soil_floor"
 },
+"water_channel:edge_upper_left": {
+"itemCode": "water_channel",
+"name": "좌상 물결",
+"sprite": "water_channel_edge_upper_left"
+},
+"water_channel:edge_upper_right": {
+"itemCode": "water_channel",
+"name": "우상 물결",
+"sprite": "water_channel_edge_upper_right"
+},
 "water_channel:edge_lower_left": {
 "itemCode": "water_channel",
 "name": "좌하 물결",
@@ -482,6 +495,16 @@
 "itemCode": "water_channel",
 "name": "우하 물결",
 "sprite": "water_channel_edge_lower_right"
+},
+"lava_channel:upper_left": {
+"itemCode": "lava_channel",
+"name": "좌상 용암길",
+"sprite": "lava_channel_upper_left"
+},
+"lava_channel:upper_right": {
+"itemCode": "lava_channel",
+"name": "우상 용암길",
+"sprite": "lava_channel_upper_right"
 },
 "lava_channel:lower_left": {
 "itemCode": "lava_channel",
@@ -493,26 +516,6 @@
 "name": "우하 용암길",
 "sprite": "lava_channel_lower_right"
 },
-"water_channel:edge_upper_right": {
-"itemCode": "water_channel",
-"name": "우상 물결",
-"sprite": "water_channel_edge_upper_right"
-},
-"lava_channel:upper_right": {
-"itemCode": "lava_channel",
-"name": "우상 용암길",
-"sprite": "lava_channel_upper_right"
-},
-"water_channel:edge_upper_left": {
-"itemCode": "water_channel",
-"name": "좌상 물결",
-"sprite": "water_channel_edge_upper_left"
-},
-"lava_channel:upper_left": {
-"itemCode": "lava_channel",
-"name": "좌상 용암길",
-"sprite": "lava_channel_upper_left"
-},
 "crystal_fountain:garden_stone": {
 "itemCode": "crystal_fountain",
 "name": "석조 분수",
@@ -520,28 +523,33 @@
 },
 "storage_chest:sword": {
 "itemCode": "storage_chest",
-"name": "검 문양",
+"name": "검 문양 차원상자",
 "sprite": "storage_chest_sword"
 },
 "storage_chest:grass": {
 "itemCode": "storage_chest",
-"name": "풀 문양",
+"name": "풀 문양 차원상자",
 "sprite": "storage_chest_grass"
 },
 "storage_chest:star": {
 "itemCode": "storage_chest",
-"name": "별 문양",
+"name": "별 문양 차원상자",
 "sprite": "storage_chest_star"
 },
 "storage_chest:pink": {
 "itemCode": "storage_chest",
-"name": "분홍빛",
+"name": "분홍빛 차원상자",
 "sprite": "storage_chest_pink"
 },
 "storage_chest:blue": {
 "itemCode": "storage_chest",
-"name": "파란빛",
+"name": "파란빛 차원상자",
 "sprite": "storage_chest_blue"
+},
+"hourglass:crystal_orb": {
+"itemCode": "hourglass",
+"name": "마력 수정구",
+"sprite": "hourglass_crystal_orb"
 },
 "town_teleporter:cottage_well": {
 "itemCode": "town_teleporter",
@@ -667,6 +675,7 @@
 "contagion_potion": "contagion_potion",
 "curse_potion": "curse_potion",
 "aquifer_potion": "aquifer_potion",
+"reversion_potion": "reversion_potion",
 "dissolution_potion": "dissolution_potion",
 "forgetting_potion": "forgetting_potion",
 "fairy_lantern": "fairy_lantern",
@@ -854,6 +863,7 @@
 "contagion_potion": "potions",
 "curse_potion": "potions",
 "aquifer_potion": "potions",
+"reversion_potion": "potions",
 "dissolution_potion": "potions",
 "forgetting_potion": "potions",
 "fairy_lantern": "items/ornament",
@@ -955,20 +965,21 @@
 "rose_vine_fence": "items/ornament",
 "flower_meadow_floor": "items/ornament",
 "tilled_soil_floor": "items/ornament",
+"water_channel_edge_upper_left": "items/ornament",
+"water_channel_edge_upper_right": "items/ornament",
 "water_channel_edge_lower_left": "items/ornament",
 "water_channel_edge_lower_right": "items/ornament",
+"lava_channel_upper_left": "items/ornament",
+"lava_channel_upper_right": "items/ornament",
 "lava_channel_lower_left": "items/ornament",
 "lava_channel_lower_right": "items/ornament",
-"water_channel_edge_upper_right": "items/ornament",
-"lava_channel_upper_right": "items/ornament",
-"water_channel_edge_upper_left": "items/ornament",
-"lava_channel_upper_left": "items/ornament",
 "garden_stone_fountain": "items/ornament",
 "storage_chest_sword": "items/ornament",
 "storage_chest_grass": "items/ornament",
 "storage_chest_star": "items/ornament",
 "storage_chest_pink": "items/ornament",
 "storage_chest_blue": "items/ornament",
+"hourglass_crystal_orb": "items/ornament",
 "town_teleporter_cottage": "items/ornament"
 }
 }

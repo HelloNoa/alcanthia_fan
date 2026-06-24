@@ -408,6 +408,7 @@ export async function renderCodex(view, sub) {
         { code: "condensing_flask", tgt: "포션", desc: "포션을 플라스크에 담아 농축 (강화도+1개까지 보관)" },
         { code: "dissolution_potion", tgt: "장비", desc: "장비에 박힌 세공 보석을 녹여 추출" },
         { code: "shatter_potion", tgt: "아무 아이템", desc: "대상의 강화도 −1 (성공률 = 0.5^강화도 차이)" },
+        { code: "reversion_potion", tgt: "아무 아이템", desc: "강화 아이템은 한 단계 낮은 아이템 2개로 환원, 0강 제작물은 재료로 환원" },
         { code: "opaque_sediment", tgt: "판매가 있는 아이템", desc: "같은 타입의 비슷한 가치 아이템으로 변환 (가치 기반)" },
       ];
       TOOLS.forEach((t) => {
