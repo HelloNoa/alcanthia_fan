@@ -121,7 +121,10 @@ export async function renderCodex(view, sub) {
     if (zs.length) src.push(`⚔️ 전리품 (${zs.join(", ")})`);
     if (shopSet.has(code)) src.push("🏪 상점");
     const dia = g.dia_shop?.[code];
-    if (dia) src.push(`💎 다이아 상점 (${dia.dia}다이아${dia.lv ? `, Lv${dia.lv}` : ""})`);
+    if (dia) {
+      const enh = dia.enhancement ? `+${dia.enhancement}, ` : "";
+      src.push(`💎 다이아 상점 (${enh}${dia.dia}다이아${dia.lv ? `, Lv${dia.lv}` : ""})`);
+    }
     if (code.startsWith("dia_box_")) src.push("💵 과금 (현금 구매) · 🛒 시장 거래");
     if (g.special_source?.[code]) src.push(g.special_source[code]);
     if (!src.length && (g.unobtainable || []).includes(code)) src.push("🚫 획득 불가");
@@ -421,17 +424,129 @@ export async function renderCodex(view, sub) {
       // 불투명한 침전물 가치 테이블
       if (!q) {
         const TY = { produce: "수확물", potion: "포션", general: "일반", equipment: "장비", tool: "도구", seed: "씨앗" };
+        const itemRanks = new Map(Object.keys(g.items || {}).map((code, i) => [code, i]));
+        const itemOrder = (code) => itemRanks.get(code) ?? Number.MAX_SAFE_INTEGER;
+        const priceOf = (code) => {
+          const v = g.item_values?.[code] ?? g.sell_price?.[code];
+          return Number.isFinite(v) && v > 0 ? v : null;
+        };
+        const targetValueOf = (code, enh) => priceOf(code) * Math.pow(2, enh);
+        const candidateValueOf = (code, enh) => priceOf(code) * Math.pow(3, enh);
+        const candidateStates = (targetCode, targetEnh, sedimentEnh) => {
+          const targetBase = priceOf(targetCode);
+          if (targetBase == null) return null;
+          const targetType = g.items?.[targetCode]?.type;
+          const maxValue = targetValueOf(targetCode, targetEnh);
+          const minFactor = Math.min(1, Math.max(0, Math.floor(sedimentEnh)) * 0.1);
+          const minValue = maxValue * minFactor;
+          const states = [];
+          for (const [code, it] of Object.entries(g.items || {})) {
+            if (code === targetCode || code === "opaque_sediment" || it.type !== targetType || isTest(code, it)) continue;
+            const base = priceOf(code);
+            if (base == null || base > maxValue) continue;
+            const maxEnh = it.type === "produce" ? 1 : 40;
+            for (let enh = 0; enh <= maxEnh; enh++) {
+              const value = candidateValueOf(code, enh);
+              if (value > maxValue) break;
+              states.push({ code, enh, value });
+            }
+          }
+          states.sort((a, b) => a.value - b.value || itemOrder(a.code) - itemOrder(b.code) || a.enh - b.enh);
+          const groups = [];
+          for (const st of states) {
+            const last = groups[groups.length - 1];
+            if (last && last.value === st.value) last.states.push(st);
+            else groups.push({ value: st.value, states: [st] });
+          }
+          const denom = maxValue - minValue;
+          if (denom <= 0) {
+            const best = [...groups].reverse().find((grp) => grp.value <= maxValue);
+            return { targetBase, targetValue: maxValue, minValue, maxValue, results: best ? best.states.map((st) => ({ ...st, prob: 1 / best.states.length })) : [] };
+          }
+          const results = [];
+          for (let i = 0; i < groups.length; i++) {
+            const cur = groups[i];
+            const nextValue = groups[i + 1]?.value ?? Infinity;
+            const lo = Math.max(minValue, cur.value);
+            const hi = Math.min(maxValue, nextValue);
+            if (lo >= hi) continue;
+            const prob = (hi - lo) / denom / cur.states.length;
+            for (const st of cur.states) results.push({ ...st, prob });
+          }
+          return { targetBase, targetValue: maxValue, minValue, maxValue, results };
+        };
+        const valuedItems = Object.entries(g.items || {})
+          .filter(([code, it]) => code !== "opaque_sediment" && !isTest(code, it) && priceOf(code) != null)
+          .sort((a, b) => (a[1].type || "").localeCompare(b[1].type || "") || priceOf(a[0]) - priceOf(b[0]) || itemOrder(a[0]) - itemOrder(b[0]));
+        const opts = valuedItems.map(([code, it]) =>
+          `<option value="${code}">${TY[it.type] || it.type} · ${it.name || code} (${fmt(priceOf(code))})</option>`).join("");
+        body.insertAdjacentHTML("beforeend",
+          `<div class="tr-calc">
+            <div class="tr-calc-title">침전물 결과 계산</div>
+            <div class="tr-calc-controls">
+              <label>대상 <select id="tr-target">${opts}</select></label>
+              <label>대상 강화 <input id="tr-target-e" type="number" min="0" max="40" value="0"></label>
+              <label>침전물 강화 <input id="tr-sed-e" type="number" min="0" max="10" value="0"></label>
+            </div>
+            <div id="tr-result" class="tr-result"></div>
+          </div>`);
+        const targetSel = body.querySelector("#tr-target");
+        const targetE = body.querySelector("#tr-target-e");
+        const sedE = body.querySelector("#tr-sed-e");
+        const trResult = body.querySelector("#tr-result");
+        if ([...targetSel.options].some((o) => o.value === "cauldron_controller")) {
+          targetSel.value = "cauldron_controller";
+          targetE.value = "2";
+        }
+        const pct = (v) => `${(v * 100).toFixed(v < 0.001 ? 3 : v < 0.01 ? 2 : 1)}%`;
+        const renderTransmuteCalc = () => {
+          const targetCode = targetSel.value;
+          const targetEnh = Math.max(0, Math.floor(+targetE.value || 0));
+          const sedimentEnh = Math.max(0, Math.min(10, Math.floor(+sedE.value || 0)));
+          targetE.value = targetEnh;
+          sedE.value = sedimentEnh;
+          const calc = candidateStates(targetCode, targetEnh, sedimentEnh);
+          if (!calc) {
+            trResult.innerHTML = `<div class="muted">가치가 없는 아이템은 침전물 변성 후보 계산을 할 수 없습니다.</div>`;
+            return;
+          }
+          const targetName = g.items?.[targetCode]?.name || targetCode;
+          const range = `${fmt(Math.ceil(calc.minValue))} ~ ${fmt(Math.floor(calc.maxValue))}`;
+          const rows = calc.results
+            .sort((a, b) => b.prob - a.prob || b.value - a.value || itemOrder(a.code) - itemOrder(b.code))
+            .map((r) => {
+              const name = `${g.items?.[r.code]?.name || r.code}${r.enh > 0 ? `+${r.enh}` : ""}`;
+              return `<div class="tr-cand">
+                <span class="tr-vic" data-ic="${r.code}"></span>
+                <span class="tr-vn">${name}</span>
+                <small>${fmt(r.value)}</small>
+                <b>${pct(r.prob)}</b>
+              </div>`;
+            }).join("");
+          trResult.innerHTML = `<div class="tr-summary">
+              <span>${targetName}+${targetEnh}</span>
+              <b>입력 가치 ${fmt(calc.targetBase)} × 2^${targetEnh} = ${fmt(calc.targetValue)}</b>
+              <span>침전물 +${sedimentEnh}: 결과 가치 ${range}</span>
+            </div>
+            <div class="tr-cands">${rows || "<div class='muted'>가능 후보 없음</div>"}</div>`;
+          trResult.querySelectorAll(".tr-vic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
+        };
+        [targetSel, targetE, sedE].forEach((el) => { el.oninput = renderTransmuteCalc; el.onchange = renderTransmuteCalc; });
+        renderTransmuteCalc();
         const byType = {};
-        for (const [code, v] of Object.entries(g.item_values || {})) {
+        for (const [code, it] of Object.entries(g.items || {})) {
+          const v = priceOf(code);
+          if (v == null || isTest(code, it)) continue;
           const tp = g.items?.[code]?.type || "기타";
           (byType[tp] ??= []).push([code, v]);
         }
         const rangeRows = [0, 1, 2, 5, 10].map((e) => `+${e} → ${Math.min(100, e * 10)}%~100%`).join(" · ");
         body.insertAdjacentHTML("beforeend",
           `<div class="tr-note">🔀 <b>불투명한 침전물</b>은 순수 랜덤이 아니라 <b>가치 기반</b>이에요.<br>
-          <b>결과 가치 = 입력 가치 × 2^입력강화 × f</b> · <b>f = min + (1−min)×랜덤</b> · <b>min = 침전물강화 × 10%</b>(최대 100%)<br>
+          <b>굴리는 가치 = 입력 기본가 × 2^입력강화 × f</b> · <b>f = min + (1−min)×랜덤</b> · <b>min = 침전물강화 × 10%</b>(최대 100%)<br>
+          <b>후보 가치 = 후보 기본가 × 3^후보강화</b>이며, 수확물 후보는 최대 +1까지만 계산함<br>
           즉 침전물 강화가 <b>결과 가치의 하한</b>을 정함 (상한 100%): ${rangeRows}<br>
-          그 가치 범위에서 <b>같은 타입</b>의 가장 가까운(이하) 아이템이 결과. 아래는 아이템 가치표.</div>`);
+          굴린 가치 이하의 <b>같은 타입</b> 후보 중 가장 가까운 값이 결과. 아래는 기본 가치표.</div>`);
         for (const tp of ["seed", "produce", "potion", "general", "equipment", "tool"]) {
           const list = (byType[tp] || []).sort((a, b) => a[1] - b[1]);
           if (!list.length) continue;
