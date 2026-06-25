@@ -57,6 +57,10 @@ async function timeCalc(body) {
   const g = await gamedata();
   const plants = g.plants || {};
   const potions = Object.entries(g.items || {}).filter(([, it]) => it.type === "potion");
+  const cauldrons = Object.entries(g.items || {})
+    .filter(([c, it]) => it.type === "tool" && it.brewDuration_ms
+      && (c.includes("cauldron") || c === "cauldron_controller" || (it.name || "").includes("가마솥")))
+    .sort((a, b) => a[1].brewDuration_ms - b[1].brewDuration_ms || a[1].name.localeCompare(b[1].name));
 
   body.innerHTML = `
     <div class="calc-grid">
@@ -106,6 +110,35 @@ async function timeCalc(body) {
         예) 9강을 만들려면 8강 포션 2개가 필요하고, 시간은 8강 기준(2⁸)으로 계산돼요.</div>
         <p class="muted">지역효과 계수 = 낯익은 터×0.1 + 안개 해방 + 지역효과 버프×0.5.<br>
         시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수 × 화염포션(선택)</p>
+      </div>
+      <div class="calc-card">
+        <h3>🛠️ 가마솥 강화 시간</h3>
+        <div class="calc-row">
+          <select id="tcItem">${cauldrons.map(([c, it]) => `<option value="${c}">${it.name}</option>`).join("")}</select>
+        </div>
+        <div class="calc-row">
+          <label class="lvlabel">불꽃 숙련 <input id="tcFlame" type="range" min="0" max="10" value="0"><b id="tcFlamev">0</b></label>
+          <label class="lvlabel">사용 가마솥 강화 <input id="tcToolE" type="range" min="0" max="20" value="0"><b id="tcToolEv">0</b></label>
+          <label class="lvlabel">대상 현재 강화 <input id="tcItemE" type="range" min="0" max="20" value="0"><b id="tcItemEv">0</b>강</label>
+        </div>
+        <div class="calc-row">
+          <label class="lvlabel">강화 존
+            <select id="tcZone">
+              <option value="">기타 (×1)</option>
+              <option value="sunset_cliff">석양절벽 (시간×2 · 결과+1)</option>
+              <option value="advanced_volcano">용암협곡 (−6%×계수)</option>
+            </select>
+          </label>
+          <label class="lvlabel">낯익은 터 <input id="tcFamG" type="range" min="0" max="10" value="0"><b id="tcFamGv">0</b></label>
+          <label class="chk"><input type="checkbox" id="tcFog"> 안개 해방</label>
+          <label class="chk"><input type="checkbox" id="tcZoneBuff"> 지역효과 버프</label>
+        </div>
+        <div class="calc-row">
+          <label class="chk"><input type="checkbox" id="tcFirePot"> 화염포션 적용</label>
+          <label class="lvlabel">화염포션 강화 <input id="tcFireE" type="range" min="0" max="20" value="0"><b id="tcFireEv">0</b>강</label>
+        </div>
+        <div id="tcOut" class="calc-out"></div>
+        <p class="muted">시간 = 대상 기본시간 × 2^현재강화 × (1−0.01×불꽃)^(사용가마솥강화+1) × 존배수 × 화염포션(선택)</p>
       </div>
     </div>`;
 
@@ -177,11 +210,49 @@ async function timeCalc(body) {
         `<span class="calc-note-inline">지역효과 계수 ${t.toFixed(1)}</span>`);
     }
   };
+  const tcOut = () => {
+    const c = body.querySelector("#tcItem").value;
+    const fl = +body.querySelector("#tcFlame").value, toolE = +body.querySelector("#tcToolE").value;
+    const itemE = +body.querySelector("#tcItemE").value;
+    const famG = +body.querySelector("#tcFamG").value, fog = body.querySelector("#tcFog").checked;
+    const zoneBuff = body.querySelector("#tcZoneBuff").checked;
+    const zone = body.querySelector("#tcZone").value;
+    const fireOn = body.querySelector("#tcFirePot").checked, fireE = +body.querySelector("#tcFireE").value;
+    body.querySelector("#tcFlamev").textContent = fl;
+    body.querySelector("#tcToolEv").textContent = toolE;
+    body.querySelector("#tcItemEv").textContent = itemE;
+    body.querySelector("#tcFamGv").textContent = famG;
+    body.querySelector("#tcFireEv").textContent = fireE;
+    const t = famG * 0.1 + (fog ? 1 : 0) + (zoneBuff ? 0.5 : 0);
+    const base = g.items[c]?.brewDuration_ms ? g.items[c].brewDuration_ms * Math.pow(2, itemE) : null;
+    const zm = zoneMult(zone, t, false);
+    const fireMult = fireOn ? Math.pow(0.9, fireE + 1) : 1;
+    const adj = base ? Math.round(base * factor(0.01, fl, toolE) * zm * fireMult) : null;
+    const el = body.querySelector("#tcOut"); el.innerHTML = "";
+    const ic = document.createElement("span"); ic.className = "calc-ic"; itemIcon(ic, c);
+    el.appendChild(ic);
+    el.insertAdjacentHTML("beforeend",
+      `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>
+       <span class="calc-note-inline">${g.items[c]?.name || c} +${itemE} → +${itemE + 1} 1회</span>`);
+    if (fireOn) el.insertAdjacentHTML("beforeend",
+      `<span class="calc-note-inline">화염포션 ×${fireMult.toFixed(2)}</span>`);
+    if (zone === "sunset_cliff") {
+      const plusRate = Math.min(1, 0.05 * t);
+      el.insertAdjacentHTML("beforeend",
+        `<span class="calc-note-inline">석양절벽: 강화 시간 ×2 고정 · 강화 결과 +1 ${pct(plusRate)}</span>`);
+    } else if (zone === "advanced_volcano") {
+      el.insertAdjacentHTML("beforeend",
+        `<span class="calc-note-inline">지역효과 계수 ${t.toFixed(1)}</span>`);
+    }
+  };
   body.querySelectorAll("#crop,#soil,#seedE").forEach((e) => e.oninput = cropOut);
   body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog,#zoneBuff,#firePot,#fireE").forEach((e) => {
     e.oninput = potOut; e.onchange = potOut;
   });
-  cropOut(); potOut();
+  body.querySelectorAll("#tcItem,#tcFlame,#tcToolE,#tcItemE,#tcZone,#tcFamG,#tcFog,#tcZoneBuff,#tcFirePot,#tcFireE").forEach((e) => {
+    e.oninput = tcOut; e.onchange = tcOut;
+  });
+  cropOut(); potOut(); tcOut();
 }
 
 // ---------- 레벨 계산 ----------
