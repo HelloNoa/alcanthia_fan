@@ -518,6 +518,44 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .cx-enh-lv { color: var(--gold); min-width: 24px; text-align: center; }
 .cx-enh-stat { color: var(--accent); font-weight: 600; margin-left: 4px; }
 
+/* 랜덤 효과 확률표 */
+.rand-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 12px; }
+.rand-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+  display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.rand-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.rand-head b { display: block; color: var(--ink); font-size: 15px; }
+.rand-head small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.rand-potion-ic { width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.rand-potion-ic img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
+.rand-effect { color: var(--ink); font-size: 13px; line-height: 1.45; min-height: 19px; }
+.rand-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.rand-controls span { color: var(--muted); }
+.rand-step { width: 24px; height: 24px; padding: 0; background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); cursor: pointer; font-size: 15px; line-height: 1; }
+.rand-step:hover, .rand-toggle:hover { border-color: var(--accent); }
+.rand-lv { color: var(--gold); min-width: 24px; text-align: center; }
+.rand-summary { display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 12px; }
+.rand-summary span { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+.rand-summary b { color: var(--gold); }
+.rand-list { display: flex; flex-direction: column; gap: 5px; }
+.rand-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; align-items: center; gap: 7px;
+  background: #171522; border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; font-size: 12.5px; }
+.rand-ic { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; }
+.rand-ic img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
+.rand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rand-row small { color: var(--muted); font-size: 11px; }
+.rand-row b, .rand-rest b { color: var(--gold); font-size: 12px; }
+.rand-rest { padding: 4px 7px; color: var(--muted); font-size: 12px; text-align: right; }
+.rand-toggle { width: 100%; padding: 6px 8px; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 7px; color: var(--ink); font-size: 12px; cursor: pointer; }
+.rand-note { margin-top: auto; padding-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+
+@media (max-width: 420px) {
+  .rand-grid { grid-template-columns: minmax(0, 1fr); }
+  .rand-row { grid-template-columns: 22px minmax(0, 1fr) auto; }
+  .rand-row small { display: none; }
+}
+
 /* 변성 탭 가치표 */
 .tr-note { background: #211f3a; border: 1px solid #4a3d6e; border-radius: 8px;
   padding: 10px 13px; font-size: 13px; color: #c9bfff; line-height: 1.6; margin: 16px 0 6px; }

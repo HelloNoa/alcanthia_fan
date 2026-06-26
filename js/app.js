@@ -7,6 +7,7 @@ import { renderCodex } from "./codex.js";
 import { renderSkillTree } from "./skilltree.js";
 import { renderCalc } from "./calc.js";
 import { renderPlanner } from "./planner.js";
+import { renderRandomEffects } from "./random_effects.js";
 import { itemIcon } from "./sprites.js";
 
 const view = document.getElementById("view");
@@ -298,6 +299,7 @@ const TABS = {
   residents: { label: "🗺️ 거주민", run: tabResidents },
   rank: { label: "🏆 랭킹", run: tabLeaderboard },
   codex: { label: "📖 도감", run: (sub) => renderCodex(view, sub) },
+  random: { label: "🎲 확률표", run: () => renderRandomEffects(view) },
   skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
   calc: { label: "🧮 계산기", run: (sub) => renderCalc(view, sub) },
 };

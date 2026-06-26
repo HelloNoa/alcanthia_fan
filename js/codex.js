@@ -1,4 +1,5 @@
 import { gamedata, names } from "./api.js";
+import { RANDOM_EFFECTS } from "./random_effects.js";
 import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, fmtDuration } from "./sprites.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
@@ -69,7 +70,8 @@ export async function renderCodex(view, sub) {
 
   // 테스트/미사용 아이템 (도감 제외)
   const testSet = new Set(g.test_items || []);
-  const isTest = (code, it) => testSet.has(code) || (it?.name || "").includes("시험용");
+  const extraTestSet = new Set(["growth_elixir", "poison_fang"]);
+  const isTest = (code, it) => testSet.has(code) || extraTestSet.has(code) || /^aging_/.test(code) || it?.test === true || (it?.name || "").includes("시험용");
   const ITEM_TAB_POTIONS = new Set(["condensing_flask"]);
 
   // 포션 강화(e) 효과 평가 — 게임 헬퍼 그대로 (wn=e+1, gi=⌊(e+2)/2⌋, Jt=4(e+1), YP=4^e, Oh=e×2, uy=25)
@@ -188,7 +190,9 @@ export async function renderCodex(view, sub) {
       Object.entries(g.items || {}).filter(([code, it]) => it.type === "potion" && !ITEM_TAB_POTIONS.has(code)).forEach(([code, it]) => {
         if (!match(it.name) || isTest(code, it)) return;
         const combat = g.potion_effects?.[code];
-        const use = g.potion_use_effects?.[code];
+        const rawUse = g.potion_use_effects?.[code];
+        const randMeta = RANDOM_EFFECTS[code];
+        const use = randMeta ? { ...(rawUse || {}), formula: randMeta.formula, base: randMeta.base } : rawUse;
         const useF = use?.formula, combatF = combat?.formula;
         const hasDur = (g.use_duration || []).includes(code);  // 지속형 사용효과 (10×2^강화 분)
         const durTxt = (e) => `${10 * 2 ** e}분`;
