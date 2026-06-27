@@ -12,14 +12,18 @@ export const RANDOM_EFFECTS = {
     kind: "produce",
     label: "랜덤 수확물",
     divisor: 2,
+    resultEnh: "source",
+    effectLabel: "몽환 +강",
+    sourceLabel: "수확될 +강",
     formula: "다음 1회 수확 시 랜덤 작물 (기대 가치 ×${2**e})",
     base: "다음 1회 수확 시 랜덤 작물 (강화 시 고가치 작물 확률 증가)",
-    note: "수확물 강화도 +0 기준. 실제 수확물이 강화되어 있으면 후보 가치는 ×3^강화로 계산됩니다.",
+    note: "몽환은 이번 수확 결과의 아이템 종류만 랜덤 작물로 바꾸고, 결과물에 붙을 +강은 그대로 유지합니다.",
   },
   comet_potion: {
     kind: "seed",
     label: "랜덤 씨앗",
     divisor: 2,
+    effectLabel: "혜성 +강",
     formula: "하늘에서 랜덤 씨앗 획득 (기대 가치 ×${2**e})",
     base: "하늘에서 랜덤 씨앗 획득 (강화 시 고가치 씨앗 확률 증가)",
     note: "씨앗은 +0으로 지급됩니다.",
@@ -29,6 +33,7 @@ export const RANDOM_EFFECTS = {
     label: "랜덤 출정 포션",
     divisor: 1,
     resultEnh: "effect",
+    effectLabel: "신기루 +강",
     formula: "다음 출정 시 랜덤 +${e} 포션 1개 추가 (기대 가치 ×${2**e})",
     base: "다음 출정 시 랜덤 포션 추가 (강화 시 고가치 포션 확률 증가)",
     note: "추가 포션 강화도 = 신기루포션 강화도입니다.",
@@ -37,9 +42,12 @@ export const RANDOM_EFFECTS = {
     kind: "potion",
     label: "랜덤 양조 포션",
     divisor: 1,
+    resultEnh: "source",
+    effectLabel: "백일몽 +강",
+    sourceLabel: "완성될 +강",
     formula: "다음 1회 양조 시 랜덤 포션 (기대 가치 ×${2**e})",
     base: "다음 1회 양조 시 랜덤 포션 (강화 시 고가치 포션 확률 증가)",
-    note: "양조 결과 강화도 +0 기준. 실제 결과 강화도가 있으면 후보 가치는 ×3^강화로 계산됩니다.",
+    note: "백일몽은 이번 양조 결과의 아이템 종류만 랜덤 포션으로 바꾸고, 결과물에 붙을 +강은 그대로 유지합니다.",
   },
 };
 
@@ -70,11 +78,11 @@ const randomAverage = (entries, minValue, exp) => {
   return entries.reduce((sum, it, i) => sum + it.value * weights[i], 0) / total;
 };
 
-export function randomDistribution(g, code, enh) {
+export function randomDistribution(g, code, enh, sourceEnh = 0) {
   const cfg = RANDOM_EFFECTS[code];
   const base = randomValueOf(g, code);
   if (!cfg || base == null) return null;
-  const resultEnh = cfg.resultEnh === "effect" ? enh : 0;
+  const resultEnh = cfg.resultEnh === "effect" ? enh : cfg.resultEnh === "source" ? sourceEnh : 0;
   const target = base * Math.pow(2, enh) / cfg.divisor;
   const entries = randomCandidates(g, cfg.kind).flatMap((c) => {
     const v = randomValueOf(g, c);
@@ -113,6 +121,7 @@ const evalFormula = (tpl, e) => String(tpl || "").replace(/\$\{([^}]+)\}/g, (_, 
 function renderRandomCard(g, code) {
   const cfg = RANDOM_EFFECTS[code];
   const item = g.items?.[code] || {};
+  const hasSourceEnh = cfg.resultEnh === "source";
   const card = document.createElement("section");
   card.className = "rand-card";
   card.innerHTML = `
@@ -122,11 +131,17 @@ function renderRandomCard(g, code) {
     </div>
     <div class="rand-effect"></div>
     <div class="rand-controls">
-      <span>강화</span>
+      <span>${cfg.effectLabel || "효과 +강"}</span>
       <button type="button" class="rand-step" data-d="-1">−</button>
       <b class="rand-lv">+0</b>
       <button type="button" class="rand-step" data-d="1">+</button>
     </div>
+    ${hasSourceEnh ? `<div class="rand-controls">
+      <span>${cfg.sourceLabel}</span>
+      <button type="button" class="rand-step rand-source-step" data-d="-1">−</button>
+      <b class="rand-lv rand-source-lv">+0</b>
+      <button type="button" class="rand-step rand-source-step" data-d="1">+</button>
+    </div>` : ""}
     <div class="rand-summary"></div>
     <div class="rand-list"></div>
     <div class="rand-note"></div>`;
@@ -134,15 +149,18 @@ function renderRandomCard(g, code) {
 
   const effectEl = card.querySelector(".rand-effect");
   const lvEl = card.querySelector(".rand-lv");
+  const sourceLvEl = card.querySelector(".rand-source-lv");
   const summaryEl = card.querySelector(".rand-summary");
   const listEl = card.querySelector(".rand-list");
   const noteEl = card.querySelector(".rand-note");
   let enh = 0;
+  let sourceEnh = 0;
   let expanded = false;
 
   const update = () => {
-    const dist = randomDistribution(g, code, enh);
+    const dist = randomDistribution(g, code, enh, sourceEnh);
     lvEl.textContent = `+${enh}`;
+    if (sourceLvEl) sourceLvEl.textContent = `+${sourceEnh}`;
     effectEl.textContent = evalFormula(cfg.formula, enh);
     if (!dist) {
       summaryEl.innerHTML = "";
@@ -178,6 +196,12 @@ function renderRandomCard(g, code) {
   card.querySelectorAll(".rand-step").forEach((btn) => {
     btn.onclick = () => {
       enh = Math.max(0, enh + Number(btn.dataset.d || 0));
+      update();
+    };
+  });
+  card.querySelectorAll(".rand-source-step").forEach((btn) => {
+    btn.onclick = () => {
+      sourceEnh = Math.max(0, sourceEnh + Number(btn.dataset.d || 0));
       update();
     };
   });
