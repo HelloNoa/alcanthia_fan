@@ -371,6 +371,11 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   padding: 5px 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
   cursor: pointer; font-size: 10.5px; color: var(--ink); }
 .pl-pi.active { border-color: var(--accent); background: #2a2747; box-shadow: 0 0 0 1px var(--accent); }
+.pl-fx { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 56px; min-height: 50px;
+  padding: 5px 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer; font-size: 10.5px; color: var(--ink); }
+.pl-fx.active { border-color: var(--accent); background: #2a2747; box-shadow: 0 0 0 1px var(--accent); }
+.pl-fx-emo { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; }
 .pl-pic { width: 26px; height: 26px; }
 .pl-pic img { width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; }
 .pl-erase { font-size: 20px; line-height: 26px; }
@@ -380,16 +385,21 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-cell { aspect-ratio: 1; background: #1d1c30; border-radius: 3px; position: relative;
   cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .pl-cell:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
-.pl-cic { width: 100%; height: 100%; }
-.pl-cic img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.pl-cic { width: 100%; height: 100%; position: relative; }
+.pl-cic img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: var(--pl-filter, none); }
+.pl-cic::after { content: ""; position: absolute; inset: 4px; border-radius: 50%;
+  background: var(--pl-aura, transparent); opacity: var(--pl-aura-opacity, 0);
+  mix-blend-mode: screen; pointer-events: none; }
 .pl-cell.gated { opacity: .5; }
+.pl-cell.paused .pl-cic img { opacity: .72; }
 .pl-mult { position: absolute; right: 0; bottom: 0; font-size: 8px; font-weight: 700;
   padding: 0 1px; border-radius: 3px 0 0 0; line-height: 1.25; }
 .pl-mult.up { background: #1e5e44; color: #7dffc0; }
 .pl-mult.down { background: #5e2a2a; color: #ffb3a3; }
 .pl-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .pl-legend i.lg { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
-.lg.humid { background: #3b6ea5; } .lg.sunlit { background: #d9a92e; } .lg.toxic { background: #6a9f3a; } .lg.arid { background: #c26b2c; }
+.lg.humid { background: #3b6ea5; } .lg.fertile { background: #47b96b; } .lg.sunlit { background: #d9a92e; }
+.lg.toxic { background: #6a9f3a; } .lg.poisonous { background: #8f5ac8; } .lg.arid { background: #c26b2c; }
 .pl-opts { display: flex; flex-direction: column; gap: 10px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
 .pl-detail, .pl-summary { background: var(--panel); border: 1px solid var(--line);
@@ -426,6 +436,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 
 /* 플래너 v3: 장식물/항마/수분 */
 .pl-orn { border-top: 1px dashed var(--line); padding-top: 8px; align-items: center; }
+.pl-effects { border-top: 1px dashed var(--line); padding-top: 8px; align-items: center; }
 .pl-orn-lbl { font-size: 11px; color: var(--muted); width: 100%; margin-bottom: 2px; }
 .pl-cell.isorn { background: #2a2438; }
 .pl-cell.poll::after { content: ""; position: absolute; inset: 0; border-radius: 3px; z-index: 1;  /* 바닥재 위, 작물 아래 */
@@ -444,6 +455,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 /* 입체: 배지도 똑바로 보이게 역회전 */
 .pl-grid.iso .pl-enhb { transform: rotate(-45deg) scaleY(1.732); transform-origin: top left; }
 .pl-grid.iso .pl-mult { transform: rotate(-45deg) scaleY(1.732); transform-origin: bottom right; }
+.pl-grid.iso .pl-peffs { transform: rotate(-45deg) scaleY(1.732); transform-origin: top right; }
 .pl-grid.iso .pl-cell.poll::after { border-radius: 2px; }
 
 /* 텃밭 뷰어 입체 보기 */
@@ -647,11 +659,13 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .ev-q.warn { color: var(--sell); background: #3a1f24; }
 
 /* 배치: 표면 바닥재 + 경계 울타리/장벽 */
-.pl-cell > .pl-cic, .pl-cell > .pl-enhb, .pl-cell > .pl-mult,
+.pl-cell > .pl-cic, .pl-cell > .pl-enhb, .pl-cell > .pl-mult, .pl-cell > .pl-peffs,
 .pl-cell > .pl-floor, .pl-cell > .pl-fences, .pl-cell > .pl-conds { pointer-events: none; }
 .pl-conds { position: absolute; inset: 0; z-index: 2; border-radius: 3px; }  /* 조건 테두리: 수분경로(1) 위, 작물 아래 */
 .pl-cic { z-index: 3; }  /* 작물이 제일 위 (바닥재·수분경로·조건 테두리 위) */
 .pl-enhb, .pl-mult { z-index: 4; }  /* 배지는 작물보다 위 */
+.pl-peffs { position: absolute; right: 1px; top: 1px; z-index: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 1px; max-width: 18px; }
+.pl-peffs i { width: 5px; height: 5px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
 /* 바닥재 — 실제 스프라이트(2:1 iso 다이아) → un-project(rotate-45 scaleY2) 해서 평면 사각 타일
    입체뷰에선 셀 자체 iso 변환이 다시 투영 → iso 타일로 정확히 보임 (그래서 항상 같은 변환) */
 .pl-floor { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
@@ -797,6 +811,7 @@ html[data-theme="light"] .pl-enhb-inl {
 }
 html[data-theme="light"] table.rank tr.me,
 html[data-theme="light"] .pl-pi.active,
+html[data-theme="light"] .pl-fx.active,
 html[data-theme="light"] .lc-pot tr.lc-pick td {
   background: #ece9ff;
 }
