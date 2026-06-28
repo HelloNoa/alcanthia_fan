@@ -6,12 +6,28 @@
   <title>이끼제리 · 알칸시아 팬페이지</title>
   <link rel="icon" type="image/png" href="./favicon.png">
   <link rel="apple-touch-icon" href="./favicon.png">
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("alc_theme");
+        const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+        const theme = saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch {
+        document.documentElement.dataset.theme = "dark";
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
   <header>
     <h1><img src="./favicon.png" class="h-logo" alt=""> 이끼제리 <span>알칸시아 팬페이지</span></h1>
-    <div class="proxy">proxy: <code id="proxy" title="클릭해서 변경"></code></div>
+    <div class="header-actions">
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="테마 전환">테마</button>
+      <div class="proxy">proxy: <code id="proxy" title="클릭해서 변경"></code></div>
+    </div>
   </header>
   <nav id="tabs"></nav>
   <main id="view"></main>

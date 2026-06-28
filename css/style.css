@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #161527; --panel: #21203a; --panel2: #2b2a47;
   --ink: #e9e8f5; --muted: #9a98bb; --line: #383658;
   --accent: #7c6cff; --buy: #36c98c; --sell: #e8634a; --gold: #f0c14b;
@@ -16,6 +17,13 @@ header {
 header h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 7px; }
 header h1 .h-logo { width: 40px; height: 40px; object-fit: contain; }
 header h1 span { color: var(--muted); font-weight: 400; font-size: 14px; }
+.header-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.theme-toggle {
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 10px; cursor: pointer; font-size: 12px;
+  white-space: nowrap;
+}
+.theme-toggle:hover { border-color: var(--accent); }
 .proxy { font-size: 12px; color: var(--muted); }
 .proxy code { color: var(--accent); cursor: pointer; }
 
@@ -309,7 +317,8 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 @media (max-width: 640px) {
   header { flex-wrap: wrap; gap: 4px; padding: 10px 14px; }
   header h1 { font-size: 17px; }
-  .proxy { font-size: 11px; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header-actions { width: 100%; justify-content: space-between; gap: 8px; }
+  .proxy { font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   nav#tabs { padding: 10px 12px; gap: 5px; }
   nav#tabs button { padding: 7px 11px; font-size: 13px; }
   main#view { padding: 8px 12px 50px; }
@@ -752,3 +761,147 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 /* 쿠팡 파트너스 광고 (푸터) */
 .coupang-ad { overflow-x: auto; text-align: center; max-width: 100%; margin: 0 auto 6px; }
 .coupang-disc { font-size: 11px; opacity: 0.55; margin: 0 0 10px; }
+
+/* ───────── 화이트 테마 ───────── */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7fb; --panel: #ffffff; --panel2: #eef1f8;
+  --ink: #202437; --muted: #667085; --line: #d9deea;
+  --accent: #6554e8; --buy: #0f9f69; --sell: #d04735; --gold: #b5820b;
+}
+html[data-theme="light"] header,
+html[data-theme="light"] footer {
+  background: rgba(255,255,255,.82);
+}
+html[data-theme="light"] .theme-toggle {
+  background: #ffffff;
+}
+html[data-theme="light"] .err-box {
+  background: #fff0ed; border-color: #f3b7ad;
+}
+html[data-theme="light"] .adv-portrait,
+html[data-theme="light"] .cx-ic,
+html[data-theme="light"] .sn-ic,
+html[data-theme="light"] .calc-ic,
+html[data-theme="light"] .adv-port,
+html[data-theme="light"] .adv-pic {
+  background: #eef1f8;
+}
+html[data-theme="light"] .engr-badge,
+html[data-theme="light"] .title-badge,
+html[data-theme="light"] .sn-pre i,
+html[data-theme="light"] .cstg,
+html[data-theme="light"] .pl-enhb,
+html[data-theme="light"] .pl-enhb-inl {
+  background: #fff4cc; border-color: #ecd081; color: #8a6408;
+}
+html[data-theme="light"] table.rank tr.me,
+html[data-theme="light"] .pl-pi.active,
+html[data-theme="light"] .lc-pot tr.lc-pick td {
+  background: #ece9ff;
+}
+html[data-theme="light"] .cx-card {
+  background: linear-gradient(180deg, #ffffff, #f7f8fc);
+}
+html[data-theme="light"] .cx-perk,
+html[data-theme="light"] .calc-note,
+html[data-theme="light"] .tr-note {
+  background: #f1edff; border-color: #d8d0ff; color: #4f4388;
+}
+html[data-theme="light"] .cx-perk,
+html[data-theme="light"] .adv-rec-gem,
+html[data-theme="light"] .adv-rec-gem b {
+  color: #5946b5;
+}
+html[data-theme="light"] .calc-note b,
+html[data-theme="light"] .tr-note b {
+  color: #2e2852;
+}
+html[data-theme="light"] .cx-flavor {
+  color: #7a8194;
+}
+html[data-theme="light"] .st-lines line {
+  stroke: #b7aedf;
+}
+html[data-theme="light"] .matrix td,
+html[data-theme="light"] .raw,
+html[data-theme="light"] .adv-log,
+html[data-theme="light"] .rand-row {
+  background: #f7f8fc;
+}
+html[data-theme="light"] .matrix td.mx-empty {
+  background: #edf0f7;
+}
+html[data-theme="light"] .lc-main {
+  background: #f5f2ff; border-color: #d5ccff;
+}
+html[data-theme="light"] .lc-progress {
+  background: #e9edf6;
+}
+html[data-theme="light"] .garden-grid,
+html[data-theme="light"] .pl-grid {
+  background: #cfd6e5;
+}
+html[data-theme="light"] .cell,
+html[data-theme="light"] .pl-cell {
+  background: #eef1f8;
+}
+html[data-theme="light"] .cell.empty,
+html[data-theme="light"] .pl-cell.expand-slot {
+  background: #e4e8f2;
+}
+html[data-theme="light"] .cell.tilled,
+html[data-theme="light"] .pl-cell.tilled,
+html[data-theme="light"] .lg.soil {
+  background: #b98556;
+}
+html[data-theme="light"] .pl-cell.isorn {
+  background: #ebe6f5;
+}
+html[data-theme="light"] .pl-poll {
+  background: #eaf3ff; border-color: #9dc4e8;
+}
+html[data-theme="light"] .pl-poll h3 small {
+  color: #3f7fb8;
+}
+html[data-theme="light"] .pl-mult.up,
+html[data-theme="light"] .ev-q.ok,
+html[data-theme="light"] .adv-wr.good,
+html[data-theme="light"] .adv-rec-r.ok,
+html[data-theme="light"] .adv-rec-fast,
+html[data-theme="light"] .cx-dur {
+  background: #dff7eb; border-color: #a4dfc2; color: #087a51;
+}
+html[data-theme="light"] .pl-mult.down,
+html[data-theme="light"] .ev-q.warn,
+html[data-theme="light"] .adv-wr.bad {
+  background: #fde7e1; border-color: #f0b6aa; color: #af3525;
+}
+html[data-theme="light"] .adv-wr.mid,
+html[data-theme="light"] .adv-rec-r.warn,
+html[data-theme="light"] .adv-rec-card.warn,
+html[data-theme="light"] .adv-rec-slow {
+  background: #fff4d4; border-color: #e3c36b; color: #84620b;
+}
+html[data-theme="light"] .adv-x {
+  background: #fff0ed; border-color: #f3b7ad;
+}
+html[data-theme="light"] .adv-log-r {
+  border-bottom-color: #e2e6f0;
+}
+html[data-theme="light"] .adv-log-r.log-ally {
+  color: #207a4e;
+}
+html[data-theme="light"] .adv-log-r.log-bad {
+  color: #a53c2e;
+}
+html[data-theme="light"] .adv-rec {
+  color: #261b03;
+}
+html[data-theme="light"] .adv-rec-applyg {
+  background: #ece7ff; color: #513ab5; border-color: #c9bef6;
+}
+html[data-theme="light"] .pl-share-in,
+html[data-theme="light"] #pl-disp-sel {
+  background: #ffffff;
+}

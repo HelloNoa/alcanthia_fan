@@ -12,6 +12,37 @@ import { itemIcon } from "./sprites.js";
 
 const view = document.getElementById("view");
 const $ = (s, r = document) => r.querySelector(s);
+const THEME_STORE = "alc_theme";
+
+function preferredTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_STORE);
+    if (saved === "light" || saved === "dark") return saved;
+  } catch {}
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applyTheme(theme) {
+  const next = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  document.documentElement.style.colorScheme = next;
+  const btn = $("#theme-toggle");
+  if (!btn) return;
+  btn.textContent = next === "light" ? "🌙 다크" : "☀️ 화이트";
+  btn.title = next === "light" ? "다크 모드로 전환" : "화이트 모드로 전환";
+  btn.setAttribute("aria-pressed", next === "light" ? "true" : "false");
+}
+
+function mountThemeToggle() {
+  const btn = $("#theme-toggle");
+  if (!btn) return;
+  applyTheme(preferredTheme());
+  btn.onclick = () => {
+    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    try { localStorage.setItem(THEME_STORE, next); } catch {}
+    applyTheme(next);
+  };
+}
 
 function loading() { view.innerHTML = `<div class="loading">불러오는 중…</div>`; }
 function error(e) { view.innerHTML = `<div class="err-box">⚠️ ${e.message || e}</div>`; }
@@ -329,5 +360,6 @@ function mountProxyBadge() {
 }
 
 mountTabs();
+mountThemeToggle();
 mountProxyBadge();
 selectTab((location.hash || "#garden").slice(1));
