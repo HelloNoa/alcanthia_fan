@@ -41,6 +41,7 @@ python3 -m http.server 5500
 
 ## 데이터
 이름/스킨/모험가/스킬/존/폴더색인은 `data/names.json`, 게임 데이터는 `data/gamedata.json` 에 들어있음.
+로컬 갱신 도구 `regen_names.py` 는 최신 게임 번들에서 이름 색인과 `item_values` / `item_output_values` / `sell_price` 가치표를 갱신함.
 이미지는 런타임에 CDN(`game.alcanthia.com/assets`)에서 직접 로드하며, `itemFolders` 색인으로 폴더를 찾음.
 
 ## 참고

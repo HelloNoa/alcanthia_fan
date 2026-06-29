@@ -430,12 +430,14 @@ export async function renderCodex(view, sub) {
         const TY = { produce: "수확물", potion: "포션", general: "일반", equipment: "장비", tool: "도구", seed: "씨앗" };
         const itemRanks = new Map(Object.keys(g.items || {}).map((code, i) => [code, i]));
         const itemOrder = (code) => itemRanks.get(code) ?? Number.MAX_SAFE_INTEGER;
-        const priceOf = (code) => {
-          const v = g.item_values?.[code] ?? g.sell_price?.[code];
+        const priceOf = (code, output = false) => {
+          const v = output
+            ? (g.item_output_values?.[code] ?? g.item_values?.[code] ?? g.sell_price?.[code])
+            : (g.item_values?.[code] ?? g.sell_price?.[code]);
           return Number.isFinite(v) && v > 0 ? v : null;
         };
         const targetValueOf = (code, enh) => priceOf(code) * Math.pow(2, enh);
-        const candidateValueOf = (code, enh) => priceOf(code) * Math.pow(3, enh);
+        const candidateValueOf = (code, enh) => priceOf(code, true) * Math.pow(3, enh);
         const candidateStates = (targetCode, targetEnh, sedimentEnh) => {
           const targetBase = priceOf(targetCode);
           if (targetBase == null) return null;
@@ -446,7 +448,7 @@ export async function renderCodex(view, sub) {
           const states = [];
           for (const [code, it] of Object.entries(g.items || {})) {
             if (code === targetCode || code === "opaque_sediment" || it.type !== targetType || isTest(code, it)) continue;
-            const base = priceOf(code);
+            const base = priceOf(code, true);
             if (base == null || base > maxValue) continue;
             const maxEnh = it.type === "produce" ? 1 : 40;
             for (let enh = 0; enh <= maxEnh; enh++) {
@@ -548,17 +550,19 @@ export async function renderCodex(view, sub) {
         body.insertAdjacentHTML("beforeend",
           `<div class="tr-note">🔀 <b>불투명한 침전물</b>은 순수 랜덤이 아니라 <b>가치 기반</b>이에요.<br>
           <b>굴리는 가치 = 입력 기본가 × 2^입력강화 × f</b> · <b>f = min + (1−min)×랜덤</b> · <b>min = 침전물강화 × 10%</b>(최대 100%)<br>
-          <b>후보 가치 = 후보 기본가 × 3^후보강화</b>이며, 수확물 후보는 최대 +1까지만 계산함<br>
+          <b>후보 가치 = 후보 출력 기본가 × 3^후보강화</b>이며, 수확물 후보는 최대 +1까지만 계산함<br>
           즉 침전물 강화가 <b>결과 가치의 하한</b>을 정함 (상한 100%): ${rangeRows}<br>
-          굴린 가치 이하의 <b>같은 타입</b> 후보 중 가장 가까운 값이 결과. 아래는 기본 가치표.</div>`);
+          굴린 가치 이하의 <b>같은 타입</b> 후보 중 가장 가까운 값이 결과. 아래는 기본 가치표(입력 / 후보).</div>`);
         for (const tp of ["seed", "produce", "potion", "general", "equipment", "tool"]) {
           const list = (byType[tp] || []).sort((a, b) => a[1] - b[1]);
           if (!list.length) continue;
           body.insertAdjacentHTML("beforeend", `<h3 class="cx-group">💎 ${TY[tp] || tp} <small>(${list.length})</small></h3>`);
           const tg = document.createElement("div"); tg.className = "tr-vals";
           list.forEach(([code, v]) => {
+            const ov = priceOf(code, true);
+            const val = ov != null && ov !== v ? `${fmt(v)} / ${fmt(ov)}` : fmt(v);
             tg.insertAdjacentHTML("beforeend",
-              `<div class="tr-val"><span class="tr-vic" data-ic="${code}"></span><span class="tr-vn">${g.items?.[code]?.name || code}</span><b>${fmt(v)}</b></div>`);
+              `<div class="tr-val"><span class="tr-vic" data-ic="${code}"></span><span class="tr-vn">${g.items?.[code]?.name || code}</span><b>${val}</b></div>`);
           });
           body.appendChild(tg);
           tg.querySelectorAll(".tr-vic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));

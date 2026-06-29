@@ -11,41 +11,47 @@ export const RANDOM_EFFECTS = {
   dream_potion: {
     kind: "produce",
     label: "랜덤 수확물",
-    divisor: 2,
     resultEnh: "source",
+    exponentPerEnh: 0.25,
+    exponentCap: 1,
     effectLabel: "몽환 +강",
     sourceLabel: "수확될 +강",
-    formula: "다음 1회 수확 시 랜덤 작물 (기대 가치 ×${2**e})",
+    formula: "다음 1회 수확 시 랜덤 작물 (강화 시 고가치 작물 확률 증가)",
     base: "다음 1회 수확 시 랜덤 작물 (강화 시 고가치 작물 확률 증가)",
     note: "몽환은 이번 수확 결과의 아이템 종류만 랜덤 작물로 바꾸고, 결과물에 붙을 +강은 그대로 유지합니다.",
   },
   comet_potion: {
     kind: "seed",
     label: "랜덤 씨앗",
-    divisor: 2,
+    exponentPerEnh: 0.35,
+    exponentCap: 1.2,
     effectLabel: "혜성 +강",
-    formula: "하늘에서 랜덤 씨앗 획득 (기대 가치 ×${2**e})",
+    formula: "하늘에서 랜덤 씨앗 획득 (강화 시 고가치 씨앗 확률 증가)",
     base: "하늘에서 랜덤 씨앗 획득 (강화 시 고가치 씨앗 확률 증가)",
     note: "씨앗은 +0으로 지급됩니다.",
   },
   mirage_potion: {
     kind: "potion",
     label: "랜덤 출정 포션",
-    divisor: 1,
+    exclude: new Set(["condensing_flask"]),
     resultEnh: "effect",
+    exponentPerEnh: 0.25,
+    exponentCap: 1,
     effectLabel: "신기루 +강",
-    formula: "다음 출정 시 랜덤 +${e} 포션 1개 추가 (기대 가치 ×${2**e})",
+    formula: "다음 출정 시 랜덤 +${e} 포션 1개 추가 (강화 시 고가치 포션 확률 증가)",
     base: "다음 출정 시 랜덤 포션 추가 (강화 시 고가치 포션 확률 증가)",
     note: "추가 포션 강화도 = 신기루포션 강화도입니다.",
   },
   daydream_potion: {
     kind: "potion",
     label: "랜덤 양조 포션",
-    divisor: 1,
+    exclude: new Set(["condensing_flask"]),
     resultEnh: "source",
+    exponentPerEnh: 0.25,
+    exponentCap: 1,
     effectLabel: "백일몽 +강",
     sourceLabel: "완성될 +강",
-    formula: "다음 1회 양조 시 랜덤 포션 (기대 가치 ×${2**e})",
+    formula: "다음 1회 양조 시 랜덤 포션 (강화 시 고가치 포션 확률 증가)",
     base: "다음 1회 양조 시 랜덤 포션 (강화 시 고가치 포션 확률 증가)",
     note: "백일몽은 이번 양조 결과의 아이템 종류만 랜덤 포션으로 바꾸고, 결과물에 붙을 +강은 그대로 유지합니다.",
   },
@@ -53,8 +59,10 @@ export const RANDOM_EFFECTS = {
 
 const RANDOM_ORDER = ["dream_potion", "comet_potion", "mirage_potion", "daydream_potion"];
 
-const randomValueOf = (g, code) => {
-  const v = g.item_values?.[code] ?? g.sell_price?.[code];
+const randomValueOf = (g, code, output = false) => {
+  const v = output
+    ? (g.item_output_values?.[code] ?? g.item_values?.[code] ?? g.sell_price?.[code])
+    : (g.item_values?.[code] ?? g.sell_price?.[code]);
   return Number.isFinite(v) && v > 0 ? v : null;
 };
 
@@ -68,45 +76,33 @@ const isTestItem = (g, code, it) => {
     || (it?.name || "").includes("시험용");
 };
 
-const randomCandidates = (g, kind) => Object.entries(g.items || {})
-  .filter(([code, it]) => it.type === kind && !isTestItem(g, code, it) && randomValueOf(g, code) != null)
+const randomCandidates = (g, cfg) => Object.entries(g.items || {})
+  .filter(([code, it]) => it.type === cfg.kind
+    && !cfg.exclude?.has(code)
+    && !isTestItem(g, code, it)
+    && randomValueOf(g, code, true) != null)
   .map(([code]) => code);
-
-const randomAverage = (entries, minValue, exp) => {
-  const weights = entries.map((it) => Math.pow(it.value / minValue, exp));
-  const total = weights.reduce((sum, w) => sum + w, 0);
-  return entries.reduce((sum, it, i) => sum + it.value * weights[i], 0) / total;
-};
 
 export function randomDistribution(g, code, enh, sourceEnh = 0) {
   const cfg = RANDOM_EFFECTS[code];
-  const base = randomValueOf(g, code);
-  if (!cfg || base == null) return null;
+  if (!cfg) return null;
   const resultEnh = cfg.resultEnh === "effect" ? enh : cfg.resultEnh === "source" ? sourceEnh : 0;
-  const target = base * Math.pow(2, enh) / cfg.divisor;
-  const entries = randomCandidates(g, cfg.kind).flatMap((c) => {
-    const v = randomValueOf(g, c);
+  const entries = randomCandidates(g, cfg).flatMap((c) => {
+    const v = randomValueOf(g, c, true);
     return v == null ? [] : [{ code: c, value: v * Math.pow(3, resultEnh) }];
   });
   if (!entries.length) return null;
 
   const minValue = Math.min(...entries.map((it) => it.value));
-  let lo = -64, hi = 64;
-  if (!Number.isFinite(target)) lo = 0, hi = 0;
-  else for (let i = 0; i < 32; i++) {
-    const mid = (lo + hi) / 2;
-    if (randomAverage(entries, minValue, mid) < target) lo = mid;
-    else hi = mid;
-  }
-  const exp = randomAverage(entries, minValue, hi) <= target ? hi : lo;
-  const weights = entries.map((it) => Math.max(Math.pow(it.value / minValue, exp), 1e-6));
+  const exponent = Math.min(enh * cfg.exponentPerEnh, cfg.exponentCap);
+  const weights = entries.map((it) => Math.pow(it.value / minValue, exponent));
   const total = weights.reduce((sum, w) => sum + w, 0);
   const rows = entries.map((it, i) => ({ ...it, prob: weights[i] / total }))
     .sort((a, b) => b.prob - a.prob
       || b.value - a.value
       || (g.items?.[a.code]?.name || a.code).localeCompare(g.items?.[b.code]?.name || b.code));
   const expected = rows.reduce((sum, it) => sum + it.value * it.prob, 0);
-  return { cfg, target, expected, resultEnh, rows };
+  return { cfg, exponent, expected, resultEnh, rows };
 }
 
 const evalFormula = (tpl, e) => String(tpl || "").replace(/\$\{([^}]+)\}/g, (_, expr) => {
@@ -168,7 +164,7 @@ function renderRandomCard(g, code) {
       return;
     }
     summaryEl.innerHTML = `
-      <span>목표 <b>${fmt(Math.round(dist.target))}</b></span>
+      <span>가중 <b>${dist.exponent ? `x^${dist.exponent.toFixed(2)}` : "균등"}</b></span>
       <span>기대 <b>${fmt(Math.round(dist.expected))}</b></span>
       <span>후보 <b>${dist.rows.length}종${dist.resultEnh ? ` · 결과 +${dist.resultEnh}` : ""}</b></span>`;
 
