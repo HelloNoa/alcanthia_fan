@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-names.json + gamedata 가치표 재생성 스크립트 (게임 번들만으로, 이미지 다운로드 불필요)
+names.json + gamedata 가치표/업적 재생성 스크립트 (게임 번들만으로, 이미지 다운로드 불필요)
 
 게임 업데이트 시:  python3 regen_names.py
   - game.alcanthia.com 에서 최신 index-*.js 자동 탐색·다운로드
-  - 작물/아이템 이름, 스킨, 모험가, 스킬, 존, itemFolders(폴더 색인) 추출
+  - 작물/아이템 이름, 스킨, 모험가, 스킬, 존, 업적, itemFolders(폴더 색인) 추출
   - data/names.json 갱신
-  - data/gamedata.json 의 item_values / item_output_values / sell_price 갱신
+  - data/gamedata.json 의 achievements / item_values / item_output_values / sell_price 갱신
 
 stdlib 만 사용 (urllib, re, json). 외부 패키지 없음.
 """
@@ -181,7 +181,7 @@ def parse_recipes_for_values(s):
 
 def computed_value_tables(s, item_codes):
     base_obj = extract_assignment(s, "dC")
-    if not base_obj:
+    if not base_obj or "opaque_sediment" not in base_obj:
         m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:null,earth_breath:null,herb:", s)
         base_obj = extract_assignment(s, m.group(1)) if m else None
     if not base_obj:
@@ -285,12 +285,86 @@ def set_after(d, key, value, after_key):
     return d
 
 
+def split_array_items(arr):
+    body = arr[1:-1]
+    out = []
+    start = 0
+    depth = 0
+    instr = None
+    i = 0
+    while i < len(body):
+        c = body[i]
+        if instr:
+            if c == "\\":
+                i += 2
+                continue
+            if c == instr:
+                instr = None
+            i += 1
+            continue
+        if c in "\"'`":
+            instr = c
+        elif c in "{[(":
+            depth += 1
+        elif c in "}])":
+            depth -= 1
+        elif depth == 0 and c == ",":
+            out.append(body[start:i].strip())
+            start = i + 1
+        i += 1
+    tail = body[start:].strip()
+    if tail:
+        out.append(tail)
+    return out
+
+
+def js_string_field(obj, name):
+    m = re.search(r"\b" + re.escape(name) + r':"((?:\\.|[^"\\])*)"', obj)
+    if not m:
+        return None
+    return m.group(1).replace(r"\"", '"').replace(r"\\", "\\")
+
+
+def parse_achievements(s):
+    arr = extract_assignment(s, "Il")
+    if not arr:
+        m = re.search(r"([A-Za-z0-9_$]+)=\[\{id:\"first_adventure\"", s)
+        if m:
+            i = s.find("[", m.start())
+            j = match_delim(s, i) if i >= 0 else -1
+            arr = s[i:j + 1] if j >= 0 else None
+    if not arr:
+        return []
+    out = []
+    for item in split_array_items(arr):
+        if not item.startswith("{"):
+            continue
+        aid = js_string_field(item, "id")
+        modifier = js_string_field(item, "modifier")
+        description = js_string_field(item, "description")
+        if not (aid and modifier and description):
+            continue
+        ach = {"id": aid, "modifier": modifier, "description": description}
+        icon = js_string_field(item, "icon")
+        if icon:
+            ach["icon"] = icon
+        if re.search(r"\bhidden:(?:!0|true)\b", item):
+            ach["hidden"] = True
+        out.append(ach)
+    return out
+
+
 def update_gamedata(s):
     if not os.path.exists(GAMEDATA_OUT):
         print("skip gamedata: data/gamedata.json 없음")
         return
     with open(GAMEDATA_OUT, "r", encoding="utf-8") as f:
         gd = json.load(f)
+    achievements = parse_achievements(s)
+    if achievements:
+        gd["achievements"] = achievements
+    else:
+        print("skip gamedata achievements: 번들에서 업적을 추출하지 못함")
     item_codes = list((gd.get("items") or {}).keys())
     item_values, item_output_values, sell_price = computed_value_tables(s, item_codes)
     if not item_values or not item_output_values:
@@ -322,6 +396,8 @@ def update_gamedata(s):
     print(f"  item_values: {len(item_values)}")
     print(f"  item_output_values: {len(item_output_values)}")
     print(f"  sell_price: {len(sell_price)}")
+    if achievements:
+        print(f"  achievements: {len(achievements)}")
 
 
 def parent_object(s, anchor):

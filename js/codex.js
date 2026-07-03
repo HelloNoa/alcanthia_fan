@@ -1,6 +1,6 @@
 import { gamedata, names } from "./api.js";
 import { RANDOM_EFFECTS } from "./random_effects.js";
-import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, fmtDuration } from "./sprites.js";
+import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievementIcon, fmtDuration } from "./sprites.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
@@ -405,7 +405,10 @@ export async function renderCodex(view, sub) {
         if (q && !match(title) && !match(desc)) return;
         const rows = [["조건", desc]];
         if (!hidden && a.progressLabel) rows.push(["진행도", a.progressLabel]);
-        const card = cxCard((ic) => { ic.textContent = a.icon || "🏅"; }, title, rows);
+        const card = cxCard((ic) => {
+          if (!hidden && a.icon) achievementIcon(ic, a.icon);
+          else ic.textContent = "🏅";
+        }, title, rows);
         if (!hidden && a.note) card.insertAdjacentHTML("beforeend", `<div class="cx-sub">${a.note}</div>`);
         grid.appendChild(card);
       });

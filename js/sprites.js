@@ -52,6 +52,9 @@ export function monsterIcon(el, spriteKey, cls = "ic") {
 export function adventurerIcon(el, spriteKey, cls = "ic") {
   loadImg(el, [`${CDN}/npc/${spriteKey}.png`], "", cls);
 }
+export function achievementIcon(el, iconKey, cls = "ic") {
+  loadImg(el, [`${CDN}/ui/icons/${iconKey}.png`], "", cls);
+}
 
 // ms -> "1분 30초" 류
 export function fmtDuration(ms) {
