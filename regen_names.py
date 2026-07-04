@@ -325,6 +325,42 @@ def js_string_field(obj, name):
     return m.group(1).replace(r"\"", '"').replace(r"\\", "\\")
 
 
+def js_field_value(obj, name):
+    if not obj.startswith("{"):
+        return None
+    for k, v in split_top(obj):
+        if k == name:
+            return v
+    return None
+
+
+def parse_item_refs(arr):
+    if not arr or not arr.startswith("["):
+        return []
+    out = []
+    for item in split_array_items(arr):
+        code = js_string_field(item, "itemCode")
+        if not code:
+            continue
+        m_enh = re.search(r"\benhancement:([0-9]+)", item)
+        m_count = re.search(r"\bcount:([0-9]+)", item)
+        ref = {
+            "itemCode": code,
+            "enhancement": int(m_enh.group(1)) if m_enh else 0,
+            "count": int(m_count.group(1)) if m_count else 1,
+        }
+        if re.search(r"\buntradable:(?:!0|true)\b", item):
+            ref["untradable"] = True
+        out.append(ref)
+    return out
+
+
+def parse_string_array(arr):
+    if not arr or not arr.startswith("["):
+        return []
+    return [x.replace(r"\"", '"').replace(r"\\", "\\") for x in re.findall(r'"((?:\\.|[^"\\])*)"', arr)]
+
+
 def parse_achievements(s):
     arr = extract_assignment(s, "Il")
     if not arr:
@@ -354,6 +390,99 @@ def parse_achievements(s):
     return out
 
 
+def parse_npcs(s):
+    obj = parent_object(s, 'hestia:{name:"헤스티아",spriteKey:"npc_witch"')
+    if not obj:
+        return {}
+    keep = {"hestia", "doran", "kai", "ella", "moon_priest", "aria", "jake", "miru"}
+    out = {}
+    for k, v in split_top(obj):
+        if k not in keep:
+            continue
+        name = js_string_field(v, "name")
+        sprite = js_string_field(v, "spriteKey")
+        if name and sprite:
+            out[k] = {"name": name, "spriteKey": sprite}
+    return out
+
+
+def parse_quests(s, gd):
+    m = re.search(r"([A-Za-z0-9_$]+)=\[\{id:\"first_garden_ornament\"", s)
+    if not m:
+        return []
+    i = s.find("[", m.start())
+    j = match_delim(s, i) if i >= 0 else -1
+    if j < 0:
+        return []
+    arr = s[i:j + 1]
+    npcs = parse_npcs(s)
+    title_by_id = {}
+    raw = []
+    for order, item in enumerate(split_array_items(arr)):
+        if not item.startswith("{"):
+            continue
+        qid = js_string_field(item, "id")
+        title = js_string_field(item, "title")
+        repeat = js_string_field(item, "repeat") or "none"
+        row = {
+            "id": qid,
+            "npcId": js_string_field(item, "npcId"),
+            "title": title,
+            "description": js_string_field(item, "description"),
+            "repeat": repeat,
+            "previous": parse_string_array(js_field_value(item, "previous")),
+            "requestItems": parse_item_refs(js_field_value(item, "requestItems")),
+            "rewards": parse_item_refs(js_field_value(item, "rewards")),
+            "appearCondition": js_field_value(item, "appearCondition") or "",
+            "order": order,
+        }
+        if qid and title:
+            title_by_id[qid] = title
+        raw.append(row)
+
+    def zone_name(code):
+        z = (gd.get("zones") or {}).get(code)
+        return z.get("name") if isinstance(z, dict) else code
+
+    def npc_name(code):
+        adv = (gd.get("adventurers") or {}).get(code)
+        if code in npcs:
+            return npcs[code]["name"]
+        return adv.get("name") if isinstance(adv, dict) else code
+
+    def unlock(row):
+        text = row.get("appearCondition") or ""
+        parts = []
+        if "adventuresCompleted>0" in text:
+            parts.append("모험 1회 이상")
+        for z in re.findall(r"clearedZones(?:\?\.|\.)([a-zA-Z0-9_]+)!=null", text):
+            parts.append(f"{zone_name(z)} 클리어")
+        for a in re.findall(r"!!e\.hiredAdventurers\.([a-zA-Z0-9_]+)", text):
+            parts.append(f"{npc_name(a)} 고용")
+        for qid, n in re.findall(r"completedCount\.([a-zA-Z0-9_]+)\?\?0\)>=([0-9]+)", text):
+            parts.append(f"{title_by_id.get(qid, qid)} {n}회 완료")
+        if not parts and "!0" in text:
+            parts.append("기본")
+        return list(dict.fromkeys(parts))
+
+    out = []
+    for row in raw:
+        if row["repeat"] not in {"daily", "weekly"}:
+            continue
+        out.append({
+            "id": row["id"],
+            "npcId": row["npcId"],
+            "title": row["title"],
+            "description": row["description"],
+            "repeat": row["repeat"],
+            "previous": row["previous"],
+            "unlock": unlock(row),
+            "requestItems": row["requestItems"],
+            "rewards": row["rewards"],
+        })
+    return out
+
+
 def update_gamedata(s):
     if not os.path.exists(GAMEDATA_OUT):
         print("skip gamedata: data/gamedata.json 없음")
@@ -365,6 +494,16 @@ def update_gamedata(s):
         gd["achievements"] = achievements
     else:
         print("skip gamedata achievements: 번들에서 업적을 추출하지 못함")
+    npcs = parse_npcs(s)
+    quests = parse_quests(s, gd)
+    if npcs:
+        set_after(gd, "npcs", npcs, "achievements")
+    else:
+        print("skip gamedata npcs: 번들에서 NPC를 추출하지 못함")
+    if quests:
+        set_after(gd, "quests", quests, "npcs")
+    else:
+        print("skip gamedata quests: 번들에서 반복 의뢰를 추출하지 못함")
     item_codes = list((gd.get("items") or {}).keys())
     item_values, item_output_values, sell_price = computed_value_tables(s, item_codes)
     if not item_values or not item_output_values:
@@ -398,6 +537,8 @@ def update_gamedata(s):
     print(f"  sell_price: {len(sell_price)}")
     if achievements:
         print(f"  achievements: {len(achievements)}")
+    if quests:
+        print(f"  quests: {len(quests)}")
 
 
 def parent_object(s, anchor):

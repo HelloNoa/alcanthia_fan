@@ -8,7 +8,7 @@ import { renderSkillTree } from "./skilltree.js";
 import { renderCalc } from "./calc.js";
 import { renderPlanner } from "./planner.js";
 import { renderRandomEffects } from "./random_effects.js";
-import { itemIcon } from "./sprites.js";
+import { itemIcon, adventurerIcon } from "./sprites.js";
 
 const view = document.getElementById("view");
 const $ = (s, r = document) => r.querySelector(s);
@@ -46,6 +46,8 @@ function mountThemeToggle() {
 
 function loading() { view.innerHTML = `<div class="loading">불러오는 중…</div>`; }
 function error(e) { view.innerHTML = `<div class="err-box">⚠️ ${e.message || e}</div>`; }
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 
 // 다른 탭에서 텃밭 보기 요청 (랭킹/거주민 → 텃밭 탭)
 let pendingGarden = null;
@@ -322,6 +324,76 @@ async function tabLeaderboard() {
   renderCat(avail[0].key);
 }
 
+// ---------- 의뢰 탭 ----------
+async function tabQuests(sub) {
+  const g = await gamedata();
+  const quests = g.quests || [];
+  const npcs = g.npcs || {};
+  const titleById = Object.fromEntries(quests.map((q) => [q.id, q.title]));
+  const count = (repeat) => quests.filter((q) => q.repeat === repeat).length;
+  const cats = [
+    { key: "daily", label: `일간 ${count("daily")}` },
+    { key: "weekly", label: `주간 ${count("weekly")}` },
+    { key: "all", label: `전체 ${quests.length}` },
+  ];
+  const initial = cats.some((c) => c.key === sub) ? sub : "daily";
+  const itemName = (code) => g.items?.[code]?.name || code;
+  const repeatLabel = { daily: "일간", weekly: "주간" };
+  const itemLine = (items) => items?.length
+    ? `<div class="quest-items">${items.map((it) => {
+      const enh = it.enhancement ? `+${it.enhancement} ` : "";
+      return `<span class="quest-item">
+        <span class="quest-item-ic" data-ic="${esc(it.itemCode)}"></span>
+        <span>${enh}${esc(itemName(it.itemCode))}</span>
+        <b>×${fmt(it.count)}</b>${it.untradable ? `<em>귀속</em>` : ""}
+      </span>`;
+    }).join("")}</div>`
+    : `<span class="muted">없음</span>`;
+  const metaLine = (q) => {
+    const rows = [];
+    if (q.unlock?.length) rows.push(`<span>해금</span><b>${q.unlock.map(esc).join(" · ")}</b>`);
+    if (q.previous?.length) rows.push(`<span>선행</span><b>${q.previous.map((id) => esc(titleById[id] || id)).join(" · ")}</b>`);
+    return rows.length ? `<div class="quest-meta">${rows.map((r) => `<div>${r}</div>`).join("")}</div>` : "";
+  };
+  const card = (q) => {
+    const npc = npcs[q.npcId] || { name: q.npcId, spriteKey: q.npcId };
+    return `<article class="quest-card" data-repeat="${esc(q.repeat)}">
+      <div class="quest-head">
+        <span class="quest-npc-ic" data-npc="${esc(npc.spriteKey || q.npcId)}"></span>
+        <div class="quest-titlebox">
+          <div class="quest-title">${esc(q.title)} <span class="quest-repeat ${esc(q.repeat)}">${repeatLabel[q.repeat] || q.repeat}</span></div>
+          <div class="quest-npc">${esc(npc.name || q.npcId)}</div>
+        </div>
+      </div>
+      <p class="quest-desc">${esc(q.description)}</p>
+      <div class="quest-flow">
+        <section><h3>요청</h3>${itemLine(q.requestItems)}</section>
+        <section><h3>보상</h3>${itemLine(q.rewards)}</section>
+      </div>
+      ${metaLine(q)}
+    </article>`;
+  };
+
+  view.innerHTML = `<h2>📋 의뢰</h2>
+    <nav class="subtabs" id="questcats">${cats.map((c) =>
+      `<button data-k="${c.key}" class="${c.key === initial ? "active" : ""}">${c.label}</button>`).join("")}</nav>
+    <div id="questbody"></div>`;
+  const body = $("#questbody");
+
+  const render = (key) => {
+    location.hash = `quests/${key}`;
+    view.querySelectorAll("#questcats button").forEach((b) => b.classList.toggle("active", b.dataset.k === key));
+    const rows = key === "all" ? quests : quests.filter((q) => q.repeat === key);
+    body.innerHTML = rows.length
+      ? `<div class="quest-grid">${rows.map(card).join("")}</div>`
+      : `<div class="muted">표시할 의뢰 없음</div>`;
+    body.querySelectorAll(".quest-item-ic[data-ic]").forEach((el) => itemIcon(el, el.dataset.ic, "quest-item-img"));
+    body.querySelectorAll(".quest-npc-ic[data-npc]").forEach((el) => adventurerIcon(el, el.dataset.npc, "quest-npc-img"));
+  };
+  view.querySelectorAll("#questcats button").forEach((b) => b.onclick = () => render(b.dataset.k));
+  render(initial);
+}
+
 // ---------- 탭 라우팅 ----------
 const TABS = {
   garden: { label: "🌱 텃밭", run: tabGarden },
@@ -329,6 +401,7 @@ const TABS = {
   market: { label: "💹 거래소", run: tabMarket },
   residents: { label: "🗺️ 거주민", run: tabResidents },
   rank: { label: "🏆 랭킹", run: tabLeaderboard },
+  quests: { label: "📋 의뢰", run: (sub) => tabQuests(sub) },
   codex: { label: "📖 도감", run: (sub) => renderCodex(view, sub) },
   random: { label: "🎲 확률표", run: () => renderRandomEffects(view) },
   skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
