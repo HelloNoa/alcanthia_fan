@@ -23,6 +23,8 @@ export async function advSim(body) {
     .sort((a, b) => (g.items[a]?.name || a).localeCompare(g.items[b]?.name || b));
   const zones = Object.entries(g.zones || {});
   const nm = (c) => g.items[c]?.name || c;
+  const maxNightmare = Math.max(0, g.skills?.nightmare?.maxLevel || 3);
+  const nightmareMult = (e) => 2 ** Math.max(0, Math.floor(+e || 0));
   // 모험 소요 시간 = (턴수+1) × 6초 (La=6000ms)
   const advSec = (turns) => (turns + 1) * 6;
   const fmtSec = (s) => { s = Math.round(s); const m = Math.floor(s / 60); return m ? `${m}분 ${s % 60}초` : `${s}초`; };
@@ -37,6 +39,10 @@ export async function advSim(body) {
     `<option value="${c}"${c === sel ? " selected" : ""}>${nm(c)}</option>`).join("");
   const zoneOpts = () => zones.map(([id, z]) =>
     `<option value="${id}"${id === zoneId ? " selected" : ""}>${z.name} (${(z.monsters || []).length}마리, ${z.rule === "enemy_first" ? "적 선공" : "아군 선공"})</option>`).join("");
+  const nightmareOpts = () => Array.from({ length: maxNightmare + 1 }, (_, e) => {
+    const label = e === 0 ? "일반" : `악몽 ${e}단계 · HP/MP ×${nightmareMult(e)} · 전리품 +${e}회`;
+    return `<option value="${e}"${e === nightmare ? " selected" : ""}>${label}</option>`;
+  }).join("");
   // 전투 세공 3종 (배틀엔진이 코드로 직접 처리)
   const GEMS = [
     { code: "refined_amber", label: "호박석 (공격시 스턴)" },
@@ -70,16 +76,17 @@ export async function advSim(body) {
         party: savedParty.length ? savedParty : defaultParty(),
         pots: savedPots,
         zoneId: zoneSet.has(raw.zoneId) ? raw.zoneId : zones[0][0],
+        nightmare: clamp(raw.nightmare, 0, maxNightmare),
       };
     } catch {
-      return { party: defaultParty(), pots: [], zoneId: zones[0][0] };
+      return { party: defaultParty(), pots: [], zoneId: zones[0][0], nightmare: 0 };
     }
   };
 
   // 상태: 파티 / 포션 / 존 (기본 4명, 최대 4)
-  let { party, pots, zoneId } = loadSettings();
+  let { party, pots, zoneId, nightmare } = loadSettings();
   const saveSettings = () => {
-    try { localStorage.setItem(ADV_STORE, JSON.stringify({ party, pots, zoneId })); } catch {}
+    try { localStorage.setItem(ADV_STORE, JSON.stringify({ party, pots, zoneId, nightmare })); } catch {}
   };
 
   body.innerHTML = `
@@ -93,7 +100,9 @@ export async function advSim(body) {
         <button id="adv-addpot" class="adv-add">+ 포션</button></div>
       <div class="adv-sec"><div class="adv-sec-h">🗺️ 모험 지역</div>
         <div class="adv-zone-row"><select id="adv-zone" class="num-in">${zoneOpts()}</select>
+          <select id="adv-nightmare" class="num-in">${nightmareOpts()}</select>
           <button id="adv-rec" class="adv-rec">🎯 이 지역 추천 파티</button></div>
+        <div id="adv-nightmare-note" class="adv-nightmare-note"></div>
         <div id="adv-recnote"></div>
         <div id="adv-enemies" class="adv-enemies"></div></div>
       <button id="adv-run" class="adv-run">⚔️ 출정 (200회 시뮬)</button>
@@ -140,10 +149,14 @@ export async function advSim(body) {
   const renderEnemies = () => {
     const el = q("#adv-enemies"); el.innerHTML = "";
     const z = g.zones[zoneId];
+    const mult = nightmareMult(nightmare);
+    q("#adv-nightmare-note").innerHTML = nightmare > 0
+      ? `악몽 ${nightmare}단계: 몬스터 HP·MP ×${mult}, 전리품 추가 기회 ${nightmare}회(각 25%)`
+      : `일반 난이도: 몬스터 기본 HP·MP`;
     (z.monsters || []).forEach((mid) => {
       const m = g.monsters[mid]; if (!m) return;
       const c = document.createElement("span"); c.className = "adv-enemy";
-      c.innerHTML = `<span class="adv-mic" data-sp="${m.spriteKey}"></span><span class="adv-mn">${m.name}</span><span class="adv-ms">HP${m.hp} ATK${m.atk} DEF${m.def}</span>`;
+      c.innerHTML = `<span class="adv-mic" data-sp="${m.spriteKey}"></span><span class="adv-mn">${m.name}</span><span class="adv-ms">HP${m.hp * mult} MP${m.mp * mult}<br>ATK${m.atk} DEF${m.def}</span>`;
       el.appendChild(c);
       monsterIcon(c.querySelector(".adv-mic"), m.spriteKey);
     });
@@ -158,7 +171,7 @@ export async function advSim(body) {
   // 고정 강화도에서 각 모험가 장비를 그리디 최적화 (승률 최대) — 스킬/MP 자동 반영
   function optimizeEquip(ids, zid, enh, pool) {
     const chosen = ids.map((id) => initEq(g.adventurers[id].type, pool));
-    const wrOf = (arr) => winRate({ adventurers: ids.map((id, j) => ({ id, equip: arr[j], equipEnh: enh })), potions: [], skills: {} }, zid, g, 35).rate;
+    const wrOf = (arr) => winRate({ adventurers: ids.map((id, j) => ({ id, equip: arr[j], equipEnh: enh })), potions: [], skills: {}, difficulty: nightmare }, zid, g, 35).rate;
     for (let i = 0; i < ids.length; i++) {
       let bEq = chosen[i], bWr = wrOf(chosen);
       for (const c of pool) {
@@ -178,7 +191,7 @@ export async function advSim(body) {
   // 포션 최대 4개를 그리디로 선택 — "12초(1턴) 강화도"를 가장 많이 줄이는 포션 우선(폭딜 포션 반영),
   // 12초 불가면 "클리어 강화도" 최소화. (게임 AI 자동사용 반영)
   function optimizePotions(ids, eq, zid) {
-    const mkp = (e, pots) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: pots, skills: {} });
+    const mkp = (e, pots) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: pots, skills: {}, difficulty: nightmare });
     const evalE = (pots) => {
       let clearE = null, fastE = null;
       for (let e = 0; e <= POT_MAXE; e++) {
@@ -227,7 +240,7 @@ export async function advSim(body) {
     const evalComp = (ids) => {   // 기본장비 기준 12초(없으면 클리어) 강화도 — 낮을수록 좋음
       let clearE = null, fastE = null;
       for (let e = 0; e <= 12; e++) {
-        const r = winRate({ adventurers: ids.map((id) => ({ id, equip: eqOf(id), equipEnh: e })), potions: [], skills: {} }, zid, g, 30);
+        const r = winRate({ adventurers: ids.map((id) => ({ id, equip: eqOf(id), equipEnh: e })), potions: [], skills: {}, difficulty: nightmare }, zid, g, 30);
         if (clearE == null && r.rate >= 0.9) clearE = e;
         if (r.rate >= 0.9 && r.avgTurnsOnWin != null && r.avgTurnsOnWin <= 1.3) { fastE = e; break; }
       }
@@ -255,7 +268,7 @@ export async function advSim(body) {
     return SETTINGS.map((a) => {
       const ids = bestParty(a.grades, a.pool, zid);
       const baseEq = ids.map((id) => initEq(g.adventurers[id].type, a.pool));
-      const mk = (eq, e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: [], skills: {} });
+      const mk = (eq, e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: [], skills: {}, difficulty: nightmare });
       let e0 = null;
       for (let e = 0; e <= MAXE; e++) { if (winRate(mk(baseEq, e), zid, g, 40).rate >= 0.85) { e0 = e; break; } }
       const eq = optimizeEquip(ids, zid, e0 != null ? e0 : MAXE, a.pool);
@@ -263,10 +276,10 @@ export async function advSim(body) {
       const { pots, clearE: rawClear, fastE: rawFast } = optimizePotions(ids, eq, zid);
       const clearE = rawClear != null && rawClear <= MAXE ? rawClear : null;
       const fastE = rawFast != null && rawFast <= MAXE ? rawFast : null;
-      const mkp = (e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: pots, skills: {} });
+      const mkp = (e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e })), potions: pots, skills: {}, difficulty: nightmare });
       const conf = clearE != null ? winRate(mkp(clearE), zid, g, 200) : null;
       // 세공(호박석 스턴) 포함 버전 — 장비·세공 동일 강화도로 묶어 최소 강화도 탐색
-      const mkg = (e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e, engraved: [{ itemCode: "refined_amber", enhancement: e }] })), potions: pots, skills: {} });
+      const mkg = (e) => ({ adventurers: ids.map((id, j) => ({ id, equip: eq[j], equipEnh: e, engraved: [{ itemCode: "refined_amber", enhancement: e }] })), potions: pots, skills: {}, difficulty: nightmare });
       let gemClearE = null, gemFastE = null;
       for (let e = 0; e <= MAXE; e++) { const r = winRate(mkg(e), zid, g, 40); if (gemClearE == null && r.rate >= 0.9) gemClearE = e; if (r.rate >= 0.9 && r.avgTurnsOnWin != null && r.avgTurnsOnWin <= 1.3) { gemFastE = e; break; } }
       gemClearE = gemClearE != null && gemClearE <= MAXE ? gemClearE : null;
@@ -285,7 +298,8 @@ export async function advSim(body) {
   // 입력 바인딩 (위임)
   body.addEventListener("change", (e) => {
     const t = e.target;
-    if (t.id === "adv-zone") { zoneId = t.value; saveSettings(); renderEnemies(); return; }
+    if (t.id === "adv-zone") { zoneId = t.value; saveSettings(); renderEnemies(); q("#adv-recnote").innerHTML = ""; q("#adv-result").innerHTML = ""; return; }
+    if (t.id === "adv-nightmare") { nightmare = clamp(t.value, 0, maxNightmare); saveSettings(); renderEnemies(); q("#adv-recnote").innerHTML = ""; q("#adv-result").innerHTML = ""; return; }
     const i = +t.dataset.i;
     if (t.dataset.t === "pot") { pots[i][t.dataset.f] = t.dataset.f === "enh" ? Math.max(0, +t.value || 0) : t.value; saveSettings(); renderPots(); }
     else if (t.dataset.f) {
@@ -309,7 +323,7 @@ export async function advSim(body) {
       q("#adv-recnote").innerHTML = `<div class="adv-rec-r calc">🎯 추천 파티 계산 중… <span class="muted">(잠시만요)</span></div>`;
       setTimeout(() => {
         recOptions = recommendAll(zoneId);
-        q("#adv-recnote").innerHTML = `<div class="adv-rec-h">🎯 진행도별 추천 <span class="muted">(편성·장비·포션 시뮬 최적 · ★4=다이아, ★5=존12 해금)</span></div>
+        q("#adv-recnote").innerHTML = `<div class="adv-rec-h">🎯 진행도별 추천 <span class="muted">(편성·장비·포션 시뮬 최적 · ★4=다이아, ★5=존12 해금 · ${nightmare > 0 ? `악몽 ${nightmare}단계` : "일반"})</span></div>
           <div class="adv-rec-tip">💡 추천 데미지 포션(유성·용암정수·폭발)은 <b>최초 클리어용</b>. 반복 12초는 <b>장비 강화 + 촉진/이끼젤리</b>가 장기적으로 유리해요.</div>` +
           recOptions.map((o, i) => {
             const pnames = o.ids.map((id, j) => `${g.adventurers[id].name}<span class="muted">(${nm(o.equip[j]).replace(/^다이아 /, "")})</span>`).join(" · ");
@@ -346,6 +360,7 @@ export async function advSim(body) {
       adventurers: party.map((p) => ({ id: p.id, equip: p.equip || undefined, equipEnh: p.equipEnh, engraved: p.gem ? [{ itemCode: p.gem, enhancement: p.gemEnh || 0 }] : [] })),
       potions: pots.map((p) => ({ code: p.code, enh: p.enh })),
       skills: {},
+      difficulty: nightmare,
     };
     let wr, sample;
     try {
@@ -365,7 +380,7 @@ export async function advSim(body) {
     q("#adv-result").innerHTML = `
       <div class="adv-wr ${cls}">
         <div class="adv-wr-pct">${pct}%</div>
-        <div class="adv-wr-sub">가상 시드 승률 (${wr.wins}/${wr.trials}) · 승리 시 평균 ${winAvg}${lossInfo}</div>
+        <div class="adv-wr-sub">${nightmare > 0 ? `악몽 ${nightmare}단계 · ` : ""}가상 시드 승률 (${wr.wins}/${wr.trials}) · 승리 시 평균 ${winAvg}${lossInfo}</div>
       </div>
       <div class="adv-sample ${sample.victory ? "win" : "lose"}">대표 전투: ${sample.victory ? "⚔️ 승리" : "💀 패배"} (${sample.totalTurns}턴 · ⏱️ ${fmtSec(advSec(sample.totalTurns))})</div>
       <details class="adv-logbox"><summary>전투 로그 (${sample.events.filter((e) => e.text).length}줄)</summary>

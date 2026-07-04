@@ -776,7 +776,9 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 
 /* 모험 추천 파티 */
 .adv-zone-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.adv-zone-row #adv-zone { flex: 1; min-width: 170px; }
+.adv-zone-row select { flex: 1; min-width: 170px; }
+.adv-zone-row #adv-nightmare { flex: 0 1 280px; }
+.adv-nightmare-note { margin-top: 7px; color: var(--muted); font-size: 12.5px; }
 .adv-rec { background: var(--gold); color: #1a1828; border: 0; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .adv-rec:hover { filter: brightness(1.08); }
 .adv-rec-r { margin-top: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; }

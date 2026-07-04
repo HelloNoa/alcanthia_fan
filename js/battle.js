@@ -115,6 +115,7 @@ function s9(e,t,i){const{status:s}=e,a=t.filter(g=>g.hp>0&&!g.statusEffects.some
 function r9(e,t,i){if(i){const s=e.coefficient??0,a=Math.abs(e.flat??0),g=Math.abs(e.percent??0),r=t.filter(u=>{const n=s>0?Vi(i)*s:u.maxHp*g/100+a,o=e.status==="burn"?ao(n,u):n;return u.hp<=o});if(r.length>0)return r.reduce((u,n)=>n.hp<u.hp?n:u)}return t.reduce((s,a)=>a.hp>s.hp?a:s)};
 // ── 어댑터 ──
 function scaleEquip(b, e){ if(!b) return null; const s=(e||0)+1; return {atk:(b.atk||0)*s,def:(b.def||0)*s,hp:(b.hp||0)*s,mp:(b.mp||0)*s}; }
+function nightmareFactor(e){ return 2 ** Math.max(0, Math.floor(+e || 0)); }
 export function buildAlly(advList, gd){
   const seen = new Set();
   return advList.filter(a=>a&&a.id).map((a,idx)=>{ const adv=gd.adventurers[a.id]; if(!adv) throw new Error("모험가 없음: "+a.id);
@@ -125,9 +126,10 @@ export function buildAlly(advList, gd){
       baseAtk:adv.atk+(eq?.atk||0), baseDef:adv.def+(eq?.def||0), equipmentItemCode:a.equip,
       maxHp:Math.max(1,adv.hp+(eq?.hp||0)), maxMp:Math.max(0,adv.mp+(eq?.mp||0)), smart:true, skills:adv.skills, engravedGems:a.engraved||[] }; });
 }
-export function buildEnemy(monIds, gd){
+export function buildEnemy(monIds, gd, difficulty=0){
+  const mult=nightmareFactor(difficulty);
   return monIds.map((mid,idx)=>{ const m=gd.monsters[mid]; if(!m) throw new Error("몬스터 없음: "+mid);
-    return { id:`${mid}_${idx}`, name:m.name, spriteKey:m.spriteKey, rawAtk:m.atk, rawDef:m.def, baseAtk:m.atk, baseDef:m.def, maxHp:m.hp, maxMp:m.mp, smart:!!m.smart, skills:m.skills }; });
+    return { id:`${mid}_${idx}`, name:m.name, spriteKey:m.spriteKey, rawAtk:m.atk, rawDef:m.def, baseAtk:m.atk, baseDef:m.def, maxHp:m.hp*mult, maxMp:m.mp*mult, smart:!!m.smart, skills:m.skills }; });
 }
 function buildPotions(potList, gd){
   return (potList||[]).map(p=>{ const pc=gd.potion_combat?.[p.code]; if(!pc) return null; const enh=Math.max(0,Math.min(40,p.enh||0));
@@ -137,7 +139,7 @@ export function simulate(party, zoneId, gd, seed){
   it=gd.items||{};
   const zone=gd.zones[zoneId]; if(!zone) throw new Error("존 없음: "+zoneId);
   const ally={ units:buildAlly(party.adventurers, gd), potions:buildPotions(party.potions, gd), skills:party.skills||{...AB} };
-  const enemy={ units:buildEnemy(zone.monsters, gd), potions:[], skills:{...AB} };
+  const enemy={ units:buildEnemy(zone.monsters, gd, party.difficulty||0), potions:[], skills:{...AB} };
   return MI({ seed:(seed>>>0)||1, ally, enemy, rule:zone.rule });
 }
 export function winRate(party, zoneId, gd, trials=200, seedBase=1){
