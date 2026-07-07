@@ -533,6 +533,10 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 
 /* 플래너 생산 스킬 섹션 */
 .pl-sksec { font-size: 12px; color: var(--ink); font-weight: 600; margin: 4px 0 -2px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.pl-zone-note { margin: -2px 0 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel2); color: var(--muted); font-size: 12px; line-height: 1.45; }
+.pl-zone-note b { color: var(--ink); }
+.pl-zone-note span { font-size: 11.5px; }
 
 /* 바람꽃 수분 생산 섹션 */
 .pl-poll { border: 1px solid #3b6ea5; background: #1a2230; }

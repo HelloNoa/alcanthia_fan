@@ -54,15 +54,44 @@ const FLOOR_NAMES = {
 const FLOOR_ORDER = Object.keys(FLOOR_NAMES);   // 인덱스+1 = 바닥재 종류
 const FENCE_ORDER = ["rustic_fence", "root_barrier"];
 const SIDES = ["t", "r", "b", "l"];
+const PRODUCTION_ZONES = {
+  "": "지역 없음",
+  misty_swamp: "안개 습지",
+  poison_jungle: "독안개 정글",
+  advanced_volcano: "용암 협곡",
+  wind_corridor: "바람의 회랑",
+  golden_fields: "금빛 들판",
+  twilight_valley: "어스름 계곡",
+  crystal_mine: "수정 갱도",
+  dried_spring: "메마른 샘",
+};
+const PRODUCTION_ZONE_NOTES = {
+  "": "텃밭 생산량에 영향을 주는 지역 효과를 적용하지 않습니다.",
+  misty_swamp: "모든 칸을 습기 토양으로 계산합니다. 푸른이끼처럼 습기 조건을 보는 작물에 영향이 있습니다.",
+  poison_jungle: "중독 식물도 생산하며, 중독 상태면 생산속도에 +10%×계수가 붙습니다.",
+  advanced_volcano: "물에 약한 작물도 물 공급으로 죽지 않는 것으로 계산합니다.",
+  wind_corridor: "바람꽃 수분 주기가 60초×(1 - 10%×계수)로 짧아집니다.",
+  golden_fields: "최대 생산 횟수가 기본 수명×(1 + 50%×계수)로 늘어납니다.",
+  twilight_valley: "이웃 종류 수만큼 생산 배율이 +5%×계수×종류 수 증가합니다.",
+  crystal_mine: "같은 작물로 가로/세로 줄을 채우면 줄마다 +20%×계수. 이 칸은 일반 과밀 감소 대신 수정갱도 분기를 탑니다.",
+  dried_spring: "풍요의 손길 추가 수확 확률 효과가 (1 + 계수)배 커집니다.",
+};
+const zoneCoeff = (opt) => opt.familiar * 0.1 + (opt.fog ? 1 : 0) + (opt.raid ? 0.5 : 0);
+const plentyMultiplier = (opt) => 1 + 0.05 * opt.plenty * (opt.zone === "dried_spring" ? 1 + zoneCoeff(opt) : 1);
+const zoneNoteHtml = (opt) => `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 습격 방어 0.5</span>`;
 
-function multiplier(pid, cond, plantCond, sameCount, diversity, opt, oneShot) {
+function multiplier(pid, cond, plantCond, sameCount, diversity, opt, oneShot, crystalLineBonus) {
   let c = opt.harvest ? 1.5 : 1;
+  const zc = zoneCoeff(opt);
   if (pid === "blue_moss" && cond.has("humid")) c *= 2;
   if (pid === "poison_flower" && cond.has("toxic")) c *= 2;
   if (pid === "illusion_fern") c *= Math.max(0, diversity);
   if (cond.has("sunlit")) c *= 1.3;
   if (plantCond.has("encroached")) c *= 2;
+  if (opt.zone === "poison_jungle" && plantCond.has("poisoned")) c *= 1 + 0.1 * zc;
+  if (opt.zone === "twilight_valley") c *= 1 + 0.05 * zc * diversity;
   if (pid === "crystal_succulent") c *= 0.5 + 0.5 * sameCount;
+  else if (opt.zone === "crystal_mine" && crystalLineBonus > 0) c *= 1 + 0.2 * zc * crystalLineBonus;
   else if (!oneShot && sameCount > 0) c *= 1 - (1 - 0.5 ** sameCount) * Math.max(0, 1 - opt.resist * 0.25);
   return c;
 }
@@ -157,7 +186,7 @@ export async function renderPlanner(view) {
   let sel = palette[0];
   let mode = "plant";
   let enh = 0;
-  const opt = { harvest: false, resist: 0, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
+  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
   let condMap = null;
 
   view.innerHTML = `<h2>🌿 텃밭 배치 테스트</h2>
@@ -189,6 +218,15 @@ export async function renderPlanner(view) {
         <div class="pl-opts">
           <label class="chk"><input type="checkbox" id="pl-harvest"> 촉진포션 (×1.5)</label>
           <label class="lvlabel">과밀 저항 <input id="pl-resist" type="range" min="0" max="2" value="0"><b id="pl-resistv">0</b></label>
+          <div class="pl-sksec">지역 효과 <span class="muted">(생산량)</span></div>
+          <label class="lvlabel">지역 <select id="pl-zone" class="num-in">
+            ${Object.entries(PRODUCTION_ZONES).map(([id, label]) => `<option value="${id}">${label}</option>`).join("")}
+          </select></label>
+          <label class="lvlabel">낯익은 터 <input id="pl-familiar" type="range" min="0" max="10" value="0"><b id="pl-familiarv">0</b></label>
+          <label class="chk"><input type="checkbox" id="pl-fog"> 안개 해방</label>
+          <label class="chk"><input type="checkbox" id="pl-raid"> 습격 방어 보너스</label>
+          <div class="muted">지역효과 계수 <b id="pl-zone-coeff">0.00</b></div>
+          <div class="pl-zone-note" id="pl-zone-note">${zoneNoteHtml(opt)}</div>
           <label class="lvlabel">뿌리 지배 <input id="pl-root" type="range" min="0" max="2" value="0"><b id="pl-rootv">0</b></label>
           <label class="chk"><input type="checkbox" id="pl-vein"> 맥읽기 (강화만큼 범위↑)</label>
           <label class="chk"><input type="checkbox" id="pl-sturdy"> 단단한 줄기 (강화 작물 최대생산 ×(강화+1))</label>
@@ -395,6 +433,26 @@ export async function renderPlanner(view) {
   const plantAt = (r, c) => { const z = grid[r][c]; return z && z.p ? z : null; };
   const effectivePlantAt = (r, c) => virtualPollMap.get(`${r}:${c}`)?.clone || plantAt(r, c);
   const ornAt = (r, c) => { const z = grid[r][c]; return z && z.orn ? z : null; };
+  const crystalLineBonus = (r, c, z, lookup) => {
+    const pid = z?.p;
+    if (!pid) return 0;
+    const cellRef = (y, x) => {
+      const plant = lookup(y, x);
+      if (plant) return plant;
+      return grid[y]?.[x] ? {} : null;
+    };
+    const filled = (line) => {
+      const first = line.findIndex((cell) => cell !== null);
+      if (first < 0) return false;
+      let last = line.length - 1;
+      while (last >= first && line[last] === null) last--;
+      const segment = line.slice(first, last + 1);
+      return segment.length >= 2 && segment.every((cell) => cell?.p === pid);
+    };
+    const row = Array.from({ length: CANVAS }, (_, x) => cellRef(r, x));
+    const col = Array.from({ length: CANVAS }, (_, y) => cellRef(y, c));
+    return (filled(row) ? 1 : 0) + (filled(col) ? 1 : 0);
+  };
 
   // 조건맵 (범위: 이슬뿌리+뿌리지배, 맥읽기=강화만큼)
   const buildConds = () => {
@@ -419,6 +477,7 @@ export async function renderPlanner(view) {
       else if (floor === "lava_channel") {
         condMap[r][c].add("arid");
       }
+      if (opt.zone === "misty_swamp") condMap[r][c].add("humid");
       if (condMap[r][c].has("arid")) condMap[r][c].delete("humid");
     }
   };
@@ -458,14 +517,17 @@ export async function renderPlanner(view) {
     const nb = nbrs(r, c).map(([y, x]) => lookup(y, x)).filter(Boolean);
     const same = nb.filter((x) => x.p === z.p).length;
     const diversity = new Set(nb.map((x) => x.p)).size;
-    const m = multiplier(z.p, cond, plantCond, same, diversity, opt, P.oneShot);
+    const zc = zoneCoeff(opt);
+    const crystalBonus = opt.zone === "crystal_mine" ? crystalLineBonus(r, c, z, lookup) : 0;
+    const m = multiplier(z.p, cond, plantCond, same, diversity, opt, P.oneShot, crystalBonus);
     const prod = (P.produces || [])[0];
     const poisonFed = plantCond.has("poisoned") || cond.has("toxic") || cond.has("poisonous");
     const gated = z.p === "nightshade_sprout" && !(cond.has("humid") && poisonFed);
-    const waterKilled = waterKills(z.p, P) && cond.has("humid");
+    const waterKilled = opt.zone !== "advanced_volcano" && waterKills(z.p, P) && cond.has("humid");
     const aridBlocked = cond.has("arid") && z.p !== "fire_vine";
     const toxicBlocked = cond.has("toxic") && !poisonResistant(z.p, plantCond);
-    const paused = waterKilled || aridBlocked || toxicBlocked || plantCond.has("frozen") || (plantCond.has("poisoned") && z.p !== "nightshade_sprout");
+    const poisonPaused = plantCond.has("poisoned") && z.p !== "nightshade_sprout" && opt.zone !== "poison_jungle";
+    const paused = waterKilled || aridBlocked || toxicBlocked || plantCond.has("frozen") || poisonPaused;
     // 통합 공식: 한 생애 maxHarvests개를 (성장시간 + maxHarvests×생산간격) 동안 생산 (재배 반복 가정)
     // → 간격 큰 작물(밤그늘뿌리=1시간)은 간격 제한, 간격 작은 작물(약초)은 성장시간 제한이 자동 적용
     // 스킬: 시간숙련(생산간격↓), 토양숙련(성장시간↓) — (1-rate×Lv)^(강화+1) 곱연산
@@ -474,12 +536,16 @@ export async function renderPlanner(view) {
     const growEff = P.growTime_ms * Math.pow(Math.max(0, 1 - 0.05 * opt.soilM), e1) * (cond.has("fertile") ? 0.5 : 1);
     const baseH = (P.maxHarvests == null || !isFinite(P.maxHarvests)) ? 1e9 : P.maxHarvests;
     // 단단한 줄기: 강화 작물(e>0)의 최대생산 ×(강화+1)
-    const harvests = (opt.sturdy && (z.e || 0) > 0 && isFinite(baseH)) ? baseH * ((z.e || 0) + 1) : baseH;
+    const sturdyHarvests = (opt.sturdy && (z.e || 0) > 0 && isFinite(baseH)) ? baseH * ((z.e || 0) + 1) : baseH;
+    const harvests = opt.zone === "golden_fields" && isFinite(sturdyHarvests)
+      ? Math.floor(sturdyHarvests * (1 + 0.5 * zc))
+      : sturdyHarvests;
     const cycle = growEff + harvests * intervalEff;
-    const yieldMul = m * (1 + 0.05 * opt.plenty) * (opt.uptime / 100); // 풍요의손길 · 가동률
+    const yieldMul = m * plentyMultiplier(opt) * (opt.uptime / 100); // 풍요의손길 · 가동률
     const perHour = prod && !gated && !paused && cycle > 0 ? (harvests / cycle) * 3600000 * yieldMul : 0;
     return {
-      ...z, P, cond, plantCond, same, diversity, m, prod, gated, paused,
+      ...z, P, cond, plantCond, same, diversity, crystalBonus, m, prod, gated, paused,
+      zoneCoeff: zc,
       dryBlocked: aridBlocked, aridBlocked, toxicBlocked,
       waterKilled, fireProtected: waterKills(z.p, P) && cond.has("arid"),
       perHour, harvests, growEff,
@@ -612,7 +678,8 @@ export async function renderPlanner(view) {
   const pollProduction = () => {
     const out = {};
     if (!grid.flat().some((z) => z && z.p === "wind_blossom")) return out;
-    const cyclesPerHour = 3600000 / (60000 * (opt.gust ? 0.5 : 1)); // 질풍포션 → 2배속
+    const windZoneMult = opt.zone === "wind_corridor" ? Math.max(0.01, 1 - 0.1 * zoneCoeff(opt)) : 1;
+    const cyclesPerHour = 3600000 / (60000 * (opt.gust ? 0.5 : 1) * windZoneMult); // 질풍포션 → 2배속
     for (const { src, sr, sc, clone } of pollTargets().values()) {
       const sp = plants[src.p];
       if (!sp.oneShot || !sp.produces[0]) continue;          // 약초·버섯류만 (수분 자동화)
@@ -622,7 +689,7 @@ export async function renderPlanner(view) {
       const code = sp.produces[0].itemCode;
       // 풍요의 손길(수확 2배 확률) · 가동률 적용
       const srcH = (sp.maxHarvests || 1) * (opt.sturdy && (clone.e || 0) > 0 ? (clone.e || 0) + 1 : 1);  // 단단한 줄기
-      out[code] = (out[code] || 0) + srcH * cyclesPerHour * (1 + 0.05 * opt.plenty) * (opt.uptime / 100);
+      out[code] = (out[code] || 0) + srcH * cyclesPerHour * plentyMultiplier(opt) * (opt.uptime / 100);
     }
     return out;
   };
@@ -667,8 +734,9 @@ export async function renderPlanner(view) {
     }
     let lines = `<div class="d-row">토양 효과 <b>${soilCondTxt(st.cond)}</b></div>
       <div class="d-row">식물 상태 <b>${plantCondTxt(st.plantCond)}</b></div>
-      <div class="d-row">같은 이웃 <b>${st.same}</b> · 이웃 종류 <b>${st.diversity}</b>${st.P.oneShot ? ' <span class="muted">(과밀 면제)</span>' : ""}</div>
+      <div class="d-row">같은 이웃 <b>${st.same}</b> · 이웃 종류 <b>${st.diversity}</b>${st.P.oneShot ? ' <span class="muted">(과밀 면제)</span>' : st.crystalBonus > 0 ? ' <span class="muted">(수정갱도 한 줄 · 과밀 무시)</span>' : ""}</div>
       <div class="d-row">생산 배율 <b class="${st.m > 1 ? "up" : st.m < 1 ? "down" : ""}">×${st.m.toFixed(2)}</b></div>`;
+    if (st.crystalBonus > 0) lines += `<div class="d-row up">수정갱도 배치 <b>+${Math.round(st.crystalBonus * 20 * st.zoneCoeff)}%</b> <span class="muted">(계수 ${st.zoneCoeff.toFixed(2)})</span></div>`;
     if (st.fireProtected) lines += `<div class="d-row up">사막화로 물 공급 차단 <span class="muted">(불씨덩굴 보호)</span></div>`;
     if (st.prod) {
       const blocked = autoHarvestBlocked(st);
@@ -731,6 +799,15 @@ export async function renderPlanner(view) {
   view.querySelector("#pl-enh").oninput = (e) => { enh = +e.target.value; view.querySelector("#pl-enhv").textContent = enh; };
   view.querySelector("#pl-harvest").onchange = (e) => { opt.harvest = e.target.checked; recompute(); };
   view.querySelector("#pl-resist").oninput = (e) => { opt.resist = +e.target.value; view.querySelector("#pl-resistv").textContent = opt.resist; recompute(); };
+  const updateZoneCoeff = () => {
+    view.querySelector("#pl-zone-coeff").textContent = zoneCoeff(opt).toFixed(2);
+    view.querySelector("#pl-zone-note").innerHTML = zoneNoteHtml(opt);
+    recompute();
+  };
+  view.querySelector("#pl-zone").onchange = (e) => { opt.zone = e.target.value; updateZoneCoeff(); };
+  view.querySelector("#pl-familiar").oninput = (e) => { opt.familiar = +e.target.value; view.querySelector("#pl-familiarv").textContent = opt.familiar; updateZoneCoeff(); };
+  view.querySelector("#pl-fog").onchange = (e) => { opt.fog = e.target.checked; updateZoneCoeff(); };
+  view.querySelector("#pl-raid").onchange = (e) => { opt.raid = e.target.checked; updateZoneCoeff(); };
   view.querySelector("#pl-root").oninput = (e) => { opt.rootDom = +e.target.value; view.querySelector("#pl-rootv").textContent = opt.rootDom; recompute(); };
   view.querySelector("#pl-vein").onchange = (e) => { opt.vein = e.target.checked; recompute(); };
   view.querySelector("#pl-sturdy").onchange = (e) => { opt.sturdy = e.target.checked; recompute(); };
