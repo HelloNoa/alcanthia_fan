@@ -2,3 +2,5 @@
 .idea/
 node_modules/
 tmp/
+enhance_preview.html
+js/enhance_preview.js
