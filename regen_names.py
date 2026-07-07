@@ -528,6 +528,9 @@ def update_gamedata(s):
     if "다음 출정 시 랜덤 +" in s and "mirage_potion" in uses:
         uses["mirage_potion"]["formula"] = mirage_formula
         uses["mirage_potion"]["base"] = mirage_base
+    duration_codes = gd.setdefault("use_duration", [])
+    if "anti_magic_potion" not in duration_codes:
+        duration_codes.append("anti_magic_potion")
 
     with open(GAMEDATA_OUT, "w", encoding="utf-8") as f:
         json.dump(gd, f, ensure_ascii=False, separators=(",", ":"))

@@ -64,3 +64,15 @@ export function fmtDuration(ms) {
   const m = Math.floor(s / 60); s %= 60;
   return [h && `${h}시간`, m && `${m}분`, (s || (!h && !m)) && `${s}초`].filter(Boolean).join(" ");
 }
+
+export function fmtMinutes(minutes) {
+  if (minutes == null) return "-";
+  let m = Math.round(Number(minutes) || 0);
+  const d = Math.floor(m / 1440); m %= 1440;
+  const h = Math.floor(m / 60); m %= 60;
+  return [
+    d && `${d.toLocaleString()}일`,
+    h && `${h}시간`,
+    (m || (!d && !h)) && `${m}분`,
+  ].filter(Boolean).join(" ");
+}

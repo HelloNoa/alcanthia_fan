@@ -1,6 +1,6 @@
 import { gamedata, names } from "./api.js";
 import { RANDOM_EFFECTS } from "./random_effects.js";
-import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievementIcon, fmtDuration } from "./sprites.js";
+import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievementIcon, fmtDuration, fmtMinutes } from "./sprites.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
@@ -195,7 +195,7 @@ export async function renderCodex(view, sub) {
         const use = randMeta ? { ...(rawUse || {}), formula: randMeta.formula, base: randMeta.base } : rawUse;
         const useF = use?.formula, combatF = combat?.formula;
         const hasDur = (g.use_duration || []).includes(code);  // 지속형 사용효과 (10×2^강화 분)
-        const durTxt = (e) => `${10 * 2 ** e}분`;
+        const durTxt = (e) => fmtMinutes(10 * 2 ** e);
         const enhDep = isEnhDep(useF) || isEnhDep(combatF) || hasDur;
         const txt = (e) => e && (e.base || fmtFormula(e.formula));
         const trans = g.transmute_effects?.[code];
