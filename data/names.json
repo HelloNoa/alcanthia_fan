@@ -391,6 +391,7 @@
 },
 "itemVariantSprites": {
 "fairy_lantern:acorn": "fairy_lantern_acorn",
+"fairy_lantern:crystal_flower": "fairy_lantern_crystal_flower",
 "witch_scarecrow:fearstalk": "witch_scarecrow_fearstalk",
 "witch_scarecrow:parasol": "witch_scarecrow_parasol",
 "working_shelf:study_desk": "study_desk",
@@ -416,6 +417,8 @@
 "storage_chest:star": "storage_chest_star",
 "storage_chest:pink": "storage_chest_pink",
 "storage_chest:blue": "storage_chest_blue",
+"storage_chest:rune": "storage_chest_rune",
+"storage_chest:travel_bag": "storage_chest_travel_bag",
 "hourglass:crystal_orb": "hourglass_crystal_orb",
 "town_teleporter:cottage_well": "town_teleporter_cottage"
 },
@@ -424,6 +427,11 @@
 "itemCode": "fairy_lantern",
 "name": "도토리등불",
 "sprite": "fairy_lantern_acorn"
+},
+"fairy_lantern:crystal_flower": {
+"itemCode": "fairy_lantern",
+"name": "수정꽃 등불",
+"sprite": "fairy_lantern_crystal_flower"
 },
 "witch_scarecrow:fearstalk": {
 "itemCode": "witch_scarecrow",
@@ -549,6 +557,16 @@
 "itemCode": "storage_chest",
 "name": "파란빛 차원상자",
 "sprite": "storage_chest_blue"
+},
+"storage_chest:rune": {
+"itemCode": "storage_chest",
+"name": "고대 룬 차원상자",
+"sprite": "storage_chest_rune"
+},
+"storage_chest:travel_bag": {
+"itemCode": "storage_chest",
+"name": "여행가방 차원상자",
+"sprite": "storage_chest_travel_bag"
 },
 "hourglass:crystal_orb": {
 "itemCode": "hourglass",
@@ -964,6 +982,7 @@
 "default_cauldron": "items/cauldrons",
 "lucky_cauldron": "items/cauldrons",
 "fairy_lantern_acorn": "items/ornament",
+"fairy_lantern_crystal_flower": "items/ornament",
 "witch_scarecrow_fearstalk": "items/ornament",
 "witch_scarecrow_parasol": "items/ornament",
 "study_desk": "items/ornament",
@@ -989,6 +1008,8 @@
 "storage_chest_star": "items/ornament",
 "storage_chest_pink": "items/ornament",
 "storage_chest_blue": "items/ornament",
+"storage_chest_rune": "items/ornament",
+"storage_chest_travel_bag": "items/ornament",
 "hourglass_crystal_orb": "items/ornament",
 "town_teleporter_cottage": "items/ornament"
 }
