@@ -43,3 +43,12 @@ export async function gamedata() {
   catch { _gd = {}; }
   return _gd;
 }
+
+// 튜토리얼 진행 목표와 일회성 의뢰
+let _progression = null;
+export async function progression() {
+  if (_progression) return _progression;
+  try { _progression = await (await fetch("./data/progression.json")).json(); }
+  catch { _progression = { tutorialGoals: [], oneTimeQuests: [] }; }
+  return _progression;
+}

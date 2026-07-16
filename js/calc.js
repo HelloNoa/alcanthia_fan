@@ -1,6 +1,7 @@
 import { gamedata, names } from "./api.js";
 import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
 import { advSim } from "./adventure.js";
+import { enhancementMaterialFlow } from "./enhancement_ev.js";
 
 export async function renderCalc(view, sub) {
   view.innerHTML = `<h2>🧮 계산기</h2>
@@ -426,20 +427,44 @@ async function evCalc(body) {
       && !/^aging_/.test(c) && !(g.items[c].name || "").includes("시험용")
       && (recipeOf[c] || g.items[c].brewDuration_ms || g.item_values?.[c] != null || g.sell_price?.[c] != null || g.equipment_stats?.[c]))
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const itemCodeByInput = new Map();
+  for (const c of craftable) { itemCodeByInput.set(nameOf(c), c); itemCodeByInput.set(c, c); }
+  const EV_STORE = "alc_enhancement_ev_v1";
+  const savedEvState = (() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(EV_STORE) || "null");
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch { return {}; }
+  })();
   // 원재료 가격(골드) — 기본값은 게임 가치/판매가, 사용자가 덮어쓰면 priceState
   const priceState = {};
+  for (const [code, value] of Object.entries(savedEvState.prices || {})) {
+    if (g.items?.[code] && Number.isFinite(+value) && +value >= 0) priceState[code] = +value;
+  }
   const priceOf = (code) => priceState[code] ?? (g.item_values?.[code] ?? g.sell_price?.[code] ?? 0);
 
   body.innerHTML = `
     <div class="calc-grid">
       <div class="calc-card">
         <h3>🎲 강화 기댓값</h3>
-        <div class="calc-row"><label>아이템 <span class="muted">(원재료 전개)</span></label>
-          <select id="ev-item" class="num-in"><option value="">— 없음 (강화만) —</option>${
-            craftable.map((c) => `<option value="${c}">${nameOf(c)}</option>`).join("")}</select></div>
+        <div class="calc-row"><label for="ev-item">아이템 <span class="muted">(원재료 전개)</span></label>
+          <input id="ev-item" class="num-in ev-item-search" type="search" list="ev-item-list"
+            placeholder="이름 검색 · 비우면 강화만" autocomplete="off">
+          <datalist id="ev-item-list">${craftable.map((c) => `<option value="${nameOf(c)}">${c}</option>`).join("")}</datalist></div>
         <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="99" value="0" class="num-in"></div>
         <div class="calc-row"><label>심지 숙련 Lv</label><input id="ev-wick" type="number" min="0" max="10" value="0" class="num-in"></div>
-        <div class="calc-row"><label>제작 성공률 버프 × <span class="muted">(금빛들판 ≤2.25)</span></label><input id="ev-cbuff" type="number" min="1" step="0.05" value="1" class="num-in"></div>
+        <div class="calc-row">
+          <label class="lvlabel">작업 지역
+            <select id="ev-zone" class="num-in">
+              <option value="">기타 (효과 없음)</option>
+              <option value="golden_fields">금빛들판 (제작 성공률)</option>
+              <option value="sunset_cliff">석양절벽 (성공 결과 +1)</option>
+            </select>
+          </label>
+          <label class="lvlabel">낯익은 터 <input id="ev-famG" type="range" min="0" max="10" value="0"><b id="ev-famGv">0</b></label>
+          <label class="chk"><input type="checkbox" id="ev-fog"> 안개 해방</label>
+          <label class="chk"><input type="checkbox" id="ev-zoneBuff"> 지역효과 버프</label>
+        </div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-self"> 🔁 도구 솥 자가강화 <span class="muted">(단계마다 도구 솥 강화도↑)</span></label></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-auto" checked> ⚙️ 입력 강화 자동 최소비용 <span class="muted">(끄면 수동 지정)</span></label></div>
         <div class="calc-row" id="ev-start-row"><label>시작 강화도</label><input id="ev-start" type="number" min="0" max="99" value="0" class="num-in"></div>
@@ -450,46 +475,75 @@ async function evCalc(body) {
         <div id="ev-prices"></div>
         <div id="ev-raw"></div>
         <div class="calc-note">💡 강화 = <b>같은 강화도 아이템 2개 합성 → +1</b> (성공률 p). <b>실패 시 1개만 회수</b>(1개 손실).<br>
-          성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 필요 ≈ <code>(1+1/p)^(최종−시작)</code><br>
-          <b>2차 전개</b>: 제작은 항상 +0 산출, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.<br>
-          석양절벽의 결과 +1 확률은 성공한 양조·강화·제작에 별도로 붙으며, 이 기댓값 계산에는 아직 자동 반영하지 않습니다.</div>
+          성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 지역효과가 없으면 단계별 필요량은 <code>1+1/p</code>배.<br>
+          <b>2차 전개</b>: 기본 제작 산출은 +0, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.<br>
+          금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적하며, <b>정확히 최종 강화도인 결과만 집계</b>하고 초과 결과는 제외합니다.</div>
       </div>
     </div>`;
   const q = (id) => body.querySelector(id);
-  const fmt = (n) => n >= 1000 ? Math.round(n).toLocaleString() : n.toFixed(1);
-  const craftBuff = () => Math.max(0.01, +q("#ev-cbuff")?.value || 1);   // 금빛 들판 제작 성공률 배수 (기본 1)
-  // reqLevel R을 강화가능 입력들에 분배 (비용 per^e×weight 최소화)
-  const bestSplit = (R, w, em) => {
-    if (w.length === 0) return [];
-    if (w.length === 1) return [R];
-    if (w.length === 2) {
-      let best = [R, 0], bc = Infinity;
-      for (let a = 0; a <= R; a++) {
-        const c = em(a) * w[0] + em(R - a) * w[1];
-        if (c < bc) { bc = c; best = [a, R - a]; }
+  const restoreNumber = (id, key, min, max) => {
+    const value = Number(savedEvState[key]);
+    if (Number.isFinite(value)) q(id).value = Math.max(min, Math.min(max, Math.floor(value)));
+  };
+  if (craftable.includes(savedEvState.item)) q("#ev-item").value = nameOf(savedEvState.item);
+  restoreNumber("#ev-cauldron", "cauldron", 0, 99);
+  restoreNumber("#ev-wick", "wick", 0, 10);
+  restoreNumber("#ev-famG", "familiarGround", 0, 10);
+  restoreNumber("#ev-start", "start", 0, 99);
+  restoreNumber("#ev-brew", "brew", 0, 2);
+  restoreNumber("#ev-target", "target", 0, 99);
+  if (["", "golden_fields", "sunset_cliff"].includes(savedEvState.zone)) q("#ev-zone").value = savedEvState.zone;
+  if (typeof savedEvState.fog === "boolean") q("#ev-fog").checked = savedEvState.fog;
+  if (typeof savedEvState.zoneBuff === "boolean") q("#ev-zoneBuff").checked = savedEvState.zoneBuff;
+  if (typeof savedEvState.self === "boolean") q("#ev-self").checked = savedEvState.self;
+  if (typeof savedEvState.auto === "boolean") q("#ev-auto").checked = savedEvState.auto;
+  const fmt = (n) => !Number.isFinite(n) ? "도달 불가" : n >= 1000 ? Math.round(n).toLocaleString() : n.toFixed(1);
+  const pct = (v) => `${(v * 100).toFixed(v * 100 % 1 ? 1 : 0)}%`;
+  const zoneCoeff = () => Math.max(0, +q("#ev-famG")?.value || 0) * 0.1
+    + (q("#ev-fog")?.checked ? 1 : 0)
+    + (q("#ev-zoneBuff")?.checked ? 0.5 : 0);
+  const craftBuff = () => q("#ev-zone")?.value === "golden_fields" ? Math.min(2.25, 1 + 0.5 * zoneCoeff()) : 1;
+  const sunsetBonusRate = () => q("#ev-zone")?.value === "sunset_cliff" ? Math.min(1, 0.05 * zoneCoeff()) : 0;
+  // reqLevel R을 강화가능 입력들에 분배 (입력별 강화비용 최소화)
+  const bestSplit = (R, costFns) => {
+    if (costFns.length === 0) return [];
+    const dp = Array.from({ length: costFns.length + 1 }, () => Array(R + 1).fill(Infinity));
+    const prev = Array.from({ length: costFns.length + 1 }, () => Array(R + 1).fill(0));
+    dp[0][0] = 0;
+    for (let i = 0; i < costFns.length; i++) {
+      for (let sum = 0; sum <= R; sum++) {
+        if (!Number.isFinite(dp[i][sum])) continue;
+        for (let e = 0; e + sum <= R; e++) {
+          const next = dp[i][sum] + costFns[i](e);
+          if (next < dp[i + 1][sum + e]) { dp[i + 1][sum + e] = next; prev[i + 1][sum + e] = e; }
+        }
       }
-      return best;
     }
-    return w.map((_, i) => Math.floor(R / w.length) + (i < R % w.length ? 1 : 0));
+    const split = Array(costFns.length).fill(0);
+    for (let i = costFns.length, sum = R; i > 0; i--) {
+      split[i - 1] = prev[i][sum];
+      sum -= split[i - 1];
+    }
+    return split;
   };
   // 시작 강화도>0이면 대상 아이템(최상위)을 완제품 leaf로 취급 — +s 아이템을 직접 보유/구매한다고 보고 레시피 분해 안 함
   const leaf = (item, stack) => (stack.size === 0 && Math.floor(+q("#ev-start")?.value || 0) > 0) || !recipeOf[item] || (stack.size > 0 && terminal.has(item)) || stack.has(item);
   // 자동 최소비용 분배 → 기본 입력강화도(assign) 기록
-  const autoAssign = (em) => {
+  const autoAssign = (multFor) => {
     const memo = {}, assign = {};
     const f = (item, stack) => {
       if (memo[item]) return memo[item];
       if (leaf(item, stack)) return { dict: { [item]: 1 }, total: priceOf(item) };
       const ns = new Set(stack); ns.add(item);
       const rec = recipeOf[item];
-      const parts = rec.in.map((c) => ({ code: c, b: f(c, ns), enh: !isProduce(c) }));
+      const parts = rec.in.map((c) => ({ code: c, b: f(c, ns), enh: !isProduce(c), mult: (e) => multFor(c, e, ns) }));
       // 부분 성공까지 비교: sum 0~req 중 (강화 raw × 재시도비용) 최소 분배 선택 (제작버프↑면 부분이 유리)
-      const costs = parts.filter((p) => p.enh).map((p) => p.b.total);
-      let split = bestSplit(rec.req, costs, em), bestC = Infinity;
+      const costs = parts.filter((p) => p.enh).map((p) => (e) => p.b.total * p.mult(e));
+      let split = bestSplit(rec.req, costs), bestC = Infinity;
       for (let sum = 0; sum <= rec.req; sum++) {
-        const sp = bestSplit(sum, costs, em);
+        const sp = bestSplit(sum, costs);
         let raw = 0, j = 0;
-        for (const p of parts) raw += p.b.total * em(p.enh ? sp[j++] : 0);
+        for (const p of parts) raw += p.b.total * (p.enh ? p.mult(sp[j++]) : 1);
         const qv = Math.min(1, Math.pow(0.25, Math.max(0, rec.req - sum)) * craftBuff());
         const cost = raw * (0.5 / qv + 0.5);
         if (cost < bestC) { bestC = cost; split = sp; }
@@ -498,7 +552,7 @@ async function evCalc(body) {
       for (const p of parts) {
         const e = p.enh ? split[ai++] : 0;
         if (p.enh) assign[item + "|" + p.code] = e;
-        const m = em(e);
+        const m = p.enh ? p.mult(e) : 1;
         for (const [k, v] of Object.entries(p.b.dict)) dict[k] = (dict[k] || 0) + v * m;
         total += p.b.total * m;
       }
@@ -508,7 +562,7 @@ async function evCalc(body) {
     return { f, assign };
   };
   // 수동 입력강화도(enhState)로 원재료 계산. 제작 성공률<100%면 재시도 비용 반영
-  const manualRaw = (em, enhState, qmap) => {
+  const manualRaw = (multFor, enhState, qmap) => {
     const memo = {};
     const f = (item, stack) => {
       if (memo[item]) return memo[item];
@@ -520,14 +574,14 @@ async function evCalc(body) {
         const prod = isProduce(c);
         const e = prod ? Math.min(2, enhState[item + "|" + c] ?? 0) : (enhState[item + "|" + c] ?? 0);   // 작물 최대 +2
         sum += e;
-        return { b: f(c, ns), e, prod };
+        return { code: c, b: f(c, ns), e, prod };
       });
       const qv = Math.min(1, Math.pow(0.25, Math.max(0, rec.req - sum)) * craftBuff());
       if (qmap) qmap[item] = qv;
       const retry = 0.5 / qv + 0.5;             // 제작 실패 재시도 (입력당)
       const dict = {}; let total = 0;
       for (const p of parts) {
-        const m = (p.prod ? 1 : em(p.e)) * retry;   // 작물은 합성 불가 → 개수 1 (강화도는 reqLv 기여만)
+        const m = (p.prod ? 1 : multFor(p.code, p.e, ns)) * retry;   // 작물은 합성 불가 → 개수 1 (강화도는 reqLv 기여만)
         for (const [k, v] of Object.entries(p.b.dict)) dict[k] = (dict[k] || 0) + v * m;
         total += p.b.total * m;
       }
@@ -574,11 +628,36 @@ async function evCalc(body) {
     q("#ev-prices").querySelectorAll(".ev-price-in").forEach((inp) =>
       inp.oninput = () => { priceState[inp.dataset.pc] = Math.max(0, +inp.value || 0); calc(); });
   };
-  let enhState = {}, lastItem = null, lastStart = -1, lastBrew = -1;
-  const renderFields = (item, em) => {
+  const restoredEnhState = {};
+  for (const [key, value] of Object.entries(savedEvState.enhancements || {})) {
+    if (key.includes("|") && Number.isFinite(+value)) restoredEnhState[key] = Math.max(0, Math.min(40, Math.floor(+value)));
+  }
+  let enhState = restoredEnhState, lastItem = null, lastStart = -1, lastBrew = -1;
+  const saveState = () => {
+    const numberOf = (id) => Math.max(0, Math.floor(+q(id).value || 0));
+    try {
+      localStorage.setItem(EV_STORE, JSON.stringify({
+        item: itemCodeByInput.get(q("#ev-item").value.trim()) || "",
+        cauldron: numberOf("#ev-cauldron"),
+        wick: Math.min(10, numberOf("#ev-wick")),
+        zone: q("#ev-zone").value,
+        familiarGround: Math.min(10, numberOf("#ev-famG")),
+        fog: q("#ev-fog").checked,
+        zoneBuff: q("#ev-zoneBuff").checked,
+        self: q("#ev-self").checked,
+        auto: q("#ev-auto").checked,
+        start: numberOf("#ev-start"),
+        brew: Math.min(2, numberOf("#ev-brew")),
+        target: numberOf("#ev-target"),
+        prices: priceState,
+        enhancements: enhState,
+      }));
+    } catch {}
+  };
+  const renderFields = (item, multFor) => {
     if (leaf(item, new Set())) { q("#ev-fields").innerHTML = ""; enhState = {}; return; }   // 완제품 leaf면 제작 입력 없음
-    const aa = autoAssign(em); aa.f(item, new Set());
-    enhState = { ...aa.assign };           // 기본값 = 자동 최소비용
+    const aa = autoAssign(multFor); aa.f(item, new Set());
+    enhState = { ...aa.assign, ...enhState };   // 자동 기본값 위에 저장된 수동값 복원
     const crafts = []; collectCrafts(item, new Set(), crafts, new Set());
     q("#ev-fields").innerHTML = `<div class="ev-fields-h">🔧 제작 입력 강화도 <span class="muted">(직접 조정 · 합 ≥ reqLv면 100%)</span></div>` +
       crafts.map((cr) => `<div class="ev-craft"><div class="ev-craft-h"><b>${nameOf(cr.item)}</b> <span class="muted">reqLv ${cr.req}</span> <span class="ev-q" data-c="${cr.item}"></span></div>
@@ -592,28 +671,104 @@ async function evCalc(body) {
   const calc = () => {
     const c = Math.max(0, Math.floor(+q("#ev-cauldron").value || 0));
     const w = Math.max(0, Math.min(10, Math.floor(+q("#ev-wick").value || 0)));
-    const item = q("#ev-item").value;
+    const item = itemCodeByInput.get(q("#ev-item").value.trim()) || "";
     const self = q("#ev-self").checked;
     const potion = !!item && isPotion(item);
+    const famG = Math.max(0, Math.floor(+q("#ev-famG").value || 0));
+    q("#ev-famGv").textContent = famG;
+    const craftRateBuff = craftBuff();
+    const sunsetRate = sunsetBonusRate();
     q("#ev-brew-row").style.display = potion ? "" : "none";
     q("#ev-start-row").style.display = potion ? "none" : "";   // 포션은 양조 작물 강화도가 시작점 → 시작 강화도 숨김
     // 단계 k(→k+1) 성공률. 자가강화면 도구 솥 강화도 = max(솥강화도, k)
     const pAt = (k) => { const tool = self ? Math.max(c, k) : c; return Math.min(0.75, 0.5 * (2 - Math.pow(1 - 0.005 * w, tool + 1))); };
-    // em(e) = +0→+e 강화 누적 비용 (단계별 (1+1/p) 곱)
-    const emCache = [1];
-    const em = (e) => { while (emCache.length <= e) emCache.push(emCache[emCache.length - 1] * (1 + 1 / pAt(emCache.length - 1))); return emCache[e]; };
+    const flowMemo = new Map();
+    const materialFlow = (start, target, sourceBonusRate = 0, goal = "exact") => {
+      start = Math.max(0, Math.floor(start || 0));
+      target = Math.max(start, Math.floor(target || 0));
+      const key = `${start}:${target}:${sourceBonusRate}:${goal}`;
+      if (!flowMemo.has(key)) flowMemo.set(key, enhancementMaterialFlow({
+        start,
+        target,
+        successRate: pAt,
+        bonusRate: sunsetRate,
+        sourceBonusRate,
+        goal,
+      }));
+      return flowMemo.get(key);
+    };
+    const fmtFlow = (n) => {
+      if (!Number.isFinite(n)) return "도달 불가";
+      const digits = n < 0.1 ? 3 : n < 10 ? 2 : n < 1000 ? 1 : 0;
+      return n.toLocaleString("ko-KR", { minimumFractionDigits: 0, maximumFractionDigits: digits });
+    };
+    const renderFlowProgress = (flow, start, target, sourceBonusRate, source) => {
+      if (target - start < 2 || !Number.isFinite(flow.expectedInputs)) return "";
+      const scale = flow.expectedInputs;
+      const withSunset = sunsetRate > 0;
+      const sourceBase = scale * (1 - sourceBonusRate);
+      const sourceBonus = scale * sourceBonusRate;
+      const sourceTotal = `${source.label} ${fmtFlow(scale)}${source.suffix}`;
+      const sourceFlow = source.generated
+        ? `<b>${sourceTotal}</b><span>→</span><b>+${start} ${fmtFlow(sourceBase)}개</b>${sourceBonusRate > 0 ? `<span>+</span><b>+${start + 1} ${fmtFlow(sourceBonus)}개</b>` : ""}`
+        : `<b>${sourceTotal}</b><span>에서 시작</span>`;
+      const rows = flow.levels.map((step) => {
+        const available = step.available * scale;
+        const attempts = step.attempts * scale;
+        const normal = step.normalOutput * scale;
+        const bonus = step.bonusOutput * scale;
+        const bonusTarget = step.level + 2;
+        const excluded = bonusTarget > target ? bonus : 0;
+        return `<tr>
+          <th scope="row"><span>+${step.level}</span><small>${pct(step.successRate)}</small></th>
+          <td><b>${fmtFlow(available)}개</b></td>
+          <td>${fmtFlow(attempts)}회</td>
+          <td><b>${fmtFlow(normal)}개</b><small>→ +${step.level + 1}</small></td>
+          ${withSunset ? `<td class="${excluded > 0 ? "excluded" : ""}"><b>${fmtFlow(bonus)}개</b><small>→ +${bonusTarget}</small></td>
+          <td class="ev-flow-discard">${excluded > 0 ? `<b>${fmtFlow(excluded)}개</b>` : "-"}</td>` : ""}
+        </tr>`;
+      });
+      rows.push(`<tr class="final">
+        <th scope="row"><span>+${target}</span><small>최종</small></th>
+        <td><b>${fmtFlow(flow.targetYield * scale)}개</b></td><td>완료</td><td>-</td>
+        ${withSunset ? "<td>-</td><td>-</td>" : ""}
+      </tr>`);
+      return `<div class="ev-flow">
+        <div class="ev-flow-h"><b>강화 재고 흐름</b><span>최종 +${target} 1개 · 실패 회수와 재투입 반영</span></div>
+        <div class="ev-flow-source">${sourceFlow}</div>
+        <div class="ev-flow-scroll"><table class="${withSunset ? "sunset" : ""}">
+          <thead><tr><th scope="col">단계</th><th scope="col">유입 재고</th><th scope="col">예상 시도</th><th scope="col">일반 +1 산출</th>
+            ${withSunset ? "<th scope=\"col\">석양 +2 산출</th><th scope=\"col\">목표 초과 제외</th>" : ""}</tr></thead>
+          <tbody>${rows.join("")}</tbody>
+        </table></div>
+      </div>`;
+    };
+    const multFor = (code, e, stack) => {
+      e = Math.max(0, Math.floor(e || 0));
+      const sourceBonus = sunsetRate > 0 && !leaf(code, stack) ? sunsetRate : 0;
+      return materialFlow(0, e, sourceBonus, "atLeast").expectedInputs;
+    };
     const rawEl = q("#ev-raw"), fEl = q("#ev-fields");
     if (potion) {   // 포션: 강화 작물 양조 계승(dz) — +baseE 작물 양조 → 목표까지 합성
       const t = Math.max(0, Math.floor(+q("#ev-target").value || 0));
-      const k = Math.max(0, Math.min(2, Math.floor(+q("#ev-brew").value ?? 2)));
-      const baseE = Math.min(t, k), brews = em(t) / em(baseE);
+      const k = Math.max(0, Math.min(2, Math.floor(+q("#ev-brew").value || 0)));
+      const baseE = Math.min(t, k);
+      const brewFlow = materialFlow(baseE, t, sunsetRate, "exact");
+      const brews = brewFlow.expectedInputs;
       if (item !== lastItem || baseE !== lastBrew) { renderBrewPrices(item, baseE); lastItem = item; lastBrew = baseE; }
       fEl.innerHTML = "";
       const dict = {};
       for (const ic of brewOut[item]) dict[ic] = (dict[ic] || 0) + brews;   // 양조 1번당 작물 1개씩 (중복 포함)
+      const brewP = pAt(baseE);
       q("#ev-out").innerHTML = `
-        <div class="ev-res"><span>합성 성공률 (1회)</span><b>${(pAt(baseE) * 100).toFixed(1)}%</b></div>
-        <div class="ev-res big"><span>${nameOf(item)} +${t} <span class="muted">· +${baseE} 작물 양조 후 합성</span></span><b>양조 ${fmt(brews)}번</b></div>`;
+        ${t > baseE ? `<div class="ev-res"><span>합성 성공률 (시작 단계)</span><b>${(brewP * 100).toFixed(1)}%</b></div>` : ""}
+        ${sunsetRate > 0 ? `<div class="ev-res"><span>석양 발동률 (성공 결과)</span><b>${pct(sunsetRate)}</b></div>
+        <div class="ev-res"><span>양조 산출 +${baseE}</span><b>${pct(1 - sunsetRate)}</b></div>
+        <div class="ev-res"><span>석양 양조 산출 +${baseE + 1}</span><b>${pct(sunsetRate)}</b></div>
+        ${t > baseE ? `<div class="ev-res"><span>일반 합성 (+${baseE}→+${baseE + 1})</span><b>${pct(brewP * (1 - sunsetRate))}</b></div>
+        <div class="ev-res"><span>석양 대성공 (+${baseE}→+${baseE + 2})</span><b>${pct(brewP * sunsetRate)}</b></div>` : ""}` : ""}
+        ${renderFlowProgress(brewFlow, baseE, t, sunsetRate, { label: "양조", suffix: "회", generated: true })}
+        <div class="ev-res big"><span>정확히 +${t} ${nameOf(item)} <span class="muted">· 장기 기댓값</span></span><b>양조 ${fmt(brews)}번</b></div>`;
       let totalCost = 0;
       const rows = Object.entries(dict).sort((a, b) => b[1] - a[1]).map(([code, n]) => {
         const cnt = Math.ceil(n), cost = cnt * priceOf(code); totalCost += cost;
@@ -622,26 +777,40 @@ async function evCalc(body) {
       rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${baseE} 작물 양조 → +${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
         <div class="ev-raw-list">${rows}</div>`;
       rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
+      saveState();
       return;
     }
     const s = Math.max(0, Math.floor(+q("#ev-start").value || 0));
     const t = Math.max(s, Math.floor(+q("#ev-target").value ?? s));
     const levels = t - s;
-    const items = em(t) / em(s);
+    const hasCraft = !!item && !leaf(item, new Set());
+    const sourceBonus = hasCraft && s === 0 ? sunsetRate : 0;
+    const targetFlow = materialFlow(s, t, sourceBonus, "exact");
+    const items = targetFlow.expectedInputs;
     const pS = pAt(s), pT1 = pAt(Math.max(s, t - 1));
     const rateTxt = self && levels > 1 ? `${(pS * 100).toFixed(1)}% → ${(pT1 * 100).toFixed(1)}%` : `${(pS * 100).toFixed(2)}%`;
     const label = item ? nameOf(item) : "아이템";
+    const sourceNeedTxt = hasCraft && s === 0 ? `제작 결과 ${fmt(items)}개` : `+${s} 재료 ${fmt(items)}개`;
     q("#ev-out").innerHTML = `
-      <div class="ev-res"><span>강화 성공률 (1회)</span><b>${rateTxt}</b></div>
-      <div class="ev-res big"><span>필요한 +${s} ${label} (기댓값)</span><b>${fmt(items)}개</b></div>`;
+      ${levels > 0 ? `<div class="ev-res"><span>강화 성공률 (1회)</span><b>${rateTxt}</b></div>` : ""}
+      ${hasCraft && craftRateBuff > 1 ? `<div class="ev-res"><span>금빛들판 제작 성공률</span><b>×${craftRateBuff.toFixed(2)}</b></div>` : ""}
+      ${sunsetRate > 0 ? `<div class="ev-res"><span>석양 발동률 (성공 결과)</span><b>${pct(sunsetRate)}</b></div>
+      ${hasCraft && s === 0 ? `<div class="ev-res"><span>제작 산출 +0 / +1</span><b>${pct(1 - sunsetRate)} / ${pct(sunsetRate)}</b></div>` : ""}
+      ${levels > 0 ? `<div class="ev-res"><span>시작 단계 실패 (+${s} 회수)</span><b>${pct(1 - pS)}</b></div>
+      <div class="ev-res"><span>일반 성공 (+${s}→+${s + 1})</span><b>${pct(pS * (1 - sunsetRate))}</b></div>
+      <div class="ev-res"><span>석양 대성공 (+${s}→+${s + 2})</span><b>${pct(pS * sunsetRate)}</b></div>` : ""}` : ""}
+      ${renderFlowProgress(targetFlow, s, t, sourceBonus, hasCraft && s === 0
+        ? { label: "제작 결과", suffix: "개", generated: true }
+        : { label: `+${s} 재료`, suffix: "개", generated: false })}
+      <div class="ev-res big"><span>정확히 +${t} ${label} 1개 <span class="muted">· 장기 기댓값</span></span><b>${sourceNeedTxt}</b></div>`;
     if (item) {  // 레시피 없는 원재료(각인석 등)도 자기 자신을 원재료로 전개
       const auto = q("#ev-auto").checked;
-      if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, em); lastItem = item; lastStart = s; }
-      else if (s !== lastStart) { renderPrices(item); if (!auto) renderFields(item, em); lastStart = s; }   // 시작 강화도 바뀌면 +s 라벨·완제품 leaf 갱신
-      if (auto) { const aa = autoAssign(em); aa.f(item, new Set()); enhState = aa.assign; fEl.innerHTML = ""; }  // 가격 기준 최소비용 자동
+      if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, multFor); lastItem = item; lastStart = s; }
+      else if (s !== lastStart) { renderPrices(item); if (!auto) renderFields(item, multFor); lastStart = s; }   // 시작 강화도 바뀌면 +s 라벨·완제품 leaf 갱신
+      if (auto) { const aa = autoAssign(multFor); aa.f(item, new Set()); enhState = aa.assign; fEl.innerHTML = ""; }  // 가격 기준 최소비용 자동
       const qmap = {};
-      const base = manualRaw(em, enhState, qmap)(item, new Set());
-      const mult = items;   // 시작 강화도 반영: +s 아이템 기준 개수 = em(t)/em(s) (s=0이면 em(t))
+      const base = manualRaw(multFor, enhState, qmap)(item, new Set());
+      const mult = items;   // 정확한 목표 강화도 1개에 필요한 성공 제작물 수
       // 제작 성공률 표시
       fEl.querySelectorAll(".ev-q[data-c]").forEach((el) => {
         const qv = qmap[el.dataset.c]; if (qv == null) return;
@@ -656,12 +825,25 @@ async function evCalc(body) {
         const nm = code === item ? `+${s} ${nameOf(code)}` : nameOf(code);
         return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nm}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
       }).join("");
-      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${s}→+${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
+      const targetPath = hasCraft && s === 0 ? `제작→정확히 +${t}` : `+${s}→정확히 +${t}`;
+      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(${targetPath} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
         <div class="ev-raw-list">${rows}</div>`;
       rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
     } else { rawEl.innerHTML = ""; fEl.innerHTML = ""; q("#ev-prices").innerHTML = ""; lastItem = null; }
+    saveState();
   };
-  body.querySelectorAll("#ev-item, #ev-cauldron, #ev-wick, #ev-start, #ev-target, #ev-brew, #ev-cbuff").forEach((i) => i.oninput = calc);
+  body.querySelectorAll("#ev-item, #ev-cauldron, #ev-wick, #ev-start, #ev-target, #ev-brew, #ev-zone, #ev-famG, #ev-fog, #ev-zoneBuff").forEach((i) => {
+    i.oninput = calc; i.onchange = calc;
+  });
+  const itemInput = q("#ev-item");
+  itemInput.onsearch = calc;
+  itemInput.onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    const input = e.currentTarget, term = input.value.trim().toLocaleLowerCase("ko");
+    if (!term || itemCodeByInput.has(input.value.trim())) return;
+    const matches = craftable.filter((c) => nameOf(c).toLocaleLowerCase("ko").includes(term) || c.toLowerCase().includes(term));
+    if (matches.length === 1) { e.preventDefault(); input.value = nameOf(matches[0]); calc(); }
+  };
   q("#ev-self").onchange = () => { lastItem = null; calc(); };  // 모델 바뀌면 기본값 재계산
   q("#ev-auto").onchange = () => { lastItem = null; calc(); };   // 자동/수동 전환
   calc();

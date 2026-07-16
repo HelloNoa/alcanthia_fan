@@ -1,4 +1,4 @@
-import { api, names, gamedata } from "./api.js";
+import { api, names, gamedata, progression } from "./api.js";
 import { PROXY_BASE, setProxy } from "./config.js";
 import { renderGarden } from "./garden.js";
 import { renderMarket } from "./market.js";
@@ -326,19 +326,39 @@ async function tabLeaderboard() {
 
 // ---------- 의뢰 탭 ----------
 async function tabQuests(sub) {
-  const g = await gamedata();
-  const quests = g.quests || [];
+  const [g, progress] = await Promise.all([gamedata(), progression()]);
+  const goals = progress.tutorialGoals || [];
+  const recurring = g.quests || [];
+  const oneTime = progress.oneTimeQuests || [];
+  const questsById = new Map([...oneTime, ...recurring].map((q) => [q.id, q]));
+  const quests = [...questsById.values()];
   const npcs = g.npcs || {};
   const titleById = Object.fromEntries(quests.map((q) => [q.id, q.title]));
   const count = (repeat) => quests.filter((q) => q.repeat === repeat).length;
+  const requiredCount = goals.filter((goal) => goal.required).length;
   const cats = [
+    { key: "goals", label: `진행 목표 ${goals.length}` },
+    { key: "required", label: `필수 목표 ${requiredCount}` },
+    { key: "none", label: `일회성 ${count("none")}` },
     { key: "daily", label: `일간 ${count("daily")}` },
     { key: "weekly", label: `주간 ${count("weekly")}` },
-    { key: "all", label: `전체 ${quests.length}` },
+    { key: "all", label: `의뢰 전체 ${quests.length}` },
   ];
   const initial = cats.some((c) => c.key === sub) ? sub : "daily";
   const itemName = (code) => g.items?.[code]?.name || code;
-  const repeatLabel = { daily: "일간", weekly: "주간" };
+  const repeatLabel = { none: "일회성", daily: "일간", weekly: "주간" };
+  const actionLabel = {
+    claim: "수령",
+    garden: "텃밭",
+    inventory: "보관함",
+    shop: "마법상점",
+    contracts: "고용",
+    adventure: "모험",
+    spell_book: "마법책",
+    cauldron: "가마솥",
+    quest_board: "의뢰소",
+    world_map: "월드맵",
+  };
   const itemLine = (items) => items?.length
     ? `<div class="quest-items">${items.map((it) => {
       const enh = it.enhancement ? `+${it.enhancement} ` : "";
@@ -373,6 +393,23 @@ async function tabQuests(sub) {
       ${metaLine(q)}
     </article>`;
   };
+  const goalRow = (goal) => `<article class="goal-row${goal.required ? " is-required" : ""}" data-goal-id="${esc(goal.id)}">
+    <div class="goal-order">${String(goal.order).padStart(2, "0")}</div>
+    <div class="goal-main">
+      <div class="goal-title">
+        <span>${esc(goal.title)}</span>
+        <span class="goal-action">${esc(actionLabel[goal.action] || goal.action)}</span>
+        ${goal.required ? `<span class="quest-repeat required">필수</span>` : ""}
+      </div>
+      <p class="goal-desc">${esc(goal.description)}</p>
+    </div>
+    <section class="goal-reward"><h3>보상</h3>${itemLine(goal.rewards)}</section>
+  </article>`;
+  const hydrateIcons = (root) => {
+    root.querySelectorAll(".quest-item-ic[data-ic]").forEach((el) => itemIcon(el, el.dataset.ic, "quest-item-img"));
+    root.querySelectorAll(".quest-npc-ic[data-npc]").forEach((el) => adventurerIcon(el, el.dataset.npc, "quest-npc-img"));
+  };
+  const normalize = (value) => String(value || "").toLocaleLowerCase("ko").trim();
 
   view.innerHTML = `<h2>📋 의뢰</h2>
     <nav class="subtabs" id="questcats">${cats.map((c) =>
@@ -383,12 +420,46 @@ async function tabQuests(sub) {
   const render = (key) => {
     location.hash = `quests/${key}`;
     view.querySelectorAll("#questcats button").forEach((b) => b.classList.toggle("active", b.dataset.k === key));
+    if (key === "goals" || key === "required") {
+      const base = key === "required" ? goals.filter((goal) => goal.required) : goals;
+      const actions = [...new Set(base.map((goal) => goal.action))];
+      body.innerHTML = `<div class="quest-goal-tools">
+        <input id="goal-search" type="search" placeholder="목표·설명·보상 검색" autocomplete="off" aria-label="진행 목표 검색">
+        <select id="goal-action" aria-label="진행 위치 필터">
+          <option value="">전체 위치</option>
+          ${actions.map((action) => `<option value="${esc(action)}">${esc(actionLabel[action] || action)}</option>`).join("")}
+        </select>
+        <span class="goal-count" id="goal-count"></span>
+      </div>
+      <div class="goal-list" id="goal-list"></div>`;
+      const search = body.querySelector("#goal-search");
+      const action = body.querySelector("#goal-action");
+      const list = body.querySelector("#goal-list");
+      const drawGoals = () => {
+        const query = normalize(search.value);
+        const selectedAction = action.value;
+        const rows = base.filter((goal) => {
+          if (selectedAction && goal.action !== selectedAction) return false;
+          if (!query) return true;
+          const rewards = (goal.rewards || []).map((reward) => `${itemName(reward.itemCode)} ${reward.itemCode}`).join(" ");
+          return normalize(`${goal.title} ${goal.description} ${goal.id} ${actionLabel[goal.action] || goal.action} ${rewards}`).includes(query);
+        });
+        body.querySelector("#goal-count").textContent = `${rows.length} / ${base.length}개`;
+        list.innerHTML = rows.length
+          ? rows.map(goalRow).join("")
+          : `<div class="goal-empty muted">검색 결과 없음</div>`;
+        hydrateIcons(list);
+      };
+      search.oninput = drawGoals;
+      action.onchange = drawGoals;
+      drawGoals();
+      return;
+    }
     const rows = key === "all" ? quests : quests.filter((q) => q.repeat === key);
     body.innerHTML = rows.length
       ? `<div class="quest-grid">${rows.map(card).join("")}</div>`
       : `<div class="muted">표시할 의뢰 없음</div>`;
-    body.querySelectorAll(".quest-item-ic[data-ic]").forEach((el) => itemIcon(el, el.dataset.ic, "quest-item-img"));
-    body.querySelectorAll(".quest-npc-ic[data-npc]").forEach((el) => adventurerIcon(el, el.dataset.npc, "quest-npc-img"));
+    hydrateIcons(body);
   };
   view.querySelectorAll("#questcats button").forEach((b) => b.onclick = () => render(b.dataset.k));
   render(initial);

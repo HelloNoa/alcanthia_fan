@@ -19,6 +19,7 @@ import urllib.request
 HOME = "https://game.alcanthia.com/"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "names.json")
 GAMEDATA_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "gamedata.json")
+PROGRESSION_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "progression.json")
 
 # 타입 -> 폴더 (명확한 것)
 TYPE_FOLDER = {
@@ -334,6 +335,27 @@ def js_field_value(obj, name):
     return None
 
 
+def js_text_field(obj, name, source=None):
+    value = js_string_field(obj, name)
+    if value is not None:
+        return value
+    raw = js_field_value(obj, name)
+    if not (raw and raw.startswith("`") and raw.endswith("`")):
+        return None
+    text = raw[1:-1]
+    if source:
+        def replace_constant(match):
+            key = match.group(1)
+            constant = re.search(
+                r"\b(?:const|let|var)\s+" + re.escape(key) + r"=(-?[0-9]+(?:\.[0-9]+)?)\b",
+                source,
+            )
+            return constant.group(1) if constant else match.group(0)
+
+        text = re.sub(r"\$\{([A-Za-z_$][A-Za-z0-9_$]*)\}", replace_constant, text)
+    return text.replace(r"\`", "`").replace(r"\\", "\\")
+
+
 def parse_item_refs(arr):
     if not arr or not arr.startswith("["):
         return []
@@ -406,7 +428,7 @@ def parse_npcs(s):
     return out
 
 
-def parse_quests(s, gd):
+def parse_quests(s, gd, allowed_repeats=("daily", "weekly")):
     m = re.search(r"([A-Za-z0-9_$]+)=\[\{id:\"first_garden_ornament\"", s)
     if not m:
         return []
@@ -467,7 +489,7 @@ def parse_quests(s, gd):
 
     out = []
     for row in raw:
-        if row["repeat"] not in {"daily", "weekly"}:
+        if allowed_repeats is not None and row["repeat"] not in allowed_repeats:
             continue
         out.append({
             "id": row["id"],
@@ -481,6 +503,59 @@ def parse_quests(s, gd):
             "rewards": row["rewards"],
         })
     return out
+
+
+def parse_tutorial_goals(s):
+    m = re.search(r'([A-Za-z0-9_$]+)=\[\{id:"meet_witch"', s)
+    if not m:
+        return []
+    i = s.find("[", m.start())
+    j = match_delim(s, i) if i >= 0 else -1
+    if j < 0:
+        return []
+    out = []
+    for order, item in enumerate(split_array_items(s[i:j + 1]), 1):
+        if not item.startswith("{"):
+            continue
+        goal_id = js_string_field(item, "id")
+        title = js_string_field(item, "title")
+        if not (goal_id and title):
+            continue
+        reward = js_field_value(item, "reward")
+        out.append({
+            "order": order,
+            "id": goal_id,
+            "title": title,
+            "description": js_text_field(item, "description", s) or "",
+            "action": js_string_field(item, "action") or "",
+            "required": bool(re.search(r"\brequired:(?:!0|true)\b", item)),
+            "rewards": parse_item_refs(f"[{reward}]") if reward else [],
+        })
+    return out
+
+
+def write_progression(s):
+    if not os.path.exists(GAMEDATA_OUT):
+        print("skip progression: data/gamedata.json 없음")
+        return
+    with open(GAMEDATA_OUT, "r", encoding="utf-8") as f:
+        gd = json.load(f)
+    tutorial_goals = parse_tutorial_goals(s)
+    one_time_quests = parse_quests(s, gd, ("none",))
+    if not tutorial_goals:
+        print("skip progression: 번들에서 진행 목표를 추출하지 못함")
+        return
+    data = {
+        "tutorialGoals": tutorial_goals,
+        "oneTimeQuests": one_time_quests,
+    }
+    with open(PROGRESSION_OUT, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print(f"wrote {PROGRESSION_OUT}")
+    print(f"  tutorialGoals: {len(tutorial_goals)}")
+    print(f"  requiredGoals: {sum(1 for goal in tutorial_goals if goal['required'])}")
+    print(f"  oneTimeQuests: {len(one_time_quests)}")
 
 
 def update_gamedata(s):
@@ -772,6 +847,7 @@ def main():
     for k, v in data.items():
         print(f"  {k}: {len(v)}")
     update_gamedata(s)
+    write_progression(s)
 
 
 if __name__ == "__main__":
