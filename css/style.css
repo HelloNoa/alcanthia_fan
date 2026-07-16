@@ -76,13 +76,18 @@ main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .garden-head h2 { margin: 8px 0; }
 .garden-head .stats { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
 .garden-head .stats b { color: var(--ink); }
+.garden-gridscroll {
+  width: 100%; max-width: 100%; overflow: auto; overscroll-behavior: contain;
+  box-sizing: border-box; padding: 2px 8px 8px;
+}
 .garden-grid {
   display: grid; gap: 2px; background: var(--line); padding: 2px;
-  border-radius: 10px; max-width: 560px; aspect-ratio: 1 / 1;
+  width: max-content; max-width: none; border-radius: 10px;
 }
 .cell {
   position: relative; background: #1d1c30; border-radius: 3px;
   display: flex; align-items: center; justify-content: center; overflow: hidden;
+  width: var(--garden-cell, 44px); height: var(--garden-cell, 44px);
   font-size: 10px; color: var(--muted);
 }
 .cell.empty { background: #14131f; }
@@ -94,6 +99,7 @@ main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
   position: absolute; right: 1px; bottom: 0; font-size: 9px; color: var(--gold);
   font-weight: 700; text-shadow: 0 0 2px #000;
 }
+.garden-grid.compact .cell .enh { font-size: 7px; }
 .cell[data-cond*="humid"] { box-shadow: inset 0 0 0 1px #3b6ea5; }
 .cell[data-cond*="poisonous"] { box-shadow: inset 0 0 0 1px #6a8f3a; }
 
@@ -408,7 +414,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   .searchbar input, .searchbar select { min-width: 0; font-size: 14px; }
 
   /* 텃밭 */
-  .garden-grid { max-width: 100%; }
+  .garden-gridscroll { max-width: 100%; }
   .garden-head .stats { gap: 8px 12px; font-size: 12px; }
   .adv-cards { gap: 6px; }
   .adv-card { min-width: 0; flex: 1 1 calc(50% - 4px); }
@@ -546,9 +552,19 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-grid.iso .pl-peffs { transform: rotate(-45deg) scaleY(1.732); transform-origin: top right; }
 .pl-grid.iso .pl-cell.poll::after { border-radius: 2px; }
 
-/* 텃밭 뷰어 입체 보기 */
-.garden-iso { margin: 4px 0 10px; display: inline-flex; }
+/* 텃밭 뷰어 보기 도구 */
+.garden-view-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+.garden-iso { margin: 0; display: inline-flex; }
 .garden-iso.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.garden-view-modes { display: inline-flex; }
+.garden-view-modes button {
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  padding: 6px 10px; cursor: pointer;
+}
+.garden-view-modes button:first-child { border-radius: 7px 0 0 7px; }
+.garden-view-modes button:last-child { border-radius: 0 7px 7px 0; margin-left: -1px; }
+.garden-view-modes button:hover { border-color: var(--accent); position: relative; }
+.garden-view-modes button.active { background: var(--accent); border-color: var(--accent); color: #fff; position: relative; }
 .garden-grid.iso { transform: scaleY(0.577) rotate(45deg); transform-origin: center;
   margin: 110px auto 90px; }
 .garden-grid.iso .cell { border-radius: 2px; }

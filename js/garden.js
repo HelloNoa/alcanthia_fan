@@ -6,6 +6,44 @@ const CONDITION_KR = {
   humid: "습함", poisonous: "유독", fertile: "비옥", arid: "건조",
   toxic: "오염", sunlit: "햇빛", anti_magic: "반마법", poison_immune: "독면역",
 };
+const GARDEN_DEFAULT_SIDE = 12;
+const GARDEN_FIT_MIN_CELL = 8;
+const GARDEN_MIN_CELL = 32;
+const GARDEN_MAX_CELL = 44;
+const GARDEN_GAP = 2;
+const GARDEN_PADDING = 2;
+const GARDEN_SCROLL_GUTTER = 8;
+const GARDEN_VIEW_STORE = "alc_garden_view";
+const gardenResizeObservers = new WeakMap();
+
+export function gardenGridLayout(grid, availableWidth = 560, mode = "detail") {
+  const safeGrid = Array.isArray(grid) ? grid : [];
+  const rows = Math.max(GARDEN_DEFAULT_SIDE, safeGrid.length);
+  const cols = safeGrid.reduce(
+    (max, row) => Math.max(max, Array.isArray(row) ? row.length : 0),
+    GARDEN_DEFAULT_SIDE,
+  );
+  const width = Number(availableWidth);
+  const usableWidth = Number.isFinite(width) && width > 0 ? width : 560;
+  const fitCell = Math.floor(
+    (usableWidth - GARDEN_PADDING * 2 - GARDEN_GAP * (cols - 1)) / cols,
+  );
+  const minCell = mode === "fit" ? GARDEN_FIT_MIN_CELL : GARDEN_MIN_CELL;
+  const cellSize = Math.max(minCell, Math.min(GARDEN_MAX_CELL, fitCell));
+  return { rows, cols, cellSize };
+}
+
+function savedGardenViewMode(availableWidth) {
+  try {
+    const saved = localStorage.getItem(GARDEN_VIEW_STORE);
+    if (saved === "fit" || saved === "detail") return saved;
+  } catch {}
+  return availableWidth >= 640 ? "fit" : "detail";
+}
+
+function saveGardenViewMode(mode) {
+  try { localStorage.setItem(GARDEN_VIEW_STORE, mode); } catch {}
+}
 
 // 식물 스프라이트 결정: 셀 skinId > 유저 기본스킨 > 기본 스프라이트
 function plantSpriteKey(N, plant, defaultSkins) {
@@ -90,6 +128,8 @@ export async function renderGarden(container, profile, label) {
   const N = await names();
   const grid = profile.grid || [];
   const defaultSkins = profile.defaultPlantSkins || {};
+  gardenResizeObservers.get(container)?.disconnect();
+  gardenResizeObservers.delete(container);
   container.innerHTML = "";
 
   // 헤더 요약
@@ -113,11 +153,18 @@ export async function renderGarden(container, profile, label) {
   // 그리드
   const board = document.createElement("div");
   board.className = "garden-grid";
-  const cols = (grid[0] || []).length || 12;
-  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  let viewMode = savedGardenViewMode(container.clientWidth);
+  const { rows, cols, cellSize } = gardenGridLayout(grid, container.clientWidth, viewMode);
+  board.dataset.rows = String(rows);
+  board.dataset.cols = String(cols);
+  board.dataset.cellSize = String(cellSize);
+  board.style.setProperty("--garden-cell", `${cellSize}px`);
+  board.style.gridTemplateColumns = `repeat(${cols}, var(--garden-cell))`;
+  board.style.gridTemplateRows = `repeat(${rows}, var(--garden-cell))`;
 
-  for (const row of grid) {
-    for (const cell of row) {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const cell = grid[row]?.[col] || null;
       const el = document.createElement("div");
       el.className = "cell";
       if (!cell) { el.classList.add("empty"); board.appendChild(el); continue; }
@@ -170,6 +217,18 @@ export async function renderGarden(container, profile, label) {
       board.appendChild(el);
     }
   }
+  const boardScroll = document.createElement("div");
+  boardScroll.className = "garden-gridscroll";
+  boardScroll.tabIndex = 0;
+  boardScroll.setAttribute("aria-label", "텃밭 그리드");
+  boardScroll.appendChild(board);
+  const centerBoard = () => {
+    if (!boardScroll.isConnected) return;
+    boardScroll.scrollLeft = Math.max(
+      0,
+      (boardScroll.scrollWidth - boardScroll.clientWidth) / 2,
+    );
+  };
   // 보기 토글 (평면/입체)
   const isoBtn = document.createElement("button");
   isoBtn.className = "chip garden-iso";
@@ -178,9 +237,71 @@ export async function renderGarden(container, profile, label) {
     const on = board.classList.toggle("iso");
     isoBtn.classList.toggle("active", on);
     isoBtn.textContent = on ? "🔲 평면 보기" : "📐 입체 보기";
+    requestAnimationFrame(centerBoard);
   };
-  container.appendChild(isoBtn);
-  container.appendChild(board);
+
+  const tools = document.createElement("div");
+  tools.className = "garden-view-tools";
+  tools.appendChild(isoBtn);
+
+  const modeGroup = document.createElement("div");
+  modeGroup.className = "garden-view-modes";
+  modeGroup.setAttribute("role", "group");
+  modeGroup.setAttribute("aria-label", "텃밭 표시 크기");
+  const modeButtons = new Map();
+  [
+    ["fit", "↔ 전체 보기", "텃밭 전체를 화면 폭에 맞춰 표시"],
+    ["detail", "🔎 크게 보기", "칸을 크게 표시하고 좌우로 이동"],
+  ].forEach(([mode, text, title]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    button.title = title;
+    button.dataset.mode = mode;
+    button.onclick = () => applyViewMode(mode, true);
+    modeButtons.set(mode, button);
+    modeGroup.appendChild(button);
+  });
+  tools.appendChild(modeGroup);
+
+  const applyViewMode = (mode, persist = false) => {
+    viewMode = mode === "fit" ? "fit" : "detail";
+    const availableWidth = Math.max(
+      1,
+      (boardScroll.clientWidth || container.clientWidth) - GARDEN_SCROLL_GUTTER * 2,
+    );
+    const layout = gardenGridLayout(grid, availableWidth, viewMode);
+    board.dataset.cellSize = String(layout.cellSize);
+    board.dataset.viewMode = viewMode;
+    board.style.setProperty("--garden-cell", `${layout.cellSize}px`);
+    board.classList.toggle("compact", layout.cellSize < 24);
+    modeButtons.forEach((button, buttonMode) => {
+      const active = buttonMode === viewMode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    if (persist) saveGardenViewMode(viewMode);
+    requestAnimationFrame(centerBoard);
+  };
+
+  container.appendChild(tools);
+  container.appendChild(boardScroll);
+  requestAnimationFrame(() => applyViewMode(viewMode));
+
+  if (typeof ResizeObserver !== "undefined") {
+    const observer = new ResizeObserver(() => {
+      if (!boardScroll.isConnected) {
+        observer.disconnect();
+        if (gardenResizeObservers.get(container) === observer) {
+          gardenResizeObservers.delete(container);
+        }
+        return;
+      }
+      applyViewMode(viewMode);
+    });
+    gardenResizeObservers.set(container, observer);
+    observer.observe(container);
+  }
 
   // 시간당 생산량
   if (profile.production?.length) {
