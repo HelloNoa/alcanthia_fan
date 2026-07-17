@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { defaultEnhancementMaterialPrice } from "../js/calc_prices.js";
 import { enhancementMaterialFlow } from "../js/enhancement_ev.js";
 
 const closeTo = (actual, expected, epsilon = 1e-10) => {
@@ -9,6 +11,24 @@ const closeRelative = (actual, expected, epsilon = 1e-11) => {
   assert.ok(Math.abs(actual - expected) <= epsilon * scale, `${actual} != ${expected}`);
 };
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+
+const gameData = JSON.parse(readFileSync(new URL("../data/gamedata.json", import.meta.url), "utf8"));
+const expectedShopBuyPrices = {
+  herb_seed: 10,
+  red_flower_seed: 30,
+  engraving_stone: 1000,
+  old_cauldron: 10000,
+  dissolution_potion: 2000,
+  polishing_powder: 500,
+  dia_box_30: 300000,
+};
+assert.deepEqual(new Set(gameData.shop_items), new Set(Object.keys(expectedShopBuyPrices)));
+for (const [code, expected] of Object.entries(expectedShopBuyPrices)) {
+  assert.equal(defaultEnhancementMaterialPrice(gameData, code), expected, `${code} shop buy price`);
+  if (!code.startsWith("dia_box_")) assert.equal(expected, gameData.sell_price[code] * 2, `${code} buy/sell ratio`);
+}
+assert.equal(defaultEnhancementMaterialPrice(gameData, "dia_box_30"), gameData.item_values.dia_box_30);
+assert.equal(defaultEnhancementMaterialPrice(gameData, "copper_scrap"), gameData.item_values.copper_scrap);
 
 // 목표에서 시작점으로 거꾸로 계산한 장기 산출률. 순방향 재고 배열을 사용하지 않는다.
 const backwardTargetYield = ({ start, target, successRate, bonusRate = 0, sourceBonusRate = 0, goal = "exact" }) => {

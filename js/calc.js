@@ -1,6 +1,7 @@
 import { gamedata, names } from "./api.js";
 import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
 import { advSim } from "./adventure.js";
+import { defaultEnhancementMaterialPrice } from "./calc_prices.js";
 import { enhancementMaterialFlow } from "./enhancement_ev.js";
 
 export async function renderCalc(view, sub) {
@@ -436,12 +437,12 @@ async function evCalc(body) {
       return value && typeof value === "object" && !Array.isArray(value) ? value : {};
     } catch { return {}; }
   })();
-  // 원재료 가격(골드) — 기본값은 게임 가치/판매가, 사용자가 덮어쓰면 priceState
+  // 원재료 가격(골드) — 일반 상점 품목은 구매가, 나머지는 게임 가치/판매가. 사용자가 덮어쓰면 priceState
   const priceState = {};
   for (const [code, value] of Object.entries(savedEvState.prices || {})) {
     if (g.items?.[code] && Number.isFinite(+value) && +value >= 0) priceState[code] = +value;
   }
-  const priceOf = (code) => priceState[code] ?? (g.item_values?.[code] ?? g.sell_price?.[code] ?? 0);
+  const priceOf = (code) => priceState[code] ?? defaultEnhancementMaterialPrice(g, code);
 
   body.innerHTML = `
     <div class="calc-grid">
@@ -615,7 +616,7 @@ async function evCalc(body) {
     // 강화 대상 자신(장비·도구 등)이면 시작 강화도 +s 시세를 입력 — 강화도별 가격 반영
     const sNow = Math.max(0, Math.floor(+q("#ev-start")?.value || 0));
     const plabel = (c) => (c === item && sNow > 0 ? `+${sNow} ` : "") + nameOf(c);
-    q("#ev-prices").innerHTML = `<div class="ev-fields-h">💰 원재료 가격 <span class="muted">(골드/개 · 강화 대상은 +s 시세 입력)</span></div>` +
+    q("#ev-prices").innerHTML = `<div class="ev-fields-h">💰 원재료 가격 <span class="muted">(골드/개 · 상점 재료는 구매가 · 강화 대상은 +s 시세 입력)</span></div>` +
       `<div class="ev-prices-list">${leaves.map((c) =>
         `<label class="ev-price"><span class="ev-price-ic" data-ic="${c}"></span><span class="ev-price-n">${plabel(c)}</span><input type="number" min="0" value="${priceOf(c)}" data-pc="${c}" class="ev-price-in"></label>`).join("")}</div>`;
     q("#ev-prices").querySelectorAll(".ev-price-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
