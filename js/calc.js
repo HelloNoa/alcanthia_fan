@@ -447,10 +447,14 @@ async function evCalc(body) {
     <div class="calc-grid">
       <div class="calc-card">
         <h3>🎲 강화 기댓값</h3>
-        <div class="calc-row"><label for="ev-item">아이템 <span class="muted">(원재료 전개)</span></label>
-          <input id="ev-item" class="num-in ev-item-search" type="search" list="ev-item-list"
-            placeholder="이름 검색 · 비우면 강화만" autocomplete="off">
-          <datalist id="ev-item-list">${craftable.map((c) => `<option value="${nameOf(c)}">${c}</option>`).join("")}</datalist></div>
+        <div class="calc-row ev-item-row"><label for="ev-item">아이템 <span class="muted">(원재료 전개)</span></label>
+          <div class="ev-item-picker">
+            <input id="ev-item" class="num-in ev-item-search" type="search"
+              placeholder="이름 검색 · 비우면 강화만" autocomplete="off"
+              role="combobox" aria-autocomplete="list" aria-controls="ev-item-options" aria-expanded="false">
+            <div id="ev-item-options" class="ev-item-options" role="listbox" hidden></div>
+          </div>
+        </div>
         <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="99" value="0" class="num-in"></div>
         <div class="calc-row"><label>심지 숙련 Lv</label><input id="ev-wick" type="number" min="0" max="10" value="0" class="num-in"></div>
         <div class="calc-row">
@@ -832,18 +836,108 @@ async function evCalc(body) {
     } else { rawEl.innerHTML = ""; fEl.innerHTML = ""; q("#ev-prices").innerHTML = ""; lastItem = null; }
     saveState();
   };
-  body.querySelectorAll("#ev-item, #ev-cauldron, #ev-wick, #ev-start, #ev-target, #ev-brew, #ev-zone, #ev-famG, #ev-fog, #ev-zoneBuff").forEach((i) => {
+  body.querySelectorAll("#ev-cauldron, #ev-wick, #ev-start, #ev-target, #ev-brew, #ev-zone, #ev-famG, #ev-fog, #ev-zoneBuff").forEach((i) => {
     i.oninput = calc; i.onchange = calc;
   });
   const itemInput = q("#ev-item");
-  itemInput.onsearch = calc;
-  itemInput.onkeydown = (e) => {
-    if (e.key !== "Enter") return;
-    const input = e.currentTarget, term = input.value.trim().toLocaleLowerCase("ko");
-    if (!term || itemCodeByInput.has(input.value.trim())) return;
-    const matches = craftable.filter((c) => nameOf(c).toLocaleLowerCase("ko").includes(term) || c.toLowerCase().includes(term));
-    if (matches.length === 1) { e.preventDefault(); input.value = nameOf(matches[0]); calc(); }
+  const itemPicker = itemInput.closest(".ev-item-picker");
+  const itemOptions = q("#ev-item-options");
+  let visibleItemCodes = [];
+  let activeItemIndex = -1;
+  const matchingItems = () => {
+    const term = itemInput.value.trim().toLocaleLowerCase("ko");
+    if (!term) return craftable;
+    return craftable.filter((c) => nameOf(c).toLocaleLowerCase("ko").includes(term) || c.toLowerCase().includes(term));
   };
+  const closeItemOptions = () => {
+    itemOptions.hidden = true;
+    itemInput.setAttribute("aria-expanded", "false");
+    itemInput.removeAttribute("aria-activedescendant");
+    activeItemIndex = -1;
+  };
+  const setActiveItem = (index) => {
+    const options = [...itemOptions.querySelectorAll(".ev-item-option")];
+    if (!options.length) return;
+    activeItemIndex = (index + options.length) % options.length;
+    options.forEach((option, i) => {
+      const active = i === activeItemIndex;
+      option.classList.toggle("active", active);
+      option.setAttribute("aria-selected", String(active));
+    });
+    const active = options[activeItemIndex];
+    itemInput.setAttribute("aria-activedescendant", active.id);
+    active.scrollIntoView({ block: "nearest" });
+  };
+  const selectItem = (code) => {
+    itemInput.value = nameOf(code);
+    closeItemOptions();
+    lastItem = null;
+    calc();
+  };
+  const openItemOptions = () => {
+    visibleItemCodes = matchingItems().slice(0, 60);
+    activeItemIndex = -1;
+    itemOptions.replaceChildren();
+    if (!visibleItemCodes.length) {
+      const empty = document.createElement("div");
+      empty.className = "ev-item-empty";
+      empty.textContent = "검색 결과가 없습니다.";
+      itemOptions.appendChild(empty);
+    } else {
+      visibleItemCodes.forEach((code, index) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.id = `ev-item-option-${index}`;
+        option.className = "ev-item-option";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", "false");
+        const icon = document.createElement("span");
+        icon.className = "ev-item-option-icon";
+        const label = document.createElement("span");
+        label.className = "ev-item-option-name";
+        label.textContent = nameOf(code);
+        const itemCode = document.createElement("span");
+        itemCode.className = "ev-item-option-code";
+        itemCode.textContent = code;
+        option.append(icon, label, itemCode);
+        option.onmousedown = (e) => e.preventDefault();
+        option.onclick = () => selectItem(code);
+        itemOptions.appendChild(option);
+        itemIcon(icon, code);
+      });
+    }
+    itemOptions.hidden = false;
+    itemInput.setAttribute("aria-expanded", "true");
+  };
+  itemInput.onfocus = openItemOptions;
+  itemInput.onclick = openItemOptions;
+  itemInput.oninput = () => { calc(); openItemOptions(); };
+  itemInput.onsearch = () => { calc(); openItemOptions(); };
+  itemInput.onkeydown = (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (itemOptions.hidden) openItemOptions();
+      setActiveItem(activeItemIndex + (e.key === "ArrowDown" ? 1 : -1));
+      return;
+    }
+    if (e.key === "Escape") { closeItemOptions(); return; }
+    if (e.key !== "Enter") return;
+    if (activeItemIndex >= 0 && visibleItemCodes[activeItemIndex]) {
+      e.preventDefault();
+      selectItem(visibleItemCodes[activeItemIndex]);
+      return;
+    }
+    const matches = matchingItems();
+    if (!itemCodeByInput.has(itemInput.value.trim()) && matches.length === 1) {
+      e.preventDefault();
+      selectItem(matches[0]);
+    } else {
+      closeItemOptions();
+    }
+  };
+  itemPicker.onfocusout = () => setTimeout(() => {
+    if (!itemPicker.contains(document.activeElement)) closeItemOptions();
+  }, 0);
   q("#ev-self").onchange = () => { lastItem = null; calc(); };  // 모델 바뀌면 기본값 재계산
   q("#ev-auto").onchange = () => { lastItem = null; calc(); };   // 자동/수동 전환
   calc();
