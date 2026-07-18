@@ -450,6 +450,7 @@ async function evCalc(body) {
         <h3>🎲 강화 기댓값</h3>
         <div class="calc-row ev-item-row"><label for="ev-item">아이템 <span class="muted">(원재료 전개)</span></label>
           <div class="ev-item-picker">
+            <span id="ev-item-selected-icon" class="ev-item-selected-icon" aria-hidden="true" hidden></span>
             <input id="ev-item" class="num-in ev-item-search" type="search"
               placeholder="이름 검색 · 비우면 강화만" autocomplete="off"
               role="combobox" aria-autocomplete="list" aria-controls="ev-item-options" aria-expanded="false">
@@ -457,7 +458,7 @@ async function evCalc(body) {
           </div>
         </div>
         <div class="calc-row"><label>솥 강화도</label><input id="ev-cauldron" type="number" min="0" max="99" value="0" class="num-in"></div>
-        <div class="calc-row"><label>심지 숙련 Lv</label><input id="ev-wick" type="number" min="0" max="10" value="0" class="num-in"></div>
+        <div class="calc-row"><label class="lvlabel">심지 숙련 Lv <input id="ev-wick" type="range" min="0" max="10" value="0"><b id="ev-wickv">0</b></label></div>
         <div class="calc-row">
           <label class="lvlabel">작업 지역
             <select id="ev-zone" class="num-in">
@@ -676,6 +677,7 @@ async function evCalc(body) {
   const calc = () => {
     const c = Math.max(0, Math.floor(+q("#ev-cauldron").value || 0));
     const w = Math.max(0, Math.min(10, Math.floor(+q("#ev-wick").value || 0)));
+    q("#ev-wickv").textContent = w;
     const item = itemCodeByInput.get(q("#ev-item").value.trim()) || "";
     const self = q("#ev-self").checked;
     const potion = !!item && isPotion(item);
@@ -842,9 +844,25 @@ async function evCalc(body) {
   });
   const itemInput = q("#ev-item");
   const itemPicker = itemInput.closest(".ev-item-picker");
+  const selectedItemIcon = q("#ev-item-selected-icon");
   const itemOptions = q("#ev-item-options");
   let visibleItemCodes = [];
   let activeItemIndex = -1;
+  let selectedIconCode = "";
+  const updateSelectedItemIcon = () => {
+    const code = itemCodeByInput.get(itemInput.value.trim()) || "";
+    if (code === selectedIconCode) return;
+    selectedIconCode = code;
+    selectedItemIcon.replaceChildren();
+    selectedItemIcon.hidden = !code;
+    selectedItemIcon.title = code ? nameOf(code) : "";
+    itemPicker.classList.toggle("has-selected-item", Boolean(code));
+    if (!code) return;
+    const holder = document.createElement("span");
+    itemIcon(holder, code, "ev-item-selected-img").then(() => {
+      if (selectedIconCode === code) selectedItemIcon.replaceChildren(...holder.children);
+    });
+  };
   const matchingItems = () => {
     const term = itemInput.value.trim().toLocaleLowerCase("ko");
     if (!term) return craftable;
@@ -871,6 +889,7 @@ async function evCalc(body) {
   };
   const selectItem = (code) => {
     itemInput.value = nameOf(code);
+    updateSelectedItemIcon();
     closeItemOptions();
     lastItem = null;
     calc();
@@ -912,8 +931,8 @@ async function evCalc(body) {
   };
   itemInput.onfocus = openItemOptions;
   itemInput.onclick = openItemOptions;
-  itemInput.oninput = () => { calc(); openItemOptions(); };
-  itemInput.onsearch = () => { calc(); openItemOptions(); };
+  itemInput.oninput = () => { updateSelectedItemIcon(); calc(); openItemOptions(); };
+  itemInput.onsearch = () => { updateSelectedItemIcon(); calc(); openItemOptions(); };
   itemInput.onkeydown = (e) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -941,5 +960,6 @@ async function evCalc(body) {
   }, 0);
   q("#ev-self").onchange = () => { lastItem = null; calc(); };  // 모델 바뀌면 기본값 재계산
   q("#ev-auto").onchange = () => { lastItem = null; calc(); };   // 자동/수동 전환
+  updateSelectedItemIcon();
   calc();
 }
