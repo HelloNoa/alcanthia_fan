@@ -144,12 +144,13 @@ export function simulate(party, zoneId, gd, seed){
 }
 export function winRate(party, zoneId, gd, trials=200, seedBase=1){
   let win=0, turns=0, lossTurns=0;
+  const winTurnCounts={};
   for(let i=0;i<trials;i++){
     const r=simulate(party, zoneId, gd, ((seedBase+i*2654435761)>>>0)||1);
-    if(r.victory){win++; turns+=r.totalTurns;}
+    if(r.victory){win++; turns+=r.totalTurns; winTurnCounts[r.totalTurns]=(winTurnCounts[r.totalTurns]||0)+1;}
     else lossTurns+=r.totalTurns;
   }
   const losses=trials-win;
-  return { trials, wins:win, losses, rate:win/trials, avgTurnsOnWin: win? turns/win : null, avgTurnsOnLoss: losses? lossTurns/losses : null };
+  return { trials, wins:win, losses, rate:win/trials, avgTurnsOnWin: win? turns/win : null, avgTurnsOnLoss: losses? lossTurns/losses : null, winTurnCounts };
 }
 export { MI };

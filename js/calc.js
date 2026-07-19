@@ -259,6 +259,7 @@ async function timeCalc(body) {
 
 // ---------- 레벨 계산 ----------
 function levelCalc(body) {
+  const LEVEL_TABLE_MAX = 1000;
   // 게임 공식: 레벨 L → L+1 에 2^floor(L/5) exp 필요
   const expToNext = (L) => 2 ** Math.floor(L / 5);
   const totalForLevel = (L) => { let s = 0; for (let i = 1; i < L; i++) s += expToNext(i); return s; };
@@ -269,14 +270,22 @@ function levelCalc(body) {
   };
   const potionExp = (enh) => 4 ** enh;
   const fmt = (n) => Number(Math.round(n)).toLocaleString();
+  const largeUnits = [
+    [1e20, "해"], [1e16, "경"], [1e12, "조"], [1e8, "억"], [1e4, "만"],
+  ];
   const fmtShort = (n) => {
     const v = Number(Math.round(n));
-    if (v >= 1e12) return `${(v / 1e12).toLocaleString(undefined, { maximumFractionDigits: 1 })}조`;
-    if (v >= 1e8) return `${(v / 1e8).toLocaleString(undefined, { maximumFractionDigits: 1 })}억`;
-    if (v >= 1e4) return `${(v / 1e4).toLocaleString(undefined, { maximumFractionDigits: 1 })}만`;
+    if (!Number.isFinite(v)) return "계산 범위 초과";
+    if (v >= 1e24) {
+      const [coefficient, exponent] = v.toExponential(2).split("e");
+      return `<span class="lc-sci">${Number(coefficient)}×10<sup>${Number(exponent)}</sup></span>`;
+    }
+    const unit = largeUnits.find(([size]) => v >= size);
+    if (unit) return `${(v / unit[0]).toLocaleString(undefined, { maximumFractionDigits: 1 })}${unit[1]}`;
     return fmt(v);
   };
   const expTxt = (n) => `<span title="${fmt(n)} exp">${fmtShort(n)}</span>`;
+  const countTxt = (n) => `<span class="lc-number" title="${fmt(n)}개">${fmtShort(n)}</span>`;
   const current = () => {
     const lv = Math.max(1, Math.floor(+body.querySelector("#lc-lv").value || 1));
     const into = Math.max(0, +body.querySelector("#lc-into").value || 0);
@@ -286,7 +295,7 @@ function levelCalc(body) {
 
   body.innerHTML = `
     <div class="calc-grid">
-      <div class="calc-card lc-main">
+      <div class="calc-card lc-card lc-main">
         <h3>성장포션 사용 결과</h3>
         <div class="lc-row">
           <label class="lvlabel">현재 레벨 <input id="lc-lv" type="number" min="1" value="1" class="num-in"></label>
@@ -298,22 +307,22 @@ function levelCalc(body) {
         </div>
         <div id="lc-out-use" class="lc-out"></div>
       </div>
-      <div class="calc-card">
+      <div class="calc-card lc-card">
         <h3>목표까지 필요한 성장포션</h3>
         <div class="lc-row">
           <label class="lvlabel">목표 레벨 <input id="lc-tgt" type="number" min="2" value="20" class="num-in"></label>
         </div>
         <div id="lc-out-target" class="lc-out"></div>
       </div>
-      <div class="calc-card">
+      <div class="calc-card lc-card">
         <h3>총 경험치 직접 입력</h3>
         <label class="lvlabel">총 경험치 <input id="lc-exp" type="number" min="0" value="0" class="num-in"></label>
         <div id="lc-out-exp" class="lc-out"></div>
       </div>
-      <div class="calc-card">
+      <div class="calc-card lc-card">
         <details class="lc-details">
           <summary>레벨별 경험치 표</summary>
-          <label class="lvlabel">표 최대 레벨 <input id="lc-tblmax" type="number" min="2" value="30" class="num-in"></label>
+          <label class="lvlabel">표 최대 레벨 <input id="lc-tblmax" type="number" min="2" max="${LEVEL_TABLE_MAX}" value="30" class="num-in"></label>
           <div id="lc-out-table" class="lc-out"></div>
         </details>
       </div>
@@ -332,7 +341,7 @@ function levelCalc(body) {
       ? `<div class="lc-warn">레벨 내 경험치가 현재 구간(${fmt(cur.need)})을 넘어서 입력값 기준 실제 레벨로 계산했어요.</div>` : "";
     body.querySelector("#lc-out-use").innerHTML =
       `<div class="lc-big">Lv ${after.level}</div>
-       <div class="lc-sub">+${enh} 성장포션 ${fmt(count)}개 = <b class="t-adj">${expTxt(gain)}</b> exp · ${lvGain > 0 ? `+${lvGain}레벨` : "레벨 유지"}<br>
+       <div class="lc-sub">+${enh} 성장포션 ${countTxt(count)}개 = <b class="t-adj">${expTxt(gain)}</b> exp · ${lvGain > 0 ? `+${lvGain}레벨` : "레벨 유지"}<br>
        현재 총 경험치 ${expTxt(cur.total)} → ${expTxt(cur.total + gain)}<br>
        Lv ${after.level} 진행: ${expTxt(after.into)} / ${expTxt(after.need)}</div>
        <div class="lc-progress"><span style="width:${pct}%"></span></div>${over}`;
@@ -347,6 +356,7 @@ function levelCalc(body) {
     const selectedCnt = remain > 0 ? Math.ceil(remain / selectedPer) : 0;
     let oneEnh = 0;
     while (oneEnh < 30 && potionExp(oneEnh) < remain) oneEnh++;
+    const canFinishWithOne = potionExp(oneEnh) >= remain;
     const rowSet = new Set([selectedEnh]);
     const addNear = (center, radius) => {
       for (let n = Math.max(0, center - radius); n <= Math.min(30, center + radius); n++) rowSet.add(n);
@@ -358,13 +368,19 @@ function levelCalc(body) {
       const per = potionExp(n);
       const cnt = remain > 0 ? Math.ceil(remain / per) : 0;
       const klass = n === selectedEnh ? ` class="lc-pick"` : "";
-      return `<tr${klass}><td><b>${n}강</b></td><td>${expTxt(per)}</td><td class="lc-cnt">${fmt(cnt)}개</td></tr>`;
+      return `<tr${klass}><td><b>${n}강</b></td><td>${expTxt(per)}</td><td class="lc-cnt">${countTxt(cnt)}개</td></tr>`;
     }).join("");
+    const exactValues = selectedCnt >= 1e24 || remain >= 1e24
+      ? `<details class="lc-exact"><summary>전체 숫자</summary>
+          <div><span>${selectedEnh}강 필요 개수</span><code>${fmt(selectedCnt)}개</code></div>
+          <div><span>남은 경험치</span><code>${fmt(remain)} exp</code></div>
+        </details>`
+      : "";
     body.querySelector("#lc-out-target").innerHTML = remain <= 0
       ? `<div class="lc-big">도달 완료</div><div class="lc-sub">현재 입력값이 이미 Lv ${tgt} 이상입니다.</div>`
-      : `<div class="lc-big">${selectedEnh}강 ${fmt(selectedCnt)}개</div>
-         <div class="lc-sub">Lv ${tgt}까지 남은 경험치: <b class="t-adj">${expTxt(remain)}</b><br>
-         1개로 끝내려면 <b>${oneEnh}강 이상</b></div>
+      : `<div class="lc-big lc-target-big"><span>${selectedEnh}강</span><span class="lc-target-quantity"><span>${countTxt(selectedCnt)}개</span></span></div>
+         <div class="lc-sub"><span class="lc-remain">Lv ${tgt}까지 남은 경험치: <b class="t-adj">${expTxt(remain)}</b></span>
+         1개로 끝내려면 <b>${canFinishWithOne ? `${oneEnh}강 이상` : "30강으로도 부족"}</b></div>${exactValues}
          <div class="lc-pot-h">가까운 성장포션 강화도</div>
          <table class="lc-pot"><thead><tr><th>성장포션</th><th>회당 exp</th><th>필요 개수</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
@@ -379,7 +395,7 @@ function levelCalc(body) {
   };
   // 레벨별 [구간 경험치 / 누적 총 경험치] 표
   const updTable = () => {
-    const max = Math.min(100, Math.max(2, +body.querySelector("#lc-tblmax").value || 30));
+    const max = Math.min(LEVEL_TABLE_MAX, Math.max(2, Math.floor(+body.querySelector("#lc-tblmax").value || 30)));
     let rows = "", cum = 0;
     for (let L = 1; L <= max; L++) {
       rows += `<tr><td><b>Lv ${L}</b></td><td>${expTxt(expToNext(L))}</td><td>${expTxt(cum)}</td></tr>`;
