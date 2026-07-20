@@ -56,13 +56,23 @@ export function achievementIcon(el, iconKey, cls = "ic") {
   loadImg(el, [`${CDN}/ui/icons/${iconKey}.png`], "", cls);
 }
 
-// ms -> "1분 30초" 류
+// ms -> "2년 14일 1시간 30분" 류
 export function fmtDuration(ms) {
   if (ms == null) return "-";
-  let s = Math.round(ms / 1000);
+  const value = Number(ms);
+  if (!Number.isFinite(value)) return "-";
+  let s = Math.max(0, Math.round(value / 1000));
+  const y = Math.floor(s / 31536000); s %= 31536000;
+  const d = Math.floor(s / 86400); s %= 86400;
   const h = Math.floor(s / 3600); s %= 3600;
   const m = Math.floor(s / 60); s %= 60;
-  return [h && `${h}시간`, m && `${m}분`, (s || (!h && !m)) && `${s}초`].filter(Boolean).join(" ");
+  return [
+    y && `${y.toLocaleString("ko-KR")}년`,
+    d && `${d}일`,
+    h && `${h}시간`,
+    m && `${m}분`,
+    (s || (!y && !d && !h && !m)) && `${s}초`,
+  ].filter(Boolean).join(" ");
 }
 
 export function fmtMinutes(minutes) {

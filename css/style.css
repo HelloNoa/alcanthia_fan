@@ -360,13 +360,17 @@ table.matrix thead th { text-align: center; }
 .lvlabel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .lvlabel input[type=range] { width: 110px; accent-color: var(--accent); }
 .lvlabel b { color: var(--accent); min-width: 18px; text-align: center; }
-.calc-out { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.calc-out { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .calc-ic { width: 40px; height: 40px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   background: #15131f; border-radius: 9px; }
 .calc-ic img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
-.t-base { color: var(--muted); font-size: 15px; }
-.t-arrow { color: var(--muted); }
-.t-adj { color: var(--gold); font-size: 20px; font-weight: 700; }
+.calc-time-values { display: grid; gap: 5px; flex: 1 1 220px; min-width: 0; }
+.calc-time-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: baseline; gap: 8px; min-width: 0; }
+.calc-time-label { color: var(--muted); font-size: 11px; font-weight: 700; }
+.calc-time-row.is-result .calc-time-label { color: var(--gold); }
+.t-base { color: var(--muted); font-size: 14px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
+.t-adj { color: var(--gold); font-size: 20px; line-height: 1.35; font-weight: 700; word-break: keep-all; overflow-wrap: anywhere; }
+.calc-out > .calc-note-inline { flex-basis: 100%; }
 .num-in { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 10px; font-size: 15px; width: 150px; }
 .ev-item-picker { position: relative; display: flex; align-items: center; gap: 8px; flex: 1 1 320px;

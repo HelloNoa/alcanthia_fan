@@ -88,7 +88,7 @@ async function timeCalc(body) {
         <div class="calc-row">
           <label class="lvlabel">불꽃 숙련 <input id="flame" type="range" min="0" max="10" value="0"><b id="flamev">0</b></label>
           <label class="lvlabel">가마솥 강화 <input id="cauE" type="range" min="0" max="20" value="0"><b id="cauEv">0</b></label>
-          <label class="lvlabel">만들 포션 <input id="matE" type="range" min="0" max="20" value="0"><b id="matEv">0</b>강</label>
+          <label class="lvlabel">만들 포션 <input id="matE" type="range" min="0" max="40" value="0"><b id="matEv">0</b>강</label>
         </div>
         <div class="calc-row">
           <label class="lvlabel">양조 존
@@ -162,7 +162,10 @@ async function timeCalc(body) {
     const ic = document.createElement("span"); ic.className = "calc-ic"; plantIcon(ic, plants[id]?.spriteKey || id);
     el.appendChild(ic);
     el.insertAdjacentHTML("beforeend",
-      `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>`);
+      `<div class="calc-time-values">
+        <div class="calc-time-row"><span class="calc-time-label">기본</span><span class="t-base">${fmtDuration(base)}</span></div>
+        <div class="calc-time-row is-result"><span class="calc-time-label">최종</span><span class="t-adj">${fmtDuration(adj)}</span></div>
+      </div>`);
   };
   const zoneMult = (zone, cult, sameIng) => {
     if (zone === "sunset_cliff") return 2;
@@ -200,7 +203,10 @@ async function timeCalc(body) {
     const ic = document.createElement("span"); ic.className = "calc-ic"; itemIcon(ic, c);
     el.appendChild(ic);
     el.insertAdjacentHTML("beforeend",
-      `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>`);
+      `<div class="calc-time-values">
+        <div class="calc-time-row"><span class="calc-time-label">기본</span><span class="t-base">${fmtDuration(base)}</span></div>
+        <div class="calc-time-row is-result"><span class="calc-time-label">최종</span><span class="t-adj">${fmtDuration(adj)}</span></div>
+      </div>`);
     if (fireOn) el.insertAdjacentHTML("beforeend",
       `<span class="calc-note-inline">화염포션 ×${fireMult.toFixed(2)}</span>`);
     if (zone === "sunset_cliff") {
@@ -234,7 +240,10 @@ async function timeCalc(body) {
     const ic = document.createElement("span"); ic.className = "calc-ic"; itemIcon(ic, c);
     el.appendChild(ic);
     el.insertAdjacentHTML("beforeend",
-      `<span class="t-base">${fmtDuration(base)}</span><span class="t-arrow">→</span><span class="t-adj">${fmtDuration(adj)}</span>
+      `<div class="calc-time-values">
+        <div class="calc-time-row"><span class="calc-time-label">기본</span><span class="t-base">${fmtDuration(base)}</span></div>
+        <div class="calc-time-row is-result"><span class="calc-time-label">최종</span><span class="t-adj">${fmtDuration(adj)}</span></div>
+      </div>
        <span class="calc-note-inline">${g.items[c]?.name || c} +${itemE} → +${itemE + 1} 1회</span>`);
     if (fireOn) el.insertAdjacentHTML("beforeend",
       `<span class="calc-note-inline">화염포션 ×${fireMult.toFixed(2)}</span>`);
