@@ -383,6 +383,78 @@ def parse_string_array(arr):
     return [x.replace(r"\"", '"').replace(r"\\", "\\") for x in re.findall(r'"((?:\\.|[^"\\])*)"', arr)]
 
 
+ITEM_PERK_OVERRIDES = {
+    "guardian_censer": "사용 시 1시간 동안 지역 효과 +50%",
+    "leyline_stitching_needle": "사용 시 습격으로 억제된 지역 효과 즉시 복구",
+    "witch_paint_pot": "사용 시 닉네임 색상 변경 · +0 15색, +1 30색, +2 이상 45색",
+}
+
+
+def parse_item_catalog(s):
+    items = {}
+    allowed_types = {"seed", "produce", "potion", "equipment", "tool", "general", "material", "ingredient"}
+    for match in re.finditer(r'\b([a-z0-9_]+):\{name:"', s):
+        code = match.group(1)
+        if code in items:
+            continue
+        start = s.index("{", match.start())
+        end = match_fwd(s, start)
+        if end < 0:
+            continue
+        obj = s[start:end + 1]
+        item_type = js_string_field(obj, "type")
+        if item_type not in allowed_types or js_string_field(obj, "spriteKey") is None:
+            continue
+        duration = js_number(js_field_value(obj, "brewDuration") or "")
+        row = {
+            "name": js_string_field(obj, "name") or code,
+            "type": item_type,
+            "brewDuration_ms": duration,
+            "prefix": js_string_field(obj, "prefix"),
+            "description": js_string_field(obj, "description") or "",
+        }
+        perk = ITEM_PERK_OVERRIDES.get(code)
+        if perk is None:
+            raw_perk = js_field_value(obj, "perk") or ""
+            constant = re.search(r'=>\s*"((?:\\.|[^"\\])*)"$', raw_perk)
+            if constant:
+                perk = constant.group(1).replace(r"\"", '"').replace(r"\\", "\\")
+        if perk:
+            row["perk"] = perk
+        items[code] = row
+    return items
+
+
+def parse_dia_shop(s):
+    match = re.search(
+        r'([A-Za-z0-9_$]+)=\[\{itemKey:[A-Za-z0-9_$]+\("forgetting_potion"\),diaPrice:10\}',
+        s,
+    )
+    if not match:
+        return {}
+    start = s.find("[", match.start())
+    end = match_delim(s, start) if start >= 0 else -1
+    if end < 0:
+        return {}
+    out = {}
+    for item in split_array_items(s[start:end + 1]):
+        code_match = re.search(r'itemKey:[A-Za-z0-9_$]+\("([a-z0-9_]+)"\)', item)
+        if not code_match:
+            code_match = re.search(r'itemCode:"([a-z0-9_]+)"', item)
+        price = js_number(js_field_value(item, "diaPrice") or "")
+        if not code_match or price is None:
+            continue
+        row = {"dia": price}
+        enhancement = re.search(r'\benhancement:([0-9]+)', item)
+        reputation = js_number(js_field_value(item, "requiredReputation") or "")
+        if enhancement:
+            row["enhancement"] = int(enhancement.group(1))
+        if reputation is not None:
+            row["requiredReputation"] = reputation
+        out[code_match.group(1)] = row
+    return out
+
+
 def parse_achievements(s):
     arr = extract_assignment(s, "Il")
     if not arr:
@@ -564,6 +636,22 @@ def update_gamedata(s):
         return
     with open(GAMEDATA_OUT, "r", encoding="utf-8") as f:
         gd = json.load(f)
+    catalog = parse_item_catalog(s)
+    stored_items = gd.setdefault("items", {})
+    for code, item in catalog.items():
+        if code in stored_items:
+            for key in ("name", "type", "brewDuration_ms", "prefix", "description"):
+                stored_items[code][key] = item[key]
+            if "perk" in item:
+                stored_items[code]["perk"] = item["perk"]
+        else:
+            stored_items[code] = item
+    dia_shop = gd.setdefault("dia_shop", {})
+    for code, item in parse_dia_shop(s).items():
+        dia_shop.setdefault(code, {}).update(item)
+    special_source = gd.setdefault("special_source", {})
+    for code in ("guardian_censer", "leyline_stitching_needle"):
+        special_source[code] = "📌 현재 게임 데이터에 제작법·고정 상점 판매 없음"
     achievements = parse_achievements(s)
     if achievements:
         gd["achievements"] = achievements
@@ -617,6 +705,8 @@ def update_gamedata(s):
         print(f"  achievements: {len(achievements)}")
     if quests:
         print(f"  quests: {len(quests)}")
+    print(f"  items: {len(stored_items)}")
+    print(f"  dia_shop: {len(dia_shop)}")
 
 
 def parent_object(s, anchor):

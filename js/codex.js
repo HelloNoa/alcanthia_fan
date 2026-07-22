@@ -125,7 +125,9 @@ export async function renderCodex(view, sub) {
     const dia = g.dia_shop?.[code];
     if (dia) {
       const enh = dia.enhancement ? `+${dia.enhancement}, ` : "";
-      src.push(`💎 다이아 상점 (${enh}${dia.dia}다이아${dia.lv ? `, Lv${dia.lv}` : ""})`);
+      const level = dia.lv ? `, Lv${dia.lv}` : "";
+      const reputation = dia.requiredReputation != null ? `, 평판 ${dia.requiredReputation} 이상` : "";
+      src.push(`💎 다이아 상점 (${enh}${dia.dia}다이아${level}${reputation})`);
     }
     if (code.startsWith("dia_box_")) src.push("💵 과금 (현금 구매) · 🛒 시장 거래");
     if (g.special_source?.[code]) src.push(g.special_source[code]);
@@ -196,10 +198,15 @@ export async function renderCodex(view, sub) {
         const useF = use?.formula, combatF = combat?.formula;
         const hasDur = (g.use_duration || []).includes(code);  // 지속형 사용효과 (10×2^강화 분)
         const durTxt = (e) => fmtMinutes(10 * 2 ** e);
-        const enhDep = isEnhDep(useF) || isEnhDep(combatF) || hasDur;
+        const effectEnhDep = isEnhDep(useF) || isEnhDep(combatF) || hasDur;
         const txt = (e) => e && (e.base || fmtFormula(e.formula));
         const trans = g.transmute_effects?.[code];
-        const rows = [["양조", fmtDuration(craftTime(code))]];
+        const sellPrice = g.sell_price?.[code];
+        const enhDep = effectEnhDep || Number.isFinite(sellPrice);
+        const rows = [
+          ["양조", fmtDuration(craftTime(code))],
+          ["상점 판매가", Number.isFinite(sellPrice) ? `${fmt(sellPrice)} G` : "판매 불가"],
+        ];
         // 강화 비의존이면 정적으로 행에 표시
         if (!enhDep) {
           if (txt(use)) rows.push(["🧪 사용", txt(use)]);
@@ -212,7 +219,7 @@ export async function renderCodex(view, sub) {
         }
         const card = cxCard((ic) => itemIcon(ic, code), it.name, rows);
         if (brewByOut[code]) ingRow(card, "재료", brewByOut[code]);
-        // 강화 의존: +/- 로 효과 갱신
+        // 강화 선택: 효과와 상점 판매가 갱신
         if (enhDep) {
           let enhP = 0;
           const effLine = (k, f, base, combatObj) => {
@@ -229,8 +236,11 @@ export async function renderCodex(view, sub) {
             <button class="cx-enh-btn" data-d="-1">−</button><b class="cx-enh-lv">+0</b>
             <button class="cx-enh-btn" data-d="1">+</button></div><div class="cx-rows cx-eff-rows"></div>`;
           const rowsEl = block.querySelector(".cx-eff-rows"), lvEl = block.querySelector(".cx-enh-lv");
+          const sellPriceEl = Array.from(card.querySelectorAll(".cx-rows > div"))
+            .find((row) => row.querySelector("span")?.textContent === "상점 판매가")?.querySelector("b");
           const upd = () => {
             lvEl.textContent = `+${enhP}`;
+            if (sellPriceEl && Number.isFinite(sellPrice)) sellPriceEl.textContent = `${fmt(sellPrice * 2 ** enhP)} G`;
             const out = [];
             if (useF || use?.base || hasDur) {
               let v = isEnhDep(useF) ? evalEff(useF, enhP) : (useF ? fmtFormula(useF) : (use?.base || ""));
@@ -361,9 +371,9 @@ export async function renderCodex(view, sub) {
       Object.entries(g.items || {}).forEach(([code, it]) => {
         if (!match(it.name) || isTest(code, it) || (it.type === "potion" && !ITEM_TAB_POTIONS.has(code))) return;  // 포션은 전용 탭
         const stat = g.equipment_stats?.[code];
-        const rows = [["분류", ITEM_TAB_POTIONS.has(code) ? "변성 도구" : TYPE[it.type] || it.type]];
-        if (it.brewDuration_ms) rows.push(["제작시간", fmtDuration(craftTime(code))]);
         const recs = craftByOut[code] || [];
+        const rows = [["분류", ITEM_TAB_POTIONS.has(code) ? "변성 도구" : TYPE[it.type] || it.type]];
+        if ((brewByOut[code] || recs.length) && it.brewDuration_ms) rows.push(["제작시간", fmtDuration(craftTime(code))]);
         if (recs.length) rows.push(["필요레벨", recs.map((r) => `Lv ${r.requiredLevel || 0}`).join(" / ")]);
         const uses = (useByIn[code] || [])
           .filter((u, i, a) => a.findIndex((x) => x.output === u.output && x.kind === u.kind) === i)

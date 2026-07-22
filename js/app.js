@@ -174,15 +174,16 @@ async function tabResidents() {
       <div class="zfx-controls">
         <label class="lvlabel">낯익은 터 <input id="zf-fam" type="range" min="0" max="10" value="0"><b id="zf-famv">0</b></label>
         <label class="chk"><input type="checkbox" id="zf-fog"> 안개 해방</label>
-        <label class="chk"><input type="checkbox" id="zf-raid"> 습격 방어 보너스</label>
+        <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="zf-raid"> 지역효과 +50% 버프</label>
         <span class="zfx-coeff">지역효과 계수 <b id="zf-coeff">0.00</b></span>
       </div>
+      <div class="muted">습격 방어 성공 또는 수호의 향로 사용 시 1시간 동안 계수 +0.5 · 습격 패배 시 지역효과 0% · 지맥 봉합침으로 즉시 복구</div>
       <div id="zf-list" class="zfx-list"></div>
       <div id="zf-cost" class="zfx-cost"></div>
     </div>
     <div id="residents"></div>`;
 
-  // 지역 효과 계산 (계수 e = 낯익은터×0.1 + 안개해방×1 + 습격방어보너스×0.5)
+  // 지역 효과 계산 (계수 e = 낯익은터×0.1 + 안개해방×1 + 추가 버프×0.5)
   const evalTpl = (tpl, e) => tpl.replace(/\$\{([^}]+)\}/g, (_, x) => {
     try { const v = Number(new Function("e", "Math", "return (" + x + ")")(e, Math)); return isFinite(v) ? v.toFixed(2) : "∞"; }
     catch { return "?"; }

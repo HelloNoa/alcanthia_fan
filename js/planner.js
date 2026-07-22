@@ -78,7 +78,7 @@ const PRODUCTION_ZONE_NOTES = {
 };
 const zoneCoeff = (opt) => opt.familiar * 0.1 + (opt.fog ? 1 : 0) + (opt.raid ? 0.5 : 0);
 const plentyMultiplier = (opt) => 1 + 0.05 * opt.plenty * (opt.zone === "dried_spring" ? 1 + zoneCoeff(opt) : 1);
-const zoneNoteHtml = (opt) => `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 습격 방어 0.5</span>`;
+const zoneNoteHtml = (opt) => `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 추가 버프 0.5 (습격 방어 성공·수호의 향로)</span>`;
 
 function multiplier(pid, cond, plantCond, sameCount, diversity, opt, oneShot, crystalLineBonus) {
   let c = opt.harvest ? 1.5 : 1;
@@ -224,7 +224,7 @@ export async function renderPlanner(view) {
           </select></label>
           <label class="lvlabel">낯익은 터 <input id="pl-familiar" type="range" min="0" max="10" value="0"><b id="pl-familiarv">0</b></label>
           <label class="chk"><input type="checkbox" id="pl-fog"> 안개 해방</label>
-          <label class="chk"><input type="checkbox" id="pl-raid"> 습격 방어 보너스</label>
+          <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="pl-raid"> 지역효과 +50% 버프</label>
           <div class="muted">지역효과 계수 <b id="pl-zone-coeff">0.00</b></div>
           <div class="pl-zone-note" id="pl-zone-note">${zoneNoteHtml(opt)}</div>
           <label class="lvlabel">뿌리 지배 <input id="pl-root" type="range" min="0" max="2" value="0"><b id="pl-rootv">0</b></label>

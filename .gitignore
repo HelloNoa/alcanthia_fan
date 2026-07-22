@@ -2,5 +2,6 @@
 .idea/
 node_modules/
 tmp/
+__pycache__/
 enhance_preview.html
 js/enhance_preview.js

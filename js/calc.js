@@ -101,7 +101,7 @@ async function timeCalc(body) {
           </label>
           <label class="lvlabel">낯익은 터 <input id="famG" type="range" min="0" max="10" value="0"><b id="famGv">0</b></label>
           <label class="chk"><input type="checkbox" id="fog"> 안개 해방</label>
-          <label class="chk"><input type="checkbox" id="zoneBuff"> 지역효과 버프</label>
+          <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="zoneBuff"> 지역효과 +50% 버프</label>
         </div>
         <div class="calc-row">
           <label class="chk"><input type="checkbox" id="firePot"> 화염포션 적용</label>
@@ -110,7 +110,7 @@ async function timeCalc(body) {
         <div id="potOut" class="calc-out"></div>
         <div class="calc-note">💡 N강 포션은 <b>(N−1)강 포션 2개를 합성</b>해 만듭니다.
         예) 9강을 만들려면 8강 포션 2개가 필요하고, 시간은 8강 기준(2⁸)으로 계산돼요.</div>
-        <p class="muted">지역효과 계수 = 낯익은 터×0.1 + 안개 해방 + 지역효과 버프×0.5.<br>
+        <p class="muted">지역효과 계수 = 낯익은 터×0.1 + 안개 해방 1 + 추가 버프 0.5 (습격 방어 성공·수호의 향로).<br>
         시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수 × 화염포션(선택)</p>
       </div>
       <div class="calc-card">
@@ -133,7 +133,7 @@ async function timeCalc(body) {
           </label>
           <label class="lvlabel">낯익은 터 <input id="tcFamG" type="range" min="0" max="10" value="0"><b id="tcFamGv">0</b></label>
           <label class="chk"><input type="checkbox" id="tcFog"> 안개 해방</label>
-          <label class="chk"><input type="checkbox" id="tcZoneBuff"> 지역효과 버프</label>
+          <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="tcZoneBuff"> 지역효과 +50% 버프</label>
         </div>
         <div class="calc-row">
           <label class="chk"><input type="checkbox" id="tcFirePot"> 화염포션 적용</label>
@@ -187,7 +187,7 @@ async function timeCalc(body) {
     body.querySelector("#matEv").textContent = me;
     body.querySelector("#famGv").textContent = famG;
     body.querySelector("#fireEv").textContent = fireE;
-    // 게임의 Xe 공식: 낯익은 터×0.1 + 안개 해방×1 + 지역효과 버프×0.5
+    // 게임의 _e 공식: 낯익은 터×0.1 + 안개 해방×1 + 추가 버프×0.5
     const t = famG * 0.1 + (fog ? 1 : 0) + (zoneBuff ? 0.5 : 0);
     const ing = recipeOf[c] || [];
     const sameIng = ing.length === 2 && ing[0] === ing[1];
@@ -494,7 +494,7 @@ async function evCalc(body) {
           </label>
           <label class="lvlabel">낯익은 터 <input id="ev-famG" type="range" min="0" max="10" value="0"><b id="ev-famGv">0</b></label>
           <label class="chk"><input type="checkbox" id="ev-fog"> 안개 해방</label>
-          <label class="chk"><input type="checkbox" id="ev-zoneBuff"> 지역효과 버프</label>
+          <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="ev-zoneBuff"> 지역효과 +50% 버프</label>
         </div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-self"> 🔁 도구 솥 자가강화 <span class="muted">(단계마다 도구 솥 강화도↑)</span></label></div>
         <div class="calc-row"><label class="chk"><input type="checkbox" id="ev-auto" checked> ⚙️ 입력 강화 자동 최소비용 <span class="muted">(끄면 수동 지정)</span></label></div>
