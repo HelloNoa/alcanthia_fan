@@ -94,6 +94,14 @@ def extract_assignment(s, name):
     return s[i:j + 1] if j >= 0 else None
 
 
+def extract_delimited_from(s, start, opener):
+    i = s.find(opener, start)
+    if i < 0:
+        return None
+    j = match_delim(s, i)
+    return s[i:j + 1] if j >= 0 else None
+
+
 def js_number(v):
     v = v.strip()
     if v == "null":
@@ -119,18 +127,15 @@ def parse_shop_prices(s):
         base_var = m.group(1)
     if not base_var:
         return {}
-    base = extract_assignment(s, base_var) or ""
+    base = extract_delimited_from(s, m.start(), "[") or ""
     sell = {}
     for code, price in re.findall(r"\{itemCode:\"([a-z0-9_]+)\",price:([^,}]+)", base):
         n = js_number(price)
         if n is not None:
             sell[code] = n / 2
 
-    shop_var = None
     m = re.search(r"([A-Za-z0-9_$]+)=\{buy:\[\.\.\." + re.escape(base_var), s)
-    if m:
-        shop_var = m.group(1)
-    shop = extract_assignment(s, shop_var) if shop_var else ""
+    shop = extract_delimited_from(s, m.start(), "{") if m else ""
     for code, price in re.findall(r"\{itemCode:\"([a-z0-9_]+)\",price:([^,}]+)", shop or ""):
         n = js_number(price)
         if n is not None:
@@ -184,7 +189,7 @@ def computed_value_tables(s, item_codes):
     base_obj = extract_assignment(s, "dC")
     if not base_obj or "opaque_sediment" not in base_obj:
         m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:null,earth_breath:null,herb:", s)
-        base_obj = extract_assignment(s, m.group(1)) if m else None
+        base_obj = extract_delimited_from(s, m.start(), "{") if m else None
     if not base_obj:
         return {}, {}, {}
     base_values = parse_value_object(base_obj)
@@ -387,6 +392,7 @@ ITEM_PERK_OVERRIDES = {
     "guardian_censer": "사용 시 1시간 동안 지역 효과 +50%",
     "leyline_stitching_needle": "사용 시 습격으로 억제된 지역 효과 즉시 복구",
     "witch_paint_pot": "사용 시 닉네임 색상 변경 · +0 15색, +1 30색, +2 이상 45색",
+    "farmers_baton": "텃밭에 설치 가능 · 주변 작물 상태 관측 및 관리 · +1부터 강화도+1 거리",
 }
 
 
@@ -439,10 +445,25 @@ def parse_dia_shop(s):
     out = {}
     for item in split_array_items(s[start:end + 1]):
         code_match = re.search(r'itemKey:[A-Za-z0-9_$]+\("([a-z0-9_]+)"\)', item)
+        code = code_match.group(1) if code_match else None
+        if not code:
+            alias_match = re.search(
+                r'itemKey:[A-Za-z0-9_$]+\(([A-Za-z0-9_$]+)\)',
+                item,
+            )
+            if alias_match:
+                declarations = list(re.finditer(
+                    r'\b' + re.escape(alias_match.group(1)) + r'="([a-z0-9_]+)"',
+                    s[:start],
+                ))
+                if declarations:
+                    code = declarations[-1].group(1)
         if not code_match:
             code_match = re.search(r'itemCode:"([a-z0-9_]+)"', item)
+            if code_match:
+                code = code_match.group(1)
         price = js_number(js_field_value(item, "diaPrice") or "")
-        if not code_match or price is None:
+        if not code or price is None:
             continue
         row = {"dia": price}
         enhancement = re.search(r'\benhancement:([0-9]+)', item)
@@ -451,7 +472,7 @@ def parse_dia_shop(s):
             row["enhancement"] = int(enhancement.group(1))
         if reputation is not None:
             row["requiredReputation"] = reputation
-        out[code_match.group(1)] = row
+        out[code] = row
     return out
 
 
@@ -577,17 +598,12 @@ def parse_quests(s, gd, allowed_repeats=("daily", "weekly")):
     return out
 
 
-def parse_tutorial_goals(s):
-    m = re.search(r'([A-Za-z0-9_$]+)=\[\{id:"meet_witch"', s)
-    if not m:
-        return []
-    i = s.find("[", m.start())
-    j = match_delim(s, i) if i >= 0 else -1
-    if j < 0:
-        return []
+def parse_tutorial_goal_array(s, arr):
     out = []
-    for order, item in enumerate(split_array_items(s[i:j + 1]), 1):
+    for item in split_array_items(arr):
         if not item.startswith("{"):
+            continue
+        if "appearCondition:()=>!1" in item and "completionCondition:()=>!1" in item:
             continue
         goal_id = js_string_field(item, "id")
         title = js_string_field(item, "title")
@@ -595,7 +611,6 @@ def parse_tutorial_goals(s):
             continue
         reward = js_field_value(item, "reward")
         out.append({
-            "order": order,
             "id": goal_id,
             "title": title,
             "description": js_text_field(item, "description", s) or "",
@@ -604,6 +619,60 @@ def parse_tutorial_goals(s):
             "rewards": parse_item_refs(f"[{reward}]") if reward else [],
         })
     return out
+
+
+def parse_tutorial_goals(s):
+    arrays = []
+    for anchor in ("meet_witch", "enable_hourglass"):
+        m = re.search(
+            r'([A-Za-z0-9_$]+)=\[\{id:"' + re.escape(anchor) + r'"',
+            s,
+        )
+        if not m:
+            continue
+        arr = extract_delimited_from(s, m.start(), "[")
+        if arr:
+            arrays.append(arr)
+    if not arrays:
+        return []
+
+    out = []
+    seen = set()
+    for arr in arrays:
+        for goal in parse_tutorial_goal_array(s, arr):
+            if goal["id"] in seen:
+                continue
+            seen.add(goal["id"])
+            out.append({"order": len(out) + 1, **goal})
+    return out
+
+
+def sync_recipe(gd, s, output, recipe_type):
+    recipe = next(
+        (
+            item for item in parse_recipes_for_values(s)
+            if item.get("outputs") == [output] and len(item.get("inputs", [])) == 2
+        ),
+        None,
+    )
+    if not recipe:
+        return False
+    item_names = gd.get("items") or {}
+    row = {
+        "type": recipe_type,
+        "inputs": recipe["inputs"],
+        "requiredLevel": recipe.get("requiredLevel", 0),
+        "output": output,
+        "inputs_kr": [item_names.get(code, {}).get("name", code) for code in recipe["inputs"]],
+        "output_kr": item_names.get(output, {}).get("name", output),
+    }
+    recipes = gd.setdefault("recipes_full", [])
+    for index, stored in enumerate(recipes):
+        if stored.get("output") == output and stored.get("inputs") == recipe["inputs"]:
+            recipes[index] = row
+            return True
+    recipes.append(row)
+    return True
 
 
 def write_progression(s):
@@ -646,9 +715,14 @@ def update_gamedata(s):
                 stored_items[code]["perk"] = item["perk"]
         else:
             stored_items[code] = item
-    dia_shop = gd.setdefault("dia_shop", {})
-    for code, item in parse_dia_shop(s).items():
-        dia_shop.setdefault(code, {}).update(item)
+    dia_shop = parse_dia_shop(s)
+    if dia_shop:
+        gd["dia_shop"] = dia_shop
+    else:
+        dia_shop = gd.setdefault("dia_shop", {})
+        print("skip gamedata dia_shop: 번들에서 다이아 상점을 추출하지 못함")
+    if not sync_recipe(gd, s, "farmers_baton", "special"):
+        print("skip gamedata farmers_baton recipe: 번들에서 제작법을 추출하지 못함")
     special_source = gd.setdefault("special_source", {})
     for code in ("guardian_censer", "leyline_stitching_needle"):
         special_source[code] = "📌 현재 게임 데이터에 제작법·고정 상점 판매 없음"
