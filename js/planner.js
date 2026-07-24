@@ -6,6 +6,13 @@ const CENTER = (CANVAS - 1) / 2; // 13
 const STORE = "alc_planner_v3";
 const PEDESTAL = "pedestal";
 const LEGACY_PEDESTAL = "equipment_pedestal";
+const FARMERS_BATON = "farmers_baton";
+export const farmersBatonRange = (enhancement = 0) =>
+  Math.max(1, Math.floor(Number(enhancement) || 0) + 1);
+export const farmersBatonCovers = (sourceRow, sourceCol, targetRow, targetCol, enhancement = 0) => {
+  const distance = Math.abs(targetRow - sourceRow) + Math.abs(targetCol - sourceCol);
+  return distance > 0 && distance <= farmersBatonRange(enhancement);
+};
 // 조건 부여원 (작물 perk + 장식물)
 const EMIT = {
   dew_root: "humid", sunlight_flower: "sunlit", poison_flower: "poisonous",
@@ -37,13 +44,19 @@ const POTION_EFFECTS = [
 // 설치형 장식물
 const ORN = {
   witch_scarecrow: "마녀 허수아비", crystal_fountain: "수정 분수", fairy_lantern: "요정 등불",
-  mana_sprayer: "마력 분사기",
+  mana_sprayer: "마력 분사기", farmers_baton: "새싹 지휘봉",
   flower_trellis_arch: "꽃 트렐리스", star_music_box: "별조각 오르골", telescope: "망원경", town_teleporter: "마을 텔레포터",
   campfire: "모닥불",
   rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", storage_chest: "차원상자", pedestal: "전시대",
 };
 // 장식물 부가설명 (기능형)
-const ORN_NOTE = { root_barrier: "지표 효과 차단 (조건 전파 막음)", storage_chest: "아이템 보관", pedestal: "장비 전시", mana_sprayer: "인접 식물 포션 공급" };
+const ORN_NOTE = {
+  root_barrier: "지표 효과 차단 (조건 전파 막음)",
+  storage_chest: "아이템 보관",
+  pedestal: "장비 전시",
+  mana_sprayer: "인접 식물 포션 공급",
+  farmers_baton: "주변 작물 상태 관측 및 관리",
+};
 // 바닥재 종류 (표면 배치, CSS 텍스처)
 const FLOOR_NAMES = {
   stone_floor: "석판", cobblestone_floor: "조약돌", grass_floor: "잔디",
@@ -204,7 +217,7 @@ export async function renderPlanner(view) {
         <div class="pl-palette" id="pl-pal"></div>
         <div class="pl-palette pl-orn" id="pl-pal-orn"></div>
         <div class="pl-palette pl-effects" id="pl-pal-eff"></div>
-        <label class="lvlabel pl-enh">작물 강화 <input id="pl-enh" type="range" min="0" max="12" value="0"><b id="pl-enhv">0</b>강</label>
+        <label class="lvlabel pl-enh"><span id="pl-enh-label">작물 강화</span> <input id="pl-enh" type="range" min="0" max="12" value="0"><b id="pl-enhv">0</b>강</label>
         <div class="pl-gridscroll"><div class="pl-grid" id="pl-grid" style="--n:${CANVAS};--cell:34px"></div></div>
         <div class="pl-legend">
           <span><i class="lg humid"></i>습기</span><span><i class="lg fertile"></i>비옥</span>
@@ -212,6 +225,7 @@ export async function renderPlanner(view) {
           <span><i class="lg sunlit"></i>햇살</span><span><i class="lg anti"></i>항마</span>
           <span><i class="lg arid"></i>사막화</span>
           <span><i class="lg soil"></i>흙</span><span><i class="lg poll"></i>수분 경로</span>
+          <span><i class="lg managed"></i>지휘봉 관리</span>
         </div>
       </div>
       <div class="pl-side">
@@ -266,6 +280,13 @@ export async function renderPlanner(view) {
   const summary = view.querySelector("#pl-summary");
   const pollsum = view.querySelector("#pl-pollsum");
   const hint = view.querySelector("#pl-hint");
+  const enhControl = view.querySelector(".pl-enh");
+  const enhLabel = view.querySelector("#pl-enh-label");
+  const updateEnhControl = (kind, key) => {
+    const supported = kind === "plant" || (kind === "orn" && key === FARMERS_BATON);
+    enhControl.style.display = mode === "plant" && supported ? "" : "none";
+    enhLabel.textContent = key === FARMERS_BATON ? "지휘봉 강화" : "작물 강화";
+  };
 
   const palItem = (key, label, kind) => {
     const b = document.createElement("button");
@@ -282,6 +303,7 @@ export async function renderPlanner(view) {
     b.onclick = () => {
       sel = key;
       view.querySelectorAll(".pl-pi").forEach((x) => x.classList.toggle("active", x === b));
+      updateEnhControl(kind || "plant", key);
     };
     return b;
   };
@@ -385,7 +407,12 @@ export async function renderPlanner(view) {
         if (cell.fences[s] === sel) delete cell.fences[s]; else cell.fences[s] = sel;
         if (!Object.keys(cell.fences).length) delete cell.fences;
       }
-      else if (kind === "orn") grid[r][c] = cell.orn === sel ? { p: null, ...keep(cell) } : { orn: sel, ...keep(cell) };
+      else if (kind === "orn") {
+        const same = cell.orn === sel && (sel !== FARMERS_BATON || (cell.e || 0) === enh);
+        grid[r][c] = same
+          ? { p: null, ...keep(cell) }
+          : { orn: sel, ...(sel === FARMERS_BATON && enh > 0 ? { e: enh } : {}), ...keep(cell) };
+      }
       else {
         const same = cell.p === sel && (cell.e || 0) === enh;
         grid[r][c] = same ? { p: null, ...keep(cell) } : { p: sel, e: enh, ...keep(cell), ...keepPlantCond(cell, sel) };
@@ -398,6 +425,21 @@ export async function renderPlanner(view) {
   // 동적 윈도우: 밭 bbox + 여백만 렌더 → 작은 밭일수록 셀이 커짐
   const cellMap = new Map();
   let virtualPollMap = new Map();
+  let batonMap = null;
+  const buildBatonMap = () => {
+    batonMap = Array.from({ length: CANVAS }, () =>
+      Array.from({ length: CANVAS }, () => new Set()));
+    for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) {
+      const baton = grid[r][c];
+      if (baton?.orn !== FARMERS_BATON) continue;
+      const range = farmersBatonRange(baton.e);
+      for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
+        const y = r + dr, x = c + dc;
+        if (y < 0 || y >= CANVAS || x < 0 || x >= CANVAS) continue;
+        if (farmersBatonCovers(r, c, y, x, baton.e)) batonMap[y][x].add(`${r}:${c}`);
+      }
+    }
+  };
   let win = null;
   const computeWin = () => {
     let minR = CANVAS, maxR = -1, minC = CANVAS, maxC = -1;
@@ -586,6 +628,7 @@ export async function renderPlanner(view) {
 
   const recompute = () => {
     buildConds();
+    buildBatonMap();
     virtualPollMap = pollTargets();
     const want = computeWin();
     const changed = !win || win.minR !== want.minR || win.maxR !== want.maxR || win.minC !== want.minC || win.maxC !== want.maxC;
@@ -600,6 +643,11 @@ export async function renderPlanner(view) {
       const z = grid[r][c];
       if (!z) { if (showSlots && adjField(r, c)) el.classList.add("expand-slot"); continue; }
       el.classList.add("tilled"); tilled++;
+      if (batonMap[r][c].size) {
+        const managed = document.createElement("span");
+        managed.className = "pl-baton-zone";
+        el.appendChild(managed);
+      }
       // 표면 바닥재 (작물 아래) — CSS 석판 텍스처 (스프라이트는 iso라 평면뷰서 회전돼 보임)
       if (z.floor) { const fl = document.createElement("span"); fl.className = "pl-floor"; itemIcon(fl, z.floor); el.appendChild(fl); }
       // 경계 울타리/장벽
@@ -622,6 +670,9 @@ export async function renderPlanner(view) {
         const ic = document.createElement("span"); ic.className = "pl-cic"; itemIcon(ic, z.orn); el.appendChild(ic);
         if (z.orn === PEDESTAL && z.display) {   // 전시대 위 아이템
           const di = document.createElement("span"); di.className = "pl-disp"; itemIcon(di, z.display); el.appendChild(di);
+        }
+        if (z.orn === FARMERS_BATON && (z.e || 0) > 0) {
+          el.insertAdjacentHTML("beforeend", `<span class="pl-enhb">+${z.e}</span>`);
         }
         el.classList.add("isorn");
         continue;
@@ -706,15 +757,37 @@ export async function renderPlanner(view) {
 
   const soilCondTxt = (cond) => [...(cond || [])].map((x) => COND_KR[x] || x).join(", ") || "없음";
   const plantCondTxt = (pc) => [...(pc || [])].map((x) => PLANT_COND_KR[x] || x).join(", ") || "없음";
+  const batonCoverageInfo = (r, c, enhancement) => {
+    let fieldTiles = 0, plantsInRange = 0;
+    for (let y = 0; y < CANVAS; y++) for (let x = 0; x < CANVAS; x++) {
+      if (!farmersBatonCovers(r, c, y, x, enhancement)) continue;
+      if (grid[y][x]) fieldTiles++;
+      if (plantAt(y, x)) plantsInRange++;
+    }
+    const range = farmersBatonRange(enhancement);
+    return { maxTiles: 2 * range * (range + 1), fieldTiles, plantsInRange };
+  };
 
   const showDetail = (r, c) => {
     const cell = grid[r][c];
     const orn = ornAt(r, c);
     if (orn) {
-      const eff = EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
-        : ORN_NOTE[orn.orn] ? `<div class="d-row">${ORN_NOTE[orn.orn]}</div>`
-        : `<div class="d-row muted">장식 (효과 없음)</div>`;
-      let html = `<h3>${ORN[orn.orn]}</h3>${eff}<div class="d-row">토양 효과 <b>${soilCondTxt(condMap?.[r]?.[c] || new Set())}</b></div>`;
+      let eff;
+      if (orn.orn === FARMERS_BATON) {
+        const range = farmersBatonRange(orn.e);
+        const info = batonCoverageInfo(r, c, orn.e);
+        eff = `<div class="d-row">강화 <b>+${orn.e || 0}</b> · 관리 거리 <b>${range}</b></div>
+          <div class="d-row">관리 범위 <b>최대 ${info.maxTiles}칸</b> · 현재 밭 <b>${info.fieldTiles}칸</b></div>
+          <div class="d-row">현재 범위 내 작물 <b>${info.plantsInRange}칸</b></div>
+          <div class="d-row muted">지휘봉이 놓인 칸에는 작물을 심을 수 없습니다.</div>`;
+      } else {
+        eff = EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
+          : ORN_NOTE[orn.orn] ? `<div class="d-row">${ORN_NOTE[orn.orn]}</div>`
+          : `<div class="d-row muted">장식 (효과 없음)</div>`;
+      }
+      const enhTitle = orn.orn === FARMERS_BATON && (orn.e || 0) > 0
+        ? ` <span class="pl-enhb-inl">+${orn.e}</span>` : "";
+      let html = `<h3>${ORN[orn.orn]}${enhTitle}</h3>${eff}<div class="d-row">토양 효과 <b>${soilCondTxt(condMap?.[r]?.[c] || new Set())}</b></div>`;
       if (orn.orn === PEDESTAL) {   // 전시대 위에 올릴 아이템 선택
         html += `<div class="d-row">전시 아이템 <select id="pl-disp-sel">
           <option value="">— 없음 —</option>
@@ -775,7 +848,7 @@ export async function renderPlanner(view) {
     view.querySelectorAll(".pl-modes button").forEach((b) => b.classList.toggle("active", b.dataset.m === m));
     palBox.style.display = ornBox.style.display = m === "plant" ? "" : "none";
     effBox.style.display = m === "effect" ? "" : "none";
-    view.querySelector(".pl-enh").style.display = m === "plant" ? "" : "none";
+    updateEnhControl(selKind(), sel);
     hint.textContent = m === "till"
       ? "밭에 인접한 칸만 확장 가능 (점선=확장 가능) · 클릭으로 제거"
       : m === "effect"
@@ -886,6 +959,10 @@ export async function renderPlanner(view) {
     for (const row of g) for (const cell of row || []) {
       if (!cell) continue;
       if (cell.orn === LEGACY_PEDESTAL) cell.orn = PEDESTAL;
+      if (cell.orn === FARMERS_BATON) {
+        cell.e = Math.max(0, Math.min(12, Math.floor(Number(cell.e) || 0)));
+        if (!cell.e) delete cell.e;
+      } else if (cell.orn) delete cell.e;
       cell.cond = COND_ORDER.filter((x) => Array.isArray(cell.cond) && cell.cond.includes(x));
       if (!cell.cond.length) delete cell.cond;
       cell.plantCond = PLANT_COND_ORDER.filter((x) => Array.isArray(cell.plantCond) && cell.plantCond.includes(x));
@@ -894,15 +971,19 @@ export async function renderPlanner(view) {
     return g;
   }
 
-  // ── 배치 압축 인코딩 (바이너리 → url-safe base64). v2: 바닥재·울타리, v3: 전시대 전시 아이템, v4: 포션 효과 ──
+  // ── 배치 압축 인코딩 (바이너리 → url-safe base64).
+  // v2: 바닥재·울타리, v3: 전시대 전시 아이템, v4: 포션 효과, v5: 장식물 강화도
   function encodeGrid() {
     let minR = CANVAS, maxR = -1, minC = CANVAS, maxC = -1;
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) if (grid[r][c]) {
       if (r < minR) minR = r; if (r > maxR) maxR = r; if (c < minC) minC = c; if (c > maxC) maxC = c;
     }
     if (maxR < 0) return "";
-    const h = maxR - minR + 1, w = maxC - minC + 1, pl = [], orn = [], disp = [], vals = [], floors = [], fences = [], dispVals = [], soilVals = [], plantVals = [];
-    let hasFloor = false, hasFence = false, hasDisp = false, hasSoilFx = false, hasPlantFx = false;
+    const h = maxR - minR + 1, w = maxC - minC + 1;
+    const pl = [], orn = [], disp = [], vals = [], floors = [], fences = [];
+    const dispVals = [], soilVals = [], plantVals = [], ornEnhVals = [];
+    let hasFloor = false, hasFence = false, hasDisp = false;
+    let hasSoilFx = false, hasPlantFx = false, hasOrnEnh = false;
     for (let r = minR; r <= maxR; r++) for (let c = minC; c <= maxC; c++) {
       const z = grid[r][c];
       if (!z) vals.push(0);
@@ -918,9 +999,12 @@ export async function renderPlanner(view) {
       soilVals.push(sv); if (sv) hasSoilFx = true;
       let pv = 0; if (z?.plantCond) PLANT_COND_ORDER.forEach((cc, k) => { if (z.plantCond.includes(cc)) pv |= 1 << k; });
       plantVals.push(pv); if (pv) hasPlantFx = true;
+      const oe = z?.orn ? Math.max(0, Math.min(12, Math.floor(Number(z.e) || 0))) : 0;
+      ornEnhVals.push(oe); if (oe) hasOrnEnh = true;
     }
-    const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0) | (hasDisp ? 4 : 0) | (hasSoilFx ? 8 : 0) | (hasPlantFx ? 16 : 0);
-    const ver = (hasSoilFx || hasPlantFx) ? 4 : hasDisp ? 3 : 2;
+    const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0) | (hasDisp ? 4 : 0)
+      | (hasSoilFx ? 8 : 0) | (hasPlantFx ? 16 : 0) | (hasOrnEnh ? 32 : 0);
+    const ver = hasOrnEnh ? 5 : (hasSoilFx || hasPlantFx) ? 4 : hasDisp ? 3 : 2;
     const bytes = [ver, minR, minC, h, w, flags, pl.length];
     const wrStr = (id) => { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); };
     for (const id of pl) wrStr(id);
@@ -931,6 +1015,7 @@ export async function renderPlanner(view) {
     if (hasDisp) { bytes.push(disp.length); for (const id of disp) wrStr(id); dispVals.forEach((v) => bytes.push(v)); }
     if (hasSoilFx) soilVals.forEach((v) => bytes.push(v));
     if (hasPlantFx) plantVals.forEach((v) => bytes.push(v));
+    if (hasOrnEnh) ornEnhVals.forEach((v) => bytes.push(v));
     let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
     return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
@@ -940,7 +1025,7 @@ export async function renderPlanner(view) {
     const b = []; for (let k = 0; k < bin.length; k++) b.push(bin.charCodeAt(k));
     let i = 0;
     const ver = b[i++];
-    if (ver < 1 || ver > 4) return null;
+    if (ver < 1 || ver > 5) return null;
     const minR = b[i++], minC = b[i++], h = b[i++], w = b[i++];
     const flags = ver >= 2 ? b[i++] : 0;
     const pl = [], orn = [];
@@ -972,6 +1057,10 @@ export async function renderPlanner(view) {
     if (ver >= 4 && (flags & 16)) cells.forEach(([gr, gc]) => {
       const pv = b[i++]; if (!pv || !(g[gr] && g[gr][gc])) return;
       g[gr][gc].plantCond = PLANT_COND_ORDER.filter((cc, k) => pv & (1 << k));
+    });
+    if (ver >= 5 && (flags & 32)) cells.forEach(([gr, gc]) => {
+      const enhancement = b[i++];
+      if (enhancement && g[gr]?.[gc]?.orn) g[gr][gc].e = enhancement;
     });
     return g;
   }
