@@ -133,6 +133,59 @@ main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .cell[data-cond*="humid"] { box-shadow: inset 0 0 0 1px #3b6ea5; }
 .cell[data-cond*="poisonous"] { box-shadow: inset 0 0 0 1px #6a8f3a; }
 
+/* 이끼제리 방범대 */
+.watch-page { width: 100%; max-width: 860px; margin: 10px auto 0; }
+.watch-intro {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center; gap: 18px; padding: 18px 0 22px;
+  border-bottom: 1px solid var(--line);
+}
+.watch-mascot {
+  position: relative; display: flex; width: 76px; height: 76px;
+  align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+}
+.watch-mascot-img {
+  width: 62px; height: 62px; object-fit: contain; image-rendering: pixelated;
+}
+.watch-title { min-width: 0; }
+.watch-title p {
+  margin: 0 0 2px; color: var(--buy); font-size: 12px; font-weight: 700;
+}
+.watch-title h2 { margin: 0 0 5px; font-size: 27px; letter-spacing: 0; }
+.watch-title > span { display: block; max-width: 560px; color: var(--muted); }
+.watch-action {
+  display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px;
+  background: var(--buy); color: #fff; border: 1px solid var(--buy); border-radius: 8px;
+  padding: 9px 15px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.watch-action:hover { filter: brightness(1.08); }
+.watch-notice {
+  display: grid; gap: 3px; margin: 20px 0 4px; padding: 12px 14px;
+  background: var(--panel); border-left: 3px solid var(--gold);
+}
+.watch-notice span { color: var(--muted); }
+.watch-sections {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px; margin-top: 22px;
+}
+.watch-sections section { min-width: 0; border-top: 2px solid var(--line); padding-top: 12px; }
+.watch-sections h3 { margin: 0 0 8px; font-size: 15px; }
+.watch-sections ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.watch-sections li + li { margin-top: 5px; }
+.watch-policy {
+  margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px;
+}
+@media (max-width: 640px) {
+  .watch-intro { grid-template-columns: 58px minmax(0, 1fr); gap: 12px; }
+  .watch-mascot { width: 58px; height: 58px; }
+  .watch-mascot-img { width: 48px; height: 48px; }
+  .watch-title h2 { font-size: 22px; }
+  .watch-action { grid-column: 1 / -1; width: 100%; }
+  .watch-sections { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+
 .info-sec { margin-top: 18px; }
 .info-sec h3 { margin: 0 0 8px; font-size: 15px; }
 .kv-list { display: flex; flex-wrap: wrap; gap: 6px; }

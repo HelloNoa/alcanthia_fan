@@ -180,6 +180,62 @@ async function showGarden(query, label) {
   } catch (e) { g.innerHTML = `<div class="err-box">⚠️ ${e.message}</div>`; }
 }
 
+// ---------- 이끼제리 방범대 ----------
+function tabWatch() {
+  view.innerHTML = `
+    <div class="watch-page">
+      <header class="watch-intro">
+        <span class="watch-mascot" aria-hidden="true">
+          <img class="watch-mascot-img" src="./watch_moss_jelly.png" alt="">
+        </span>
+        <div class="watch-title">
+          <p>커뮤니티 신문고</p>
+          <h2>이끼제리 방범대</h2>
+          <span>상습적인 습격과 반복적인 비매너 행위로 어려움을 겪고 있다면 익명으로 제보할 수 있습니다.</span>
+        </div>
+        <a class="watch-action" href="https://forms.gle/k97q724zfksQtfqb8"
+          target="_blank" rel="noopener noreferrer">익명 제보하기 <span aria-hidden="true">↗</span></a>
+      </header>
+
+      <div class="watch-notice">
+        <strong>습격 자체는 게임의 정상적인 시스템입니다.</strong>
+        <span>단발성 습격이나 개인적인 다툼만으로는 공개하지 않으며, 반복적인 표적 습격과 괴롭힘 정황을 중심으로 확인합니다.</span>
+      </div>
+
+      <div class="watch-sections">
+        <section>
+          <h3>제보할 때</h3>
+          <ul>
+            <li>현재 닉네임 또는 유저 ID</li>
+            <li>발생한 날짜와 반복 횟수</li>
+            <li>확인 가능한 화면이나 기록</li>
+          </ul>
+        </section>
+        <section>
+          <h3>확인 기준</h3>
+          <ul>
+            <li>같은 대상에 대한 반복성</li>
+            <li>제보 내용과 자료의 일치 여부</li>
+            <li>정상적인 습격과 괴롭힘의 구분</li>
+          </ul>
+        </section>
+        <section>
+          <h3>공개 원칙</h3>
+          <ul>
+            <li>제보 접수만으로는 공개하지 않음</li>
+            <li>확인된 게임 내 정보만 최소한으로 안내</li>
+            <li>개인정보와 외부 계정 정보는 게시하지 않음</li>
+          </ul>
+        </section>
+      </div>
+
+      <p class="watch-policy">
+        반복성과 객관적인 자료가 확인된 비매너 행위는 운영자가 직접 검토한 뒤
+        커뮤니티 주의 대상으로 사이트에 알릴 수 있습니다. 제보자의 신원은 사이트에 공개하지 않습니다.
+      </p>
+    </div>`;
+}
+
 // ---------- 거래소 탭 ----------
 async function tabMarket() {
   const N = await names();
@@ -542,6 +598,7 @@ async function tabQuests(sub) {
 // ---------- 탭 라우팅 ----------
 const TABS = {
   garden: { label: "🌱 텃밭", run: tabGarden },
+  watch: { label: "🛡️ 이끼제리 방범대", run: tabWatch },
   planner: { label: "🌿 배치", run: () => renderPlanner(view) },
   market: { label: "💹 거래소", run: tabMarket },
   residents: { label: "🗺️ 거주민", run: tabResidents },
