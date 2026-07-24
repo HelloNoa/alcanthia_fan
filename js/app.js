@@ -48,6 +48,16 @@ function loading() { view.innerHTML = `<div class="loading">불러오는 중…<
 function error(e) { view.innerHTML = `<div class="err-box">⚠️ ${e.message || e}</div>`; }
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const compactUserId = (value) => {
+  const id = String(value || "");
+  return id.length > 18 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
+};
+const parseUserId = (value) => {
+  const candidate = String(value || "").trim().replace(/^ID\s*[:：]?\s*/i, "");
+  return /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(candidate)
+    ? candidate
+    : "";
+};
 
 // 다른 탭에서 텃밭 보기 요청 (랭킹/거주민 → 텃밭 탭)
 let pendingGarden = null;
@@ -60,7 +70,7 @@ function openGarden(userId, nickname) {
 async function tabGarden() {
   view.innerHTML = `
     <div class="searchbar">
-      <input id="q" placeholder="닉네임 검색 (예: 노아)" autocomplete="off">
+      <input id="q" placeholder="닉네임 또는 유저 ID 검색" autocomplete="off">
       <button id="go">검색</button>
     </div>
     <div id="results" class="results"></div>
@@ -69,6 +79,12 @@ async function tabGarden() {
     const q = $("#q").value.trim();
     if (!q) return;
     const box = $("#results"); box.innerHTML = "검색 중…";
+    const userId = parseUserId(q);
+    if (userId) {
+      box.innerHTML = "";
+      await showGarden({ userId });
+      return;
+    }
     // 정확한 닉네임으로 바로 열기 (비공개 포함 — friend/profile 은 is_public 무관)
     const direct = document.createElement("button");
     direct.className = "chip direct";
@@ -81,8 +97,19 @@ async function tabGarden() {
       if (list.length) {
         for (const u of list) {
           const b = document.createElement("button");
-          b.className = "chip"; b.textContent = u.nickname;
-          b.onclick = () => showGarden({ userId: u.user_id }, u.nickname);
+          const userId = u.user_id || u.userId || "";
+          const nickname = u.nickname || "닉네임 없음";
+          b.className = "chip garden-search-result";
+          const name = document.createElement("span");
+          name.className = "garden-search-name";
+          name.textContent = nickname;
+          const id = document.createElement("span");
+          id.className = "garden-search-id";
+          id.textContent = userId ? `ID ${compactUserId(userId)}` : "ID 정보 없음";
+          if (userId) id.title = `유저 ID: ${userId}`;
+          b.append(name, id);
+          b.disabled = !userId;
+          b.onclick = () => showGarden({ userId }, nickname);
           box.appendChild(b);
         }
       } else {
@@ -102,7 +129,53 @@ async function showGarden(query, label) {
   try {
     const data = await api.garden(query);
     const profile = data.profile || data;
-    await renderGarden(g, profile, label || data.nickname || query.nickname || "");
+    await renderGarden(g, profile, label || data.nickname || profile.nickname || query.nickname || "");
+    const userId = profile.userId || profile.user_id || data.userId || data.user_id || query.userId;
+    const stats = g.querySelector(".garden-head .stats");
+    if (userId && stats) {
+      const idTools = document.createElement("span");
+      idTools.className = "garden-user-id-tools";
+      const idStat = document.createElement("button");
+      idStat.type = "button";
+      idStat.className = "garden-user-id";
+      idStat.textContent = "ID 보기";
+      idStat.title = "유저 ID 표시";
+      idStat.setAttribute("aria-expanded", "false");
+      const setIdExpanded = (expanded) => {
+        idStat.setAttribute("aria-expanded", String(expanded));
+        idStat.classList.toggle("expanded", expanded);
+        idStat.textContent = expanded ? `ID ${userId}` : "ID 보기";
+        idStat.title = expanded ? "유저 ID 숨기기" : "유저 ID 표시";
+      };
+      idStat.onclick = () => {
+        setIdExpanded(idStat.getAttribute("aria-expanded") !== "true");
+      };
+      const copyId = document.createElement("button");
+      copyId.type = "button";
+      copyId.className = "garden-copy-id";
+      copyId.textContent = "⧉ ID 복사";
+      copyId.title = "유저 ID 복사";
+      copyId.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(userId);
+          copyId.classList.add("copied");
+          copyId.textContent = "✓ 복사됨";
+          copyId.title = "유저 ID 복사 완료";
+          window.setTimeout(() => {
+            if (!copyId.isConnected) return;
+            copyId.classList.remove("copied");
+            copyId.textContent = "⧉ ID 복사";
+            copyId.title = "유저 ID 복사";
+          }, 1500);
+        } catch {
+          setIdExpanded(true);
+          copyId.textContent = "복사 실패";
+          copyId.title = "표시된 ID를 직접 복사하세요";
+        }
+      };
+      idTools.append(idStat, copyId);
+      stats.appendChild(idTools);
+    }
     g.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { g.innerHTML = `<div class="err-box">⚠️ ${e.message}</div>`; }
 }
