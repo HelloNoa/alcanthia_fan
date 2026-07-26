@@ -16,6 +16,12 @@ const GARDEN_PADDING = 2;
 const GARDEN_SCROLL_GUTTER = 8;
 const GARDEN_VIEW_STORE = "alc_garden_view";
 const gardenResizeObservers = new WeakMap();
+const GARDEN_EDGE_SIDES = [
+  ["upperRight", "t", "위"],
+  ["lowerRight", "r", "오른쪽"],
+  ["lowerLeft", "b", "아래"],
+  ["upperLeft", "l", "왼쪽"],
+];
 
 export function gardenGridLayout(grid, availableWidth = 560, mode = "detail") {
   const safeGrid = Array.isArray(grid) ? grid : [];
@@ -32,6 +38,31 @@ export function gardenGridLayout(grid, availableWidth = 560, mode = "detail") {
   const minCell = mode === "fit" ? GARDEN_FIT_MIN_CELL : GARDEN_MIN_CELL;
   const cellSize = Math.max(minCell, Math.min(GARDEN_MAX_CELL, fitCell));
   return { rows, cols, cellSize };
+}
+
+export function gardenSurfaceItem(cell) {
+  const itemKey = cell?.surface?.itemKey;
+  if (!itemKey) return null;
+  const parsed = parseItemKey(itemKey);
+  return parsed.code
+    ? { code: parsed.code, enhancement: parsed.enhancement }
+    : null;
+}
+
+export function gardenEdgeItems(cell) {
+  return GARDEN_EDGE_SIDES.flatMap(([edge, side, label]) => {
+    const raw = cell?.edges?.[edge];
+    const itemKey = typeof raw === "string" ? raw : raw?.itemKey;
+    if (!itemKey) return [];
+    const parsed = parseItemKey(itemKey);
+    return parsed.code ? [{
+      edge,
+      side,
+      label,
+      code: parsed.code,
+      enhancement: parsed.enhancement,
+    }] : [];
+  });
 }
 
 function savedGardenViewMode(availableWidth) {
@@ -144,6 +175,48 @@ export async function renderGarden(container, profile, label) {
       el.classList.add("tilled");
       if (cell.conditions?.length) el.dataset.cond = cell.conditions.join(",");
 
+      const surface = gardenSurfaceItem(cell);
+      const edges = gardenEdgeItems(cell);
+      let surfaceLabel = "";
+      if (surface) {
+        const surfaceName = N.items?.[surface.code] || surface.code;
+        const spriteKey = N.itemSprites?.[surface.code] || surface.code;
+        surfaceLabel = `${surfaceName}${surface.enhancement ? ` +${surface.enhancement}` : ""}`;
+        el.classList.add("has-surface");
+        const layer = document.createElement("span");
+        layer.className = "cell-surface";
+        loadImg(layer, itemURLs(N, spriteKey), "", "cell-surface-img");
+        el.appendChild(layer);
+        if (surface.enhancement > 0) {
+          const badge = document.createElement("span");
+          badge.className = "surface-enh";
+          badge.textContent = `+${surface.enhancement}`;
+          el.appendChild(badge);
+        }
+      }
+      if (edges.length) {
+        el.classList.add("has-edges");
+        const layer = document.createElement("span");
+        layer.className = "pl-fences garden-fences";
+        edges.forEach((edge) => {
+          const marker = document.createElement("i");
+          marker.className = `pl-fc pl-fc-${edge.side}${edge.code === "root_barrier" ? " bar" : ""}`;
+          marker.dataset.edgeCode = edge.code;
+          marker.dataset.enhancement = String(edge.enhancement);
+          layer.appendChild(marker);
+        });
+        el.appendChild(layer);
+      }
+      const edgeLabel = edges.map((edge) => {
+        const name = N.items?.[edge.code] || edge.code;
+        return `${edge.label} ${name}${edge.enhancement ? ` +${edge.enhancement}` : ""}`;
+      }).join(" · ");
+      const titleWithDecorations = (title) => [
+        title,
+        surfaceLabel ? `표면: ${surfaceLabel}` : "",
+        edgeLabel ? `경계: ${edgeLabel}` : "",
+      ].filter(Boolean).join("\n");
+
       if (cell.plant) {
         const p = cell.plant;
         const info = N.plants?.[p.id];
@@ -160,9 +233,9 @@ export async function renderGarden(container, profile, label) {
         }
         const cond = (cell.conditions || []).concat(p.conditions || [])
           .map((c) => CONDITION_KR[c] || c).join(", ");
-        el.title = `${nm}${p.enhancement ? " +" + p.enhancement : ""}\n` +
+        el.title = titleWithDecorations(`${nm}${p.enhancement ? " +" + p.enhancement : ""}\n` +
           `체력 ${p.health ?? "-"} · 누적생산 ${fmt(p.totalProduced)}` +
-          (cond ? `\n상태: ${cond}` : "");
+          (cond ? `\n상태: ${cond}` : ""));
       } else if (cell.ornament?.items?.length) {
         el.classList.add("ornament");
         const its = cell.ornament.items;
@@ -175,7 +248,8 @@ export async function renderGarden(container, profile, label) {
         // 베이스(전시대/장식) — 전체 크기
         const b = keysOf(its[0]);
         const img = loadImg(el, b.keys.flatMap((k) => itemURLs(N, k)), "🏵");
-        img.alt = el.title = (N.items && N.items[b.code]) || b.code;
+        img.alt = (N.items && N.items[b.code]) || b.code;
+        el.title = titleWithDecorations(img.alt);
         // 전시대 위 전시 아이템(나머지) — 작게 위에
         for (let di = 1; di < its.length; di++) {
           const d = keysOf(its[di]);
@@ -185,7 +259,10 @@ export async function renderGarden(container, profile, label) {
           el.appendChild(wrap);
         }
       } else {
-        el.title = (cell.conditions || []).map((c) => CONDITION_KR[c] || c).join(", ") || "빈 경작칸";
+        const conditions = (cell.conditions || [])
+          .map((c) => CONDITION_KR[c] || c)
+          .join(", ");
+        el.title = titleWithDecorations(conditions || "빈 경작칸");
       }
       board.appendChild(el);
     }

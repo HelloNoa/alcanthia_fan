@@ -123,13 +123,32 @@ main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .cell.empty { background: #14131f; }
 .cell.tilled { background: #3a2c1e; }
 .cell img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.cell > img { position: relative; z-index: 2; }
+.cell-surface {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden;
+}
+.cell-surface img {
+  position: absolute; left: 50%; top: 50%; width: 100%; height: 100%;
+  object-fit: contain; image-rendering: pixelated;
+  transform: translate(-50%, -50%) scale(1.44) rotate(-45deg) scaleY(2);
+}
+.cell .surface-enh {
+  position: absolute; left: 1px; top: 0; z-index: 5; font-size: 8px;
+  color: #7ee8ff; font-weight: 700; text-shadow: 0 0 2px #000;
+}
 .cell.noimg { color: var(--ink); font-weight: 700; }
 .cell.ornament { font-size: 16px; }
 .cell .enh {
-  position: absolute; right: 1px; bottom: 0; font-size: 9px; color: var(--gold);
+  position: absolute; right: 1px; bottom: 0; z-index: 5; font-size: 9px; color: var(--gold);
   font-weight: 700; text-shadow: 0 0 2px #000;
 }
 .garden-grid.compact .cell .enh { font-size: 7px; }
+.garden-grid.compact .cell .surface-enh { font-size: 6px; }
+.garden-fences { pointer-events: none; }
+.garden-fences .pl-fc-t { top: 0; }
+.garden-fences .pl-fc-r { right: 0; }
+.garden-fences .pl-fc-b { bottom: 0; }
+.garden-fences .pl-fc-l { left: 0; }
 .cell[data-cond*="humid"] { box-shadow: inset 0 0 0 1px #3b6ea5; }
 .cell[data-cond*="poisonous"] { box-shadow: inset 0 0 0 1px #6a8f3a; }
 
@@ -705,8 +724,9 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .garden-grid.iso { transform: scaleY(0.577) rotate(45deg); transform-origin: center;
   margin: 110px auto 90px; }
 .garden-grid.iso .cell { border-radius: 2px; }
-.garden-grid.iso .cell img { transform: rotate(-45deg) scaleY(1.732); }
+.garden-grid.iso .cell img:not(.cell-surface-img) { transform: rotate(-45deg) scaleY(1.732); }
 .garden-grid.iso .cell .enh { transform: rotate(-45deg) scaleY(1.732); }
+.garden-grid.iso .cell .surface-enh { transform: rotate(-45deg) scaleY(1.732); }
 
 /* 플래너 확장 가능 칸 (인접 제약) */
 .pl-cell.expand-slot { background: #1a1828; box-shadow: inset 0 0 0 1px var(--accent); opacity: .8;
