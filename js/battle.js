@@ -153,4 +153,56 @@ export function winRate(party, zoneId, gd, trials=200, seedBase=1){
   const losses=trials-win;
   return { trials, wins:win, losses, rate:win/trials, avgTurnsOnWin: win? turns/win : null, avgTurnsOnLoss: losses? lossTurns/losses : null, winTurnCounts };
 }
+
+const RAID_SKILLS = Object.freeze({ crystalDivination:5, extraLoot:0, potionPreserve:0 });
+
+function buildRaidSide(party, gd, prefix){
+  const units=buildAlly(party?.adventurers||[], gd).map(unit=>({...unit,id:`${prefix}${unit.id}`}));
+  return {
+    units,
+    potions:buildPotions(party?.potions||[], gd),
+    skills:{...RAID_SKILLS},
+  };
+}
+
+export function simulateRaid(attacker, defender, gd, rule="enemy_first_interleaved", seed=1){
+  it=gd.items||{};
+  const ally=buildRaidSide(attacker, gd, "raid_attacker_");
+  const enemy=buildRaidSide(defender, gd, "raid_defender_");
+  const result=MI({seed:(seed>>>0)||1,ally,enemy,rule});
+  if(enemy.units.length) return result;
+  return {
+    ...result,
+    totalTurns:0,
+    events:result.events
+      .filter(event=>event.type==="battle_start"||event.type==="battle_end")
+      .map(event=>({...event,turn:0})),
+  };
+}
+
+export function raidWinRate(attacker, defender, gd, rule="enemy_first_interleaved", trials=1000, seedBase=1){
+  let wins=0, winTurns=0, lossTurns=0;
+  const winTurnCounts={};
+  for(let index=0;index<trials;index++){
+    const seed=((seedBase+index*2654435761)>>>0)||1;
+    const result=simulateRaid(attacker,defender,gd,rule,seed);
+    if(result.victory){
+      wins+=1;
+      winTurns+=result.totalTurns;
+      winTurnCounts[result.totalTurns]=(winTurnCounts[result.totalTurns]||0)+1;
+    }else{
+      lossTurns+=result.totalTurns;
+    }
+  }
+  const losses=trials-wins;
+  return {
+    trials,
+    wins,
+    losses,
+    rate:wins/trials,
+    avgTurnsOnWin:wins?winTurns/wins:null,
+    avgTurnsOnLoss:losses?lossTurns/losses:null,
+    winTurnCounts,
+  };
+}
 export { MI };

@@ -1,6 +1,7 @@
 import { gamedata, names } from "./api.js";
 import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
 import { advSim } from "./adventure.js";
+import { raidSim } from "./raid.js";
 import { defaultEnhancementMaterialPrice } from "./calc_prices.js";
 import { enhancementMaterialFlow } from "./enhancement_ev.js";
 
@@ -12,10 +13,11 @@ export async function renderCalc(view, sub) {
       <button data-k="level">🌱 레벨 계산</button>
       <button data-k="ev">🎲 강화 기댓값</button>
       <button data-k="adv">⚔️ 모험 시뮬</button>
+      <button data-k="raid">🛡️ 습격 시뮬</button>
     </nav>
     <div id="calcbody"></div>`;
   const body = view.querySelector("#calcbody");
-  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix, ev: evCalc, adv: advSim };
+  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix, ev: evCalc, adv: advSim, raid: raidSim };
   const sel = (k) => {
     location.hash = "calc/" + k;   // 새로고침 시 서브탭 유지
     view.querySelectorAll("#calccats button").forEach((b) => b.classList.toggle("active", b.dataset.k === k));

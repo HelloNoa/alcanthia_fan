@@ -1,6 +1,7 @@
 import { CDN } from "./config.js";
 import { names } from "./api.js";
 import { expToLevel } from "./util.js";
+import { parseItemKey } from "./item_key.js";
 
 const CONDITION_KR = {
   humid: "습함", poisonous: "유독", fertile: "비옥", arid: "건조",
@@ -89,34 +90,6 @@ function itemURLs(N, key) {
   const folder = N.itemFolders && N.itemFolders[key];
   if (folder) return [`${CDN}/${folder}/${key}.png`, `${CDN}/${folder}/${key}_anim.png`];
   return itemSpriteURLs(key);
-}
-
-// itemKey 파싱: `code+enh(세공1,세공2)~t` → { code, enh, engravings:[subKey...] }
-function parseItemKey(raw) {
-  let key = String(raw || "");
-  if (key.endsWith("~t")) key = key.slice(0, -2);
-  let base = key;
-  const engravings = [];
-  const p = key.indexOf("(");
-  if (p >= 0) {
-    base = key.slice(0, p);
-    const inner = key.slice(p + 1, key.lastIndexOf(")"));
-    let depth = 0, start = 0;
-    for (let i = 0; i < inner.length; i++) {
-      const c = inner[i];
-      if (c === "(") depth++;
-      else if (c === ")") depth--;
-      else if (c === "," && depth === 0) {
-        if (inner.slice(start, i).trim()) engravings.push(inner.slice(start, i).trim());
-        start = i + 1;
-      }
-    }
-    if (inner.slice(start).trim()) engravings.push(inner.slice(start).trim());
-  }
-  const plus = base.indexOf("+");
-  const code = plus >= 0 ? base.slice(0, plus) : base;
-  const enh = plus >= 0 ? (parseInt(base.slice(plus + 1), 10) || 0) : 0;
-  return { code, enh, engravings };
 }
 
 function fmt(n) {
