@@ -128,6 +128,39 @@ function fmt(n) {
   return Number(n).toLocaleString();
 }
 
+export function gardenProfileIntro(profile) {
+  const intro = profile?.profileIntro;
+  return typeof intro === "string" ? intro.trim() : "";
+}
+
+export function gardenCumulativeGold(profile) {
+  const value = profile?.leaderboardGoldEarned ?? profile?.totalGoldEarned;
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+export function gardenPopularity(profile) {
+  const value = profile?.popularity;
+  if (value == null || value === "") return null;
+  const popularity = Number(value);
+  return Number.isFinite(popularity) ? popularity : null;
+}
+
+export function gardenAchievementModifier(profile) {
+  const modifier = profile?.achievementModifier ?? profile?.achievement_modifier;
+  return typeof modifier === "string" ? modifier.trim() : "";
+}
+
+function appendGardenStat(container, label, value) {
+  const stat = document.createElement("span");
+  stat.append(document.createTextNode(`${label} `));
+  const strong = document.createElement("b");
+  strong.textContent = String(value);
+  stat.appendChild(strong);
+  container.appendChild(stat);
+}
+
 export async function renderGarden(container, profile, label) {
   const N = await names();
   const grid = profile.grid || [];
@@ -141,17 +174,57 @@ export async function renderGarden(container, profile, label) {
   head.className = "garden-head";
   const cells = grid.flat().filter(Boolean);
   const plants = cells.filter((c) => c.plant);
-  head.innerHTML = `
-    <h2>🌱 ${label} 의 텃밭</h2>
-    <div class="stats">
-      <span>거주 <b>${profile.currentZone == null ? "🏘️ 안개마을" : (N.zones?.[profile.currentZone] || profile.currentZone)}</b></span>
-      <span>테마 <b>${N.zones?.[profile.activeTheme] || profile.activeTheme || "-"}</b></span>
-      <span>경작칸 <b>${cells.length}</b></span>
-      <span>식물 <b>${plants.length}</b></span>
-      ${profile.exp != null ? `<span>Lv <b>${expToLevel(profile.exp)}</b></span><span>EXP <b>${fmt(profile.exp)}</b></span>` : ""}
-      ${profile.totalGoldEarned != null ? `<span>누적골드 <b>${fmt(profile.totalGoldEarned)}</b></span>` : ""}
-      ${profile.adventuresCompleted != null ? `<span>모험 <b>${fmt(profile.adventuresCompleted)}</b></span>` : ""}
-    </div>`;
+  const title = document.createElement("h2");
+  title.className = "garden-title";
+  title.append(document.createTextNode("🌱 "));
+  const achievementModifier = gardenAchievementModifier(profile);
+  if (achievementModifier) {
+    const modifier = document.createElement("span");
+    modifier.className = "garden-title-modifier";
+    modifier.textContent = achievementModifier;
+    title.append(modifier, document.createTextNode(" "));
+  }
+  title.append(document.createTextNode(`${label}의 텃밭`));
+  head.appendChild(title);
+
+  const profileIntro = gardenProfileIntro(profile);
+  if (profileIntro) {
+    const intro = document.createElement("p");
+    intro.className = "garden-profile-intro";
+    const introLabel = document.createElement("span");
+    introLabel.className = "garden-profile-intro-label";
+    introLabel.textContent = "자기소개";
+    const introText = document.createElement("span");
+    introText.className = "garden-profile-intro-text";
+    introText.textContent = profileIntro;
+    intro.append(introLabel, introText);
+    head.appendChild(intro);
+  }
+
+  const stats = document.createElement("div");
+  stats.className = "stats";
+  appendGardenStat(
+    stats,
+    "거주",
+    profile.currentZone == null
+      ? "🏘️ 안개마을"
+      : (N.zones?.[profile.currentZone] || profile.currentZone),
+  );
+  appendGardenStat(stats, "테마", N.zones?.[profile.activeTheme] || profile.activeTheme || "-");
+  appendGardenStat(stats, "경작칸", cells.length);
+  appendGardenStat(stats, "식물", plants.length);
+  if (profile.exp != null) {
+    appendGardenStat(stats, "Lv", expToLevel(profile.exp));
+    appendGardenStat(stats, "EXP", fmt(profile.exp));
+  }
+  const popularity = gardenPopularity(profile);
+  if (popularity != null) appendGardenStat(stats, "평판", fmt(popularity));
+  const cumulativeGold = gardenCumulativeGold(profile);
+  if (cumulativeGold != null) appendGardenStat(stats, "누적 골드", `${fmt(cumulativeGold)} G`);
+  if (profile.adventuresCompleted != null) {
+    appendGardenStat(stats, "모험", fmt(profile.adventuresCompleted));
+  }
+  head.appendChild(stats);
   container.appendChild(head);
 
   // 그리드

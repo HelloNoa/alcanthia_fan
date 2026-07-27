@@ -2,10 +2,39 @@ import assert from "node:assert/strict";
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
 const {
+  gardenAchievementModifier,
+  gardenCumulativeGold,
   gardenEdgeItems,
   gardenGridLayout,
+  gardenPopularity,
+  gardenProfileIntro,
   gardenSurfaceItem,
 } = await import("../js/garden.js");
+
+assert.equal(gardenAchievementModifier({ achievementModifier: "  주점단골  " }), "주점단골");
+assert.equal(gardenAchievementModifier({ achievement_modifier: "좋은 이웃" }), "좋은 이웃");
+assert.equal(gardenAchievementModifier({ achievementModifier: "   " }), "");
+assert.equal(gardenAchievementModifier({}), "");
+
+assert.equal(gardenProfileIntro({ profileIntro: "  안녕하세요\n반갑습니다  " }), "안녕하세요\n반갑습니다");
+assert.equal(gardenProfileIntro({ profileIntro: "   " }), "");
+assert.equal(gardenProfileIntro({ profileIntro: null }), "");
+assert.equal(gardenProfileIntro(null), "");
+
+assert.equal(gardenCumulativeGold({ leaderboardGoldEarned: 1_028_325_955 }), 1_028_325_955);
+assert.equal(
+  gardenCumulativeGold({ leaderboardGoldEarned: 0, totalGoldEarned: 999 }),
+  0,
+);
+assert.equal(gardenCumulativeGold({ totalGoldEarned: "12345" }), 12_345);
+assert.equal(gardenCumulativeGold({ leaderboardGoldEarned: "unknown" }), null);
+assert.equal(gardenCumulativeGold({}), null);
+
+assert.equal(gardenPopularity({ popularity: -32 }), -32);
+assert.equal(gardenPopularity({ popularity: 0 }), 0);
+assert.equal(gardenPopularity({ popularity: "200" }), 200);
+assert.equal(gardenPopularity({ popularity: "unknown" }), null);
+assert.equal(gardenPopularity({}), null);
 
 const square21 = Array.from({ length: 21 }, () => Array(21).fill(null));
 assert.deepEqual(gardenGridLayout(square21, 500), { rows: 21, cols: 21, cellSize: 32 });

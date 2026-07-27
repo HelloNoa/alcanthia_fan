@@ -83,7 +83,21 @@ main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .pot-label { color: var(--muted); font-size: 12px; align-self: center; margin-right: 2px; }
 
 /* 텃밭 */
-.garden-head h2 { margin: 8px 0; }
+.garden-head h2 { margin: 8px 0 6px; }
+.garden-title-modifier {
+  color: var(--gold); font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.garden-profile-intro {
+  display: flex; align-items: flex-start; gap: 8px; max-width: 900px;
+  margin: 0 0 10px; line-height: 1.5;
+}
+.garden-profile-intro-label {
+  flex: 0 0 auto; color: var(--accent); font-size: 12px; font-weight: 700;
+}
+.garden-profile-intro-text {
+  min-width: 0; color: var(--ink); font-size: 14px;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .garden-head .stats { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
 .garden-head .stats b { color: var(--ink); }
 .garden-user-id-tools { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
@@ -559,6 +573,8 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 
   /* 텃밭 */
   .garden-gridscroll { max-width: 100%; }
+  .garden-profile-intro { gap: 6px; }
+  .garden-profile-intro-text { font-size: 13px; }
   .garden-head .stats { gap: 8px 12px; font-size: 12px; }
   .adv-cards { gap: 6px; }
   .adv-card { min-width: 0; flex: 1 1 calc(50% - 4px); }
