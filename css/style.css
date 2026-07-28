@@ -988,6 +988,19 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-fc-t, .pl-fc-b { left: -1px; right: -1px; height: 4px; }
 .pl-fc-l, .pl-fc-r { top: -1px; bottom: -1px; width: 4px; }
 .pl-fc-t { top: -2px; } .pl-fc-b { bottom: -2px; } .pl-fc-l { left: -2px; } .pl-fc-r { right: -2px; }
+.pl-fence-en { position: absolute; z-index: 7; padding: 0 2px; border-radius: 3px;
+  background: #3a3322; color: var(--gold); font-size: 7px; font-weight: 700; font-style: normal;
+  line-height: 1.25; white-space: nowrap; pointer-events: none; }
+.pl-fence-en-t { top: 2px; left: 50%; transform: translateX(-50%); }
+.pl-fence-en-r { right: 2px; top: 50%; transform: translateY(-50%); }
+.pl-fence-en-b { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.pl-fence-en-l { left: 2px; top: 50%; transform: translateY(-50%); }
+.pl-grid.iso .pl-fence-en-t, .pl-grid.iso .pl-fence-en-b {
+  transform: translateX(-50%) rotate(-45deg) scaleY(1.732);
+}
+.pl-grid.iso .pl-fence-en-l, .pl-grid.iso .pl-fence-en-r {
+  transform: translateY(-50%) rotate(-45deg) scaleY(1.732);
+}
 /* 나무 울타리: 말뚝 패턴 */
 .pl-fc-t:not(.bar), .pl-fc-b:not(.bar) { background:
   repeating-linear-gradient(90deg, #8a5a2b 0 1px, #d9a063 1px 2px, #b07b43 2px 5px); }
