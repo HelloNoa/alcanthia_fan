@@ -1,10 +1,12 @@
 import { gamedata } from "./api.js";
 import { wardingStoneMultiplier } from "./raid_profile.js";
 import { plantIcon, itemIcon, fmtDuration, loadImg, CDN } from "./sprites.js";
+import { createSearchPicker } from "./search_picker.js";
 
 const CANVAS = 27;
 const CENTER = (CANVAS - 1) / 2; // 13
 const STORE = "alc_planner_v3";
+const BADGE_STORE = "alc_planner_badges";
 const PEDESTAL = "pedestal";
 const LEGACY_PEDESTAL = "equipment_pedestal";
 const FARMERS_BATON = "farmers_baton";
@@ -79,6 +81,17 @@ const FENCE_ORDER = ["rustic_fence", "root_barrier"];
 const FENCES = new Set(FENCE_ORDER);
 const SIDES = ["t", "r", "b", "l"];
 const SIDE_KR = { t: "위", r: "오른쪽", b: "아래", l: "왼쪽" };
+function loadBadgeVisibility() {
+  try {
+    const saved = localStorage.getItem(BADGE_STORE);
+    if (saved === "show") return true;
+    if (saved === "hide") return false;
+  } catch {}
+  return !(typeof matchMedia === "function" && matchMedia("(max-width: 640px)").matches);
+}
+function saveBadgeVisibility(visible) {
+  try { localStorage.setItem(BADGE_STORE, visible ? "show" : "hide"); } catch {}
+}
 const fenceData = (raw) => {
   if (typeof raw === "string") return { code: raw, enhancement: 0 };
   if (!raw || typeof raw !== "object") return null;
@@ -224,6 +237,7 @@ export async function renderPlanner(view) {
   let sel = palette[0];
   let mode = "plant";
   let enh = 0;
+  let badgesVisible = loadBadgeVisibility();
   const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
   let condMap = null;
 
@@ -237,6 +251,9 @@ export async function renderPlanner(view) {
           <button data-m="effect">🧪 포션 효과</button>
           <button id="pl-iso" class="pl-iso-btn">📐 입체 보기</button>
           <span class="pl-zoom"><button id="pl-zoomout">➖</button><button id="pl-zoomin">➕</button></span>
+          <label class="chk pl-badge-toggle" title="강화도와 생산 배율 배지 표시">
+            <input type="checkbox" id="pl-badges"${badgesVisible ? " checked" : ""}> 배지 표시
+          </label>
           <span class="pl-hint" id="pl-hint"></span>
         </div>
         <div class="pl-palette" id="pl-pal"></div>
@@ -457,7 +474,7 @@ export async function renderPlanner(view) {
       }
     }
     cleanCell(grid[r][c]);
-    recompute(); save();
+    recompute(); save(); showDetail(r, c);
   };
 
   // 동적 윈도우: 밭 bbox + 여백만 렌더 → 작은 밭일수록 셀이 커짐
@@ -838,7 +855,7 @@ export async function renderPlanner(view) {
         eff = `<div class="d-row">강화 <b>+${orn.e || 0}</b></div>
           <div class="d-row">단일 경계석 효과 <b>은신 선공 확률 ×${(stealthMultiplier * 100).toFixed(1)}%</b></div>
           <div class="d-row">은신 선공 확률 감소 <b class="up">${(reduction * 100).toFixed(1)}%</b></div>
-          <div class="d-row muted">여러 경계석의 중첩 방식은 확인되지 않아 합산하지 않습니다.</div>`;
+          <div class="d-row muted">습격 시뮬레이터는 여러 개 중 최고 강화도 경계석 1개만 적용합니다.</div>`;
       } else {
         const enhancementLine = `<div class="d-row">강화 <b>+${orn.e || 0}</b></div>`;
         eff = enhancementLine + (EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
@@ -849,14 +866,29 @@ export async function renderPlanner(view) {
         ? ` <span class="pl-enhb-inl">+${orn.e}</span>` : "";
       let html = `<h3>${ORN[orn.orn]}${enhTitle}</h3>${eff}<div class="d-row">토양 효과 <b>${soilCondTxt(condMap?.[r]?.[c] || new Set())}</b></div>${fenceDetailHtml(cell)}`;
       if (orn.orn === PEDESTAL) {   // 전시대 위에 올릴 아이템 선택
-        html += `<div class="d-row">전시 아이템 <select id="pl-disp-sel">
-          <option value="">— 없음 —</option>
-          ${DISPLAY_ITEMS.map(([code, name]) => `<option value="${code}"${orn.display === code ? " selected" : ""}>${name}</option>`).join("")}
-        </select></div>`;
+        html += `<div class="d-row pl-display-control"><span>전시 아이템</span><span id="pl-disp-picker"></span></div>`;
       }
       detail.innerHTML = html;
-      const sel = detail.querySelector("#pl-disp-sel");
-      if (sel) sel.onchange = (e) => { grid[r][c].display = e.target.value || undefined; recompute(); save(); };
+      const displayMount = detail.querySelector("#pl-disp-picker");
+      if (displayMount) {
+        const displayPicker = createSearchPicker({
+          value: orn.display || "",
+          choices: [
+            { code: "", label: "전시 아이템 없음" },
+            ...DISPLAY_ITEMS.map(([code, name]) => ({ code, label: name })),
+          ],
+          placeholder: "장비 이름 검색",
+          ariaLabel: "전시대에 올릴 장비",
+          className: "pl-display-picker",
+          iconRenderer: (holder, choice, cls) => choice.code && itemIcon(holder, choice.code, cls),
+          onSelect: (code) => {
+            grid[r][c].display = code || undefined;
+            recompute();
+            save();
+          },
+        });
+        displayMount.replaceWith(displayPicker);
+      }
       return;
     }
     const st = stat(r, c);
@@ -925,6 +957,15 @@ export async function renderPlanner(view) {
     isoBtn.classList.toggle("active", on);
     isoBtn.textContent = on ? "🔲 평면 보기" : "📐 입체 보기";
   };
+  const badgeToggle = view.querySelector("#pl-badges");
+  const setBadgeVisibility = (visible, persist = true) => {
+    badgesVisible = Boolean(visible);
+    badgeToggle.checked = badgesVisible;
+    gridBox.classList.toggle("badges-hidden", !badgesVisible);
+    if (persist) saveBadgeVisibility(badgesVisible);
+  };
+  badgeToggle.onchange = () => setBadgeVisibility(badgeToggle.checked);
+  setBadgeVisibility(badgesVisible, false);
   // 확대/축소 (셀 크기)
   let zoom = 34;
   const setZoom = (z) => { zoom = Math.max(16, Math.min(64, z)); gridBox.style.setProperty("--cell", zoom + "px"); };

@@ -180,17 +180,17 @@ export function stealthOpeningChance(enhancement) {
 }
 
 export function wardingStoneMultiplier(enhancements) {
-  const levels = Array.isArray(enhancements) ? enhancements : [];
-  if (levels.length > 1) return null;
+  const levels = (Array.isArray(enhancements) ? enhancements : [])
+    .map((level) => clamp(level, 0, 999));
   if (!levels.length) return 1;
-  return 0.9 ** (clamp(levels[0], 0, 999) + 1);
+  return 0.9 ** (Math.max(...levels) + 1);
 }
 
 export function raidAttackerOpeningChance(stealthEnhancement, wardingEnhancements = []) {
   const stealthChance = stealthOpeningChance(stealthEnhancement);
   if (!stealthChance) return 0;
   const wardingMultiplier = wardingStoneMultiplier(wardingEnhancements);
-  return wardingMultiplier == null ? null : stealthChance * wardingMultiplier;
+  return stealthChance * wardingMultiplier;
 }
 
 export function combineRaidRates(defenderFirst, attackerFirst, attackerFirstChance) {

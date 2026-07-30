@@ -236,13 +236,10 @@ export async function raidSim(body) {
     const levels = warding?.enhancements || [];
     const multiplier = wardingStoneMultiplier(levels);
     const finalChance = raidAttackerOpeningChance(stealthEnhancement, levels);
-    const stackingUnknown = levels.length > 1;
 
     query("#raid-stealth-rate").textContent = stealthEnhancement == null
       ? "은신 미사용 · 방어 선공"
-      : stackingUnknown
-        ? `기본 ${percent(baseChance)} · 최종 확률 계산 불가`
-        : levels.length
+      : levels.length
         ? `기본 ${percent(baseChance)} → 최종 ${percent(finalChance)}`
         : `공격 선공 ${percent(baseChance)} · 실패 시 방어 선공`;
 
@@ -254,10 +251,11 @@ export async function raidSim(body) {
     } else if (!levels.length) {
       wardingRate.textContent = "효과가 켜진 경계석 없음";
     } else {
-      const labels = levels.map((level) => `+${level}`).join(", ");
-      wardingRate.textContent = stackingUnknown
-        ? `${labels} · 여러 경계석 중첩 방식 미확인`
-        : `${labels} · 은신 선공 ×${percent(multiplier)}`;
+      const highest = Math.max(...levels);
+      const ignored = levels.length - 1;
+      wardingRate.textContent = `최고 +${highest} 적용`
+        + `${ignored ? ` · 나머지 ${ignored}개 제외` : ""}`
+        + ` · 은신 선공 ×${percent(multiplier)}`;
     }
   };
 
@@ -360,12 +358,6 @@ export async function raidSim(body) {
     if (defenderProfile?.errors?.length) errors.push(...defenderProfile.errors);
     if (stealthEnhancement != null && defenderProfile && !defenderProfile.wardingStones?.known) {
       errors.push("방어 텃밭 정보가 없어 경계석 효과를 확인할 수 없습니다.");
-    }
-    if (
-      stealthEnhancement != null
-      && defenderProfile?.wardingStones?.enhancements?.length > 1
-    ) {
-      errors.push("효과가 켜진 경계석이 여러 개라 중첩 방식을 확인할 수 없습니다. 정확한 최종 승률을 계산하지 않습니다.");
     }
     if (!attackerParty.adventurers.length) errors.push("공격 모험가를 1명 이상 편성해야 합니다.");
     if (!attackerParty.potions.length) errors.push("실제 습격 규칙상 공격 포션이 최소 1개 필요합니다.");

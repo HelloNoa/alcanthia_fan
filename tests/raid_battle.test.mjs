@@ -262,18 +262,21 @@ test("raid adapter applies potions, all sockets, and level-five crystal revival"
   assert.ok(revivals >= 80 && revivals <= 120, `expected about 25% revivals, got ${revivals}/400`);
 });
 
-test("stealth opening stays exact only when at most one warding stone is active", () => {
+test("stealth opening applies only the highest active warding stone", () => {
   assert.equal(stealthOpeningChance(null), 0);
   assert.ok(Math.abs(stealthOpeningChance(0) - 0.1) < 1e-12);
   assert.ok(Math.abs(stealthOpeningChance(9) - (1 - 0.9 ** 10)) < 1e-12);
   assert.equal(wardingStoneMultiplier([]), 1);
   assert.ok(Math.abs(wardingStoneMultiplier([2]) - (0.9 ** 3)) < 1e-12);
-  assert.equal(wardingStoneMultiplier([0, 2]), null);
+  assert.ok(Math.abs(wardingStoneMultiplier([0, 2, 1, 2]) - (0.9 ** 3)) < 1e-12);
   assert.ok(Math.abs(
     raidAttackerOpeningChance(9, [2])
       - (1 - 0.9 ** 10) * (0.9 ** 3),
   ) < 1e-12);
-  assert.equal(raidAttackerOpeningChance(9, [0, 2]), null);
+  assert.ok(Math.abs(
+    raidAttackerOpeningChance(9, [0, 2, 1])
+      - (1 - 0.9 ** 10) * (0.9 ** 3),
+  ) < 1e-12);
   assert.equal(raidAttackerOpeningChance(null, [0, 2]), 0);
 
   const defenderFirst = {

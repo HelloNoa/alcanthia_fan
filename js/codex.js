@@ -1,6 +1,7 @@
 import { gamedata, names } from "./api.js";
 import { RANDOM_EFFECTS } from "./random_effects.js";
 import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievementIcon, fmtDuration, fmtMinutes } from "./sprites.js";
+import { createSearchPicker } from "./search_picker.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
@@ -497,29 +498,31 @@ export async function renderCodex(view, sub) {
         const valuedItems = Object.entries(g.items || {})
           .filter(([code, it]) => code !== "opaque_sediment" && !isTest(code, it) && priceOf(code) != null)
           .sort((a, b) => (a[1].type || "").localeCompare(b[1].type || "") || priceOf(a[0]) - priceOf(b[0]) || itemOrder(a[0]) - itemOrder(b[0]));
-        const opts = valuedItems.map(([code, it]) =>
-          `<option value="${code}">${TY[it.type] || it.type} · ${it.name || code} (${fmt(priceOf(code))})</option>`).join("");
+        const targetChoices = valuedItems.map(([code, it]) => ({
+          code,
+          label: it.name || code,
+          detail: `${TY[it.type] || it.type} · 가치 ${fmt(priceOf(code))}`,
+          keywords: `${TY[it.type] || it.type} ${it.type || ""} ${priceOf(code)}`,
+        }));
+        let targetCode = targetChoices.some((choice) => choice.code === "cauldron_controller")
+          ? "cauldron_controller"
+          : (targetChoices[0]?.code || "");
         body.insertAdjacentHTML("beforeend",
           `<div class="tr-calc">
             <div class="tr-calc-title">침전물 결과 계산</div>
             <div class="tr-calc-controls">
-              <label>대상 <select id="tr-target">${opts}</select></label>
+              <label class="tr-target-control">대상 <span id="tr-target-picker"></span></label>
               <label>대상 강화 <input id="tr-target-e" type="number" min="0" max="40" value="0"></label>
               <label>침전물 강화 <input id="tr-sed-e" type="number" min="0" max="10" value="0"></label>
             </div>
             <div id="tr-result" class="tr-result"></div>
           </div>`);
-        const targetSel = body.querySelector("#tr-target");
         const targetE = body.querySelector("#tr-target-e");
         const sedE = body.querySelector("#tr-sed-e");
         const trResult = body.querySelector("#tr-result");
-        if ([...targetSel.options].some((o) => o.value === "cauldron_controller")) {
-          targetSel.value = "cauldron_controller";
-          targetE.value = "2";
-        }
+        if (targetCode === "cauldron_controller") targetE.value = "2";
         const pct = (v) => `${(v * 100).toFixed(v < 0.001 ? 3 : v < 0.01 ? 2 : 1)}%`;
         const renderTransmuteCalc = () => {
-          const targetCode = targetSel.value;
           const targetEnh = Math.max(0, Math.floor(+targetE.value || 0));
           const sedimentEnh = Math.max(0, Math.min(10, Math.floor(+sedE.value || 0)));
           targetE.value = targetEnh;
@@ -550,7 +553,20 @@ export async function renderCodex(view, sub) {
             <div class="tr-cands">${rows || "<div class='muted'>가능 후보 없음</div>"}</div>`;
           trResult.querySelectorAll(".tr-vic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
         };
-        [targetSel, targetE, sedE].forEach((el) => { el.oninput = renderTransmuteCalc; el.onchange = renderTransmuteCalc; });
+        const targetPicker = createSearchPicker({
+          value: targetCode,
+          choices: targetChoices,
+          placeholder: "아이템 이름 검색",
+          ariaLabel: "침전물 변성 대상 아이템",
+          className: "tr-target-picker",
+          iconRenderer: (holder, choice, cls) => itemIcon(holder, choice.code, cls),
+          onSelect: (code) => {
+            targetCode = code;
+            renderTransmuteCalc();
+          },
+        });
+        body.querySelector("#tr-target-picker").replaceWith(targetPicker);
+        [targetE, sedE].forEach((el) => { el.oninput = renderTransmuteCalc; el.onchange = renderTransmuteCalc; });
         renderTransmuteCalc();
         const byType = {};
         for (const [code, it] of Object.entries(g.items || {})) {

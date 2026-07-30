@@ -473,6 +473,8 @@ table.matrix thead th { text-align: center; }
 .calc-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
 .calc-row select { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 12px; font-size: 14px; flex: 1; min-width: 120px; }
+.time-item-picker { flex: 1 1 100%; width: 100%; max-width: 100%; }
+.time-item-picker .adv-pick { background: var(--panel2); padding: 8px 12px; font-size: 14px; }
 .lvlabel { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .lvlabel input[type=range] { width: 110px; accent-color: var(--accent); }
 .lvlabel b { color: var(--accent); min-width: 18px; text-align: center; }
@@ -722,6 +724,14 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-grid.iso .pl-enhb { transform: rotate(-45deg) scaleY(1.732); transform-origin: top left; }
 .pl-grid.iso .pl-mult { transform: rotate(-45deg) scaleY(1.732); transform-origin: bottom right; }
 .pl-grid.iso .pl-peffs { transform: rotate(-45deg) scaleY(1.732); transform-origin: top right; }
+.pl-grid.badges-hidden .pl-enhb,
+.pl-grid.badges-hidden .pl-mult,
+.pl-grid.badges-hidden .pl-fence-en { display: none; }
+.pl-badge-toggle {
+  min-height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--panel); cursor: pointer;
+}
+.pl-badge-toggle input { accent-color: var(--accent); }
 .pl-grid.iso .pl-cell.poll::after { border-radius: 2px; }
 
 /* 텃밭 뷰어 보기 도구 */
@@ -867,10 +877,13 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .tr-calc-title { color: var(--gold); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
 .tr-calc-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tr-calc-controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-.tr-calc-controls select, .tr-calc-controls input { background: var(--panel2); color: var(--ink);
+.tr-calc-controls select, .tr-calc-controls input[type=number] { background: var(--panel2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font-size: 13px; }
 .tr-calc-controls select { max-width: min(100%, 360px); }
-.tr-calc-controls input { width: 70px; }
+.tr-calc-controls input[type=number] { width: 70px; }
+.tr-calc-controls .tr-target-control { flex: 1 1 440px; min-width: 0; }
+.tr-target-picker { flex: 1 1 320px; min-width: 0; max-width: 520px; }
+.tr-target-picker .adv-pick { background: var(--panel2); padding: 6px 8px; font-size: 13px; }
 .tr-result { margin-top: 10px; }
 .tr-summary { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: 12.5px;
   padding-top: 8px; border-top: 1px solid var(--line); }
@@ -1008,6 +1021,12 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   repeating-linear-gradient(0deg, #8a5a2b 0 1px, #d9a063 1px 2px, #b07b43 2px 5px); }
 /* 뿌리장벽: 굵은 보라 (지표 효과 차단) */
 .pl-fc.bar { background: linear-gradient(#a48cff, #6f4fe0); box-shadow: 0 0 4px #8c6cff; }
+
+@media (max-width: 640px) {
+  .pl-badge-toggle { min-height: 28px; padding: 0 7px; font-size: 12px; }
+  .pl-enhb, .pl-mult { font-size: 6px; line-height: 1.15; padding: 0 1px; }
+  .pl-fence-en { font-size: 6px; line-height: 1.15; padding: 0 1px; }
+}
 
 /* ⚔️ 모험 전투 시뮬레이터 */
 .adv-sim h3 { margin: 4px 0 12px; }
@@ -1348,7 +1367,9 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 /* 장비 전시대 위 전시 아이템 */
 .pl-disp { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; }
 .pl-disp img { width: 56%; height: 56%; object-fit: contain; image-rendering: pixelated; transform: translateY(-12%); filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
-#pl-disp-sel { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; font-size: 13px; max-width: 160px; }
+.pl-display-control { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pl-display-picker { flex: 1 1 190px; min-width: 0; max-width: 100%; }
+.pl-display-picker .adv-pick { background: var(--panel); padding: 4px 7px; font-size: 13px; }
 
 /* 텃밭 조회: 전시대 위 전시 아이템 */
 .cell-disp { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; }
@@ -1501,7 +1522,6 @@ html[data-theme="light"] .adv-rec {
 html[data-theme="light"] .adv-rec-applyg {
   background: #ece7ff; color: #513ab5; border-color: #c9bef6;
 }
-html[data-theme="light"] .pl-share-in,
-html[data-theme="light"] #pl-disp-sel {
+html[data-theme="light"] .pl-share-in {
   background: #ffffff;
 }

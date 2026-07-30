@@ -4,6 +4,7 @@ import { advSim } from "./adventure.js";
 import { raidSim } from "./raid.js";
 import { defaultEnhancementMaterialPrice } from "./calc_prices.js";
 import { enhancementMaterialFlow } from "./enhancement_ev.js";
+import { createSearchPicker } from "./search_picker.js";
 
 export async function renderCalc(view, sub) {
   view.innerHTML = `<h2>🧮 계산기</h2>
@@ -60,20 +61,23 @@ async function brewMatrix(body) {
 async function timeCalc(body) {
   const g = await gamedata();
   const plants = g.plants || {};
+  const crops = Object.entries(plants)
+    .filter(([id, p]) => !/^aging_/.test(id) && !(p.name || "").includes("시험용"));
   const potions = Object.entries(g.items || {}).filter(([, it]) => it.type === "potion");
   const cauldrons = Object.entries(g.items || {})
     .filter(([c, it]) => it.type === "tool" && it.brewDuration_ms
       && (c.includes("cauldron") || c === "cauldron_controller" || (it.name || "").includes("가마솥")))
     .sort((a, b) => a[1].brewDuration_ms - b[1].brewDuration_ms || a[1].name.localeCompare(b[1].name));
+  let selectedCrop = crops[0]?.[0] || "";
+  let selectedPotion = potions[0]?.[0] || "";
+  let selectedCauldron = cauldrons[0]?.[0] || "";
 
   body.innerHTML = `
     <div class="calc-grid">
       <div class="calc-card">
         <h3>🌱 작물 성장 시간</h3>
         <div class="calc-row">
-          <select id="crop">${Object.entries(plants)
-            .filter(([id, p]) => !/^aging_/.test(id) && !(p.name || "").includes("시험용"))
-            .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join("")}</select>
+          <div id="cropPicker"></div>
         </div>
         <div class="calc-row">
           <label class="lvlabel">토양 숙련 <input id="soil" type="range" min="0" max="10" value="0"><b id="soilv">0</b></label>
@@ -85,7 +89,7 @@ async function timeCalc(body) {
       <div class="calc-card">
         <h3>⚗️ 포션 양조 시간</h3>
         <div class="calc-row">
-          <select id="pot">${potions.map(([c, it]) => `<option value="${c}">${it.name}</option>`).join("")}</select>
+          <div id="potPicker"></div>
         </div>
         <div class="calc-row">
           <label class="lvlabel">불꽃 숙련 <input id="flame" type="range" min="0" max="10" value="0"><b id="flamev">0</b></label>
@@ -118,7 +122,7 @@ async function timeCalc(body) {
       <div class="calc-card">
         <h3>🛠️ 가마솥 강화 시간</h3>
         <div class="calc-row">
-          <select id="tcItem">${cauldrons.map(([c, it]) => `<option value="${c}">${it.name}</option>`).join("")}</select>
+          <div id="tcItemPicker"></div>
         </div>
         <div class="calc-row">
           <label class="lvlabel">불꽃 숙련 <input id="tcFlame" type="range" min="0" max="10" value="0"><b id="tcFlamev">0</b></label>
@@ -154,7 +158,7 @@ async function timeCalc(body) {
   const factor = (rate, lv, enh) => Math.pow(Math.max(0, 1 - rate * lv), enh + 1);
 
   const cropOut = () => {
-    const id = body.querySelector("#crop").value;
+    const id = selectedCrop;
     const lv = +body.querySelector("#soil").value, enh = +body.querySelector("#seedE").value;
     body.querySelector("#soilv").textContent = lv;
     body.querySelector("#seedEv").textContent = enh;
@@ -177,7 +181,7 @@ async function timeCalc(body) {
   };
   const pct = (v) => `${(v * 100).toFixed(v * 100 % 1 ? 1 : 0)}%`;
   const potOut = () => {
-    const c = body.querySelector("#pot").value;
+    const c = selectedPotion;
     const fl = +body.querySelector("#flame").value, ce = +body.querySelector("#cauE").value;
     const me = +body.querySelector("#matE").value;
     const famG = +body.querySelector("#famG").value, fog = body.querySelector("#fog").checked;
@@ -221,7 +225,7 @@ async function timeCalc(body) {
     }
   };
   const tcOut = () => {
-    const c = body.querySelector("#tcItem").value;
+    const c = selectedCauldron;
     const fl = +body.querySelector("#tcFlame").value, toolE = +body.querySelector("#tcToolE").value;
     const itemE = +body.querySelector("#tcItemE").value;
     const famG = +body.querySelector("#tcFamG").value, fog = body.querySelector("#tcFog").checked;
@@ -258,11 +262,55 @@ async function timeCalc(body) {
         `<span class="calc-note-inline">지역효과 계수 ${t.toFixed(1)}</span>`);
     }
   };
-  body.querySelectorAll("#crop,#soil,#seedE").forEach((e) => e.oninput = cropOut);
-  body.querySelectorAll("#pot,#flame,#cauE,#matE,#zone,#famG,#fog,#zoneBuff,#firePot,#fireE").forEach((e) => {
+  const installPicker = (mount, inputId, value, choices, placeholder, ariaLabel, iconRenderer, onSelect) => {
+    const picker = createSearchPicker({
+      value,
+      choices,
+      placeholder,
+      ariaLabel,
+      className: "time-item-picker",
+      iconRenderer,
+      onSelect,
+    });
+    picker.querySelector("input").id = inputId;
+    body.querySelector(mount).replaceWith(picker);
+  };
+  installPicker(
+    "#cropPicker",
+    "crop",
+    selectedCrop,
+    crops.map(([code, plant]) => ({ code, label: plant.name || code })),
+    "작물 이름 검색",
+    "성장 시간을 계산할 작물",
+    (holder, choice, cls) => plantIcon(holder, plants[choice.code]?.spriteKey || choice.code, cls),
+    (code) => { selectedCrop = code; cropOut(); },
+  );
+  installPicker(
+    "#potPicker",
+    "pot",
+    selectedPotion,
+    potions.map(([code, item]) => ({ code, label: item.name || code })),
+    "포션 이름 검색",
+    "양조 시간을 계산할 포션",
+    (holder, choice, cls) => itemIcon(holder, choice.code, cls),
+    (code) => { selectedPotion = code; potOut(); },
+  );
+  installPicker(
+    "#tcItemPicker",
+    "tcItem",
+    selectedCauldron,
+    cauldrons.map(([code, item]) => ({ code, label: item.name || code })),
+    "가마솥 이름 검색",
+    "강화 시간을 계산할 가마솥",
+    (holder, choice, cls) => itemIcon(holder, choice.code, cls),
+    (code) => { selectedCauldron = code; tcOut(); },
+  );
+
+  body.querySelectorAll("#soil,#seedE").forEach((e) => e.oninput = cropOut);
+  body.querySelectorAll("#flame,#cauE,#matE,#zone,#famG,#fog,#zoneBuff,#firePot,#fireE").forEach((e) => {
     e.oninput = potOut; e.onchange = potOut;
   });
-  body.querySelectorAll("#tcItem,#tcFlame,#tcToolE,#tcItemE,#tcZone,#tcFamG,#tcFog,#tcZoneBuff,#tcFirePot,#tcFireE").forEach((e) => {
+  body.querySelectorAll("#tcFlame,#tcToolE,#tcItemE,#tcZone,#tcFamG,#tcFog,#tcZoneBuff,#tcFirePot,#tcFireE").forEach((e) => {
     e.oninput = tcOut; e.onchange = tcOut;
   });
   cropOut(); potOut(); tcOut();
