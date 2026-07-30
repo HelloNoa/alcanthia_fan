@@ -24,6 +24,37 @@ const EMIT = {
   dew_root: "humid", sunlight_flower: "sunlit", poison_flower: "poisonous",
   crystal_fountain: "humid", fairy_lantern: "sunlit", witch_scarecrow: "anti_magic",
 };
+const RANGE_SCALING_PLANT_EMITTERS = new Set([
+  "dew_root", "sunlight_flower", "poison_flower",
+]);
+export const plannerEmitterRange = (id, enhancement = 0, rootDom = 0, vein = false) => {
+  const rootBonus = id === "dew_root"
+    ? Math.max(0, Math.floor(Number(rootDom) || 0))
+    : 0;
+  const enhancementBonus = vein && RANGE_SCALING_PLANT_EMITTERS.has(id)
+    ? Math.max(0, Math.floor(Number(enhancement) || 0))
+    : 0;
+  return 1 + rootBonus + enhancementBonus;
+};
+export const plannerPollProductionPerHour = ({
+  pollIntervalMs,
+  growTimeMs,
+  produceIntervalMs,
+  harvests = 1,
+  productionMultiplier = 1,
+  yieldMultiplier = 1,
+}) => {
+  const pollMs = Math.max(1, Number(pollIntervalMs) || 1);
+  const harvestCount = Math.max(0, Number(harvests) || 0);
+  if (harvestCount <= 0) return 0;
+  const lifecycleMs =
+    Math.max(0, Number(growTimeMs) || 0) +
+    harvestCount * Math.max(0, Number(produceIntervalMs) || 0);
+  const occupiedPolls = Math.max(1, Math.ceil(lifecycleMs / pollMs));
+  return harvestCount * (3600000 / (occupiedPolls * pollMs))
+    * Math.max(0, Number(productionMultiplier) || 0)
+    * Math.max(0, Number(yieldMultiplier) || 0);
+};
 const COND_KR = { humid: "습기", fertile: "비옥", toxic: "독성 토양", poisonous: "유독(중독 부여)", sunlit: "햇살", anti_magic: "항마", arid: "사막화" };
 const COND_COLOR = { humid: "#3b6ea5", fertile: "#47b96b", toxic: "#6a9f3a", poisonous: "#8f5ac8", sunlit: "#d9a92e", anti_magic: "#9b6cff", arid: "#c26b2c" };
 const COND_ORDER = ["humid", "fertile", "toxic", "poisonous", "sunlit", "anti_magic", "arid"];  // 중첩 테두리 순서(고정)
@@ -297,7 +328,7 @@ export async function renderPlanner(view) {
           <div class="pl-cost" id="pl-cost"></div>
           <div class="pl-btns"><button class="chip" id="pl-fill">전체 개간</button><button class="chip" id="pl-clear">전체 지우기</button></div>
         </div>
-        <div class="calc-note">🌾 <b>약초 자동화</b>: 마녀 허수아비의 <b>항마</b>가 깔린 칸의 약초는 자동수확이 안 돼서 <b>번식 원천</b>으로 영구히 남습니다. <b>바람꽃</b>이 4방향 직선에서 만난 작물을 <b>그 너머 빈 칸에 복제(번식)</b>하고, <b>정령의 낫</b>이 다 자란 약초를 자동 수확해요 → 보호 약초 1개로 약초가 끝없이 번져 자동 생산. (약초·달빛버섯은 oneShot이라 <b>과밀 면제</b>)<br><span class="muted">※ 맥읽기는 바람꽃 <b>수분 범위가 아니라</b>, 번식되는 작물의 <b>최대 강화도</b>(원본·바람꽃 강화 중 작은 값)에 영향을 줍니다.<br>※ 약초·달빛버섯 생산량은 <b>성장주기 기준 이론 최대값</b>이에요. 실제 자동화는 바람꽃 수분 <b>60초 주기</b>에 묶여서 바람꽃 1개당 <b>최대 ~240/h</b>(4방향)가 상한입니다.</span></div>
+        <div class="calc-note">🌾 <b>약초 자동화</b>: 마녀 허수아비의 <b>항마</b>가 깔린 칸의 약초는 자동수확이 안 돼서 <b>번식 원천</b>으로 영구히 남습니다. <b>바람꽃</b>이 4방향 직선에서 만난 작물을 <b>그 너머 빈 칸에 복제(번식)</b>하고, <b>정령의 낫</b>이 다 자란 약초를 자동 수확해요 → 보호 약초 1개로 약초가 끝없이 번져 자동 생산. (약초·달빛버섯은 oneShot이라 <b>과밀 면제</b>)<br><span class="muted">※ 맥읽기는 바람꽃 <b>수분 범위가 아니라</b>, 번식되는 작물의 <b>최대 강화도</b>(원본·바람꽃 강화 중 작은 값)에 영향을 줍니다.<br>※ 실제 자동화 생산량은 바람꽃의 <b>60초 수분 주기</b>와 복제 작물의 <b>성장·생산 주기</b> 중 느린 쪽을 따릅니다. 밤그늘싹처럼 생산 시간이 긴 작물은 수분만으로 60초마다 수확되지 않습니다.</span></div>
         <div class="pl-detail" id="pl-detail"></div>
         <div class="pl-summary" id="pl-summary"></div>
         <div class="pl-summary pl-poll" id="pl-pollsum"></div>
@@ -551,15 +582,13 @@ export async function renderPlanner(view) {
     return (filled(row) ? 1 : 0) + (filled(col) ? 1 : 0);
   };
 
-  // 조건맵 (범위: 이슬뿌리+뿌리지배, 맥읽기=강화만큼)
+  // 조건맵 (범위: 이슬뿌리+뿌리지배, 강화된 식물만 맥읽기 적용)
   const buildConds = () => {
     condMap = Array.from({ length: CANVAS }, () => Array.from({ length: CANVAS }, () => new Set()));
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) {
       const em = emitterOf(grid[r][c]);
       if (!em) continue;
-      let range = 1;
-      if (em.id === "dew_root") range += opt.rootDom;
-      if (opt.vein && em.e > 0) range += em.e;
+      const range = plannerEmitterRange(em.id, em.e, opt.rootDom, opt.vein);
       for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
         if ((dr === 0 && dc === 0) || Math.abs(dr) + Math.abs(dc) > range) continue;
         const y = r + dr, x = c + dc;
@@ -645,7 +674,7 @@ export async function renderPlanner(view) {
       zoneCoeff: zc,
       dryBlocked: aridBlocked, aridBlocked, toxicBlocked,
       waterKilled, fireProtected: waterKills(z.p, P) && cond.has("arid"),
-      perHour, harvests, growEff,
+      perHour, harvests, growEff, intervalEff, cycle,
     };
   };
   const stat = (r, c) => statFor(r, c, effectivePlantAt(r, c), effectivePlantAt);
@@ -787,22 +816,30 @@ export async function renderPlanner(view) {
     summary.querySelectorAll(".pl-sic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
   };
 
-  // 바람꽃 수분 기반 약초·버섯 자동화 생산 (60초 주기, 항마 보호 원천 + 너머 빈칸 필요)
+  // 바람꽃 수분 기반 일회성 작물 자동화 생산 (항마 보호 원천 + 너머 빈칸 필요)
   const pollProduction = () => {
     const out = {};
     if (!grid.flat().some((z) => z && z.p === "wind_blossom")) return out;
     const windZoneMult = opt.zone === "wind_corridor" ? Math.max(0.01, 1 - 0.1 * zoneCoeff(opt)) : 1;
-    const cyclesPerHour = 3600000 / (60000 * (opt.gust ? 0.5 : 1) * windZoneMult); // 질풍포션 → 2배속
-    for (const { src, sr, sc, clone } of pollTargets().values()) {
+    const pollIntervalMs = 60000 * (opt.gust ? 0.5 : 1) * windZoneMult; // 질풍포션 → 2배속
+    for (const { src, sr, sc, clone, tr, tc } of pollTargets().values()) {
       const sp = plants[src.p];
-      if (!sp.oneShot || !sp.produces[0]) continue;          // 약초·버섯류만 (수분 자동화)
+      if (!sp.oneShot || !sp.produces[0]) continue;          // 수확 후 사라지는 작물만
       const srcCond = condMap[sr][sc] || new Set();
       const srcPlantCond = plantConds(src, srcCond);
       if (!(srcCond.has("anti_magic") || srcPlantCond.has("anti_magic"))) continue; // 원천은 항마 보호 필요
+      const cloneStat = statFor(tr, tc, clone, effectivePlantAt);
+      if (!cloneStat?.prod || cloneStat.gated || cloneStat.paused || autoHarvestBlocked(cloneStat)) continue;
       const code = sp.produces[0].itemCode;
-      // 풍요의 손길(수확 2배 확률) · 가동률 적용
-      const srcH = (sp.maxHarvests || 1) * (opt.sturdy && (clone.e || 0) > 0 ? (clone.e || 0) + 1 : 1);  // 단단한 줄기
-      out[code] = (out[code] || 0) + srcH * cyclesPerHour * plentyMultiplier(opt) * (opt.uptime / 100);
+      const perHour = plannerPollProductionPerHour({
+        pollIntervalMs,
+        growTimeMs: cloneStat.growEff,
+        produceIntervalMs: cloneStat.intervalEff,
+        harvests: cloneStat.harvests,
+        productionMultiplier: cloneStat.m,
+        yieldMultiplier: plentyMultiplier(opt) * (opt.uptime / 100),
+      });
+      out[code] = (out[code] || 0) + perHour;
     }
     return out;
   };
@@ -810,7 +847,7 @@ export async function renderPlanner(view) {
     const autoOut = pollProduction();
     const autoEnt = Object.entries(autoOut).sort((a, b) => b[1] - a[1]);
     if (!autoEnt.length) { pollsum.innerHTML = ""; return; }
-    pollsum.innerHTML = `<h3>🌾 약초/버섯 수분 자동화 <small>(60초 주기 · 시간당)</small></h3>` +
+    pollsum.innerHTML = `<h3>🌾 일회성 작물 수분 자동화 <small>(작물 점유시간 반영 · 시간당)</small></h3>` +
       `<div class="pl-sum-list">${autoEnt.map(([code, n]) =>
         `<div class="pl-sum"><span class="pl-sic" data-ic="${code}"></span>
           <span class="pl-sname">${g.items?.[code]?.name || code}</span><b>${n.toFixed(1)}/시간</b></div>`).join("")}</div>`;
@@ -931,7 +968,7 @@ export async function renderPlanner(view) {
         : blocked
           ? `<div class="d-row">항마 보호 <b class="down">자동수확 제외 · 생산요약 미포함</b></div>
              <div class="d-row">수동 기준 이론값 <b>${st.perHour.toFixed(1)}개/시간</b></div>`
-          : `<div class="d-row">시간당 생산 <b class="up">${st.perHour.toFixed(1)}개</b>${st.P.oneShot ? ' <span class="muted">(성장주기 기준 이론 최대 · 실제는 바람꽃 60초 수분에 제한, 바람꽃당 ~240/h)</span>' : ""}</div>`;
+          : `<div class="d-row">시간당 생산 <b class="up">${st.perHour.toFixed(1)}개</b>${st.P.oneShot ? ' <span class="muted">(단독 재배 반복 기준 · 수분 자동화는 바람꽃 주기와 작물 점유시간을 함께 반영)</span>' : ""}</div>`;
     } else lines += `<div class="d-row muted">생산물 없음 (지원 작물)</div>`;
     detail.innerHTML = `<h3>${st.P.name}${st.e > 0 ? ` <span class="pl-enhb-inl">+${st.e}</span>` : ""}</h3>${lines}`;
   };
