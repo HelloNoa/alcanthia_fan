@@ -5,8 +5,12 @@ const {
   farmersBatonCovers,
   farmersBatonRange,
   plannerEmitterRange,
+  plannerItemVariantId,
+  plannerItemVariantIds,
   plannerOrnamentEnhancementMax,
   plannerOrnamentSupportsEnhancement,
+  plannerPlantSkinId,
+  plannerPlantSkinIds,
   plannerPollProductionPerHour,
 } = await import("../js/planner.js");
 
@@ -53,5 +57,33 @@ assert.ok(Math.abs(plannerPollProductionPerHour({
   growTimeMs: 45000,
   produceIntervalMs: 3600000,
 }) - (60 / 61)) < 1e-12);
+
+const skinSprites = {
+  herb_golden_petal: "herb_golden_petal",
+  herb_starlit: "herb_starlit",
+  red_flower_starlit: "red_flower_starlit",
+};
+assert.deepEqual(plannerPlantSkinIds("herb", skinSprites), [
+  "herb_golden_petal",
+  "herb_starlit",
+]);
+assert.equal(plannerPlantSkinId("herb", "herb_starlit", skinSprites), "herb_starlit");
+assert.equal(plannerPlantSkinId("herb", "red_flower_starlit", skinSprites), "");
+assert.equal(plannerPlantSkinId("herb", "unknown_skin", skinSprites), "");
+
+const itemVariants = {
+  "stone_floor:grass": { itemCode: "stone_floor", name: "잔디", sprite: "grass_floor" },
+  "stone_floor:wooden_deck": { itemCode: "stone_floor", name: "나무 데크", sprite: "wooden_deck_floor" },
+  "rustic_fence:iron": { itemCode: "rustic_fence", name: "철제 울타리", sprite: "rustic_fence_iron" },
+};
+assert.deepEqual(plannerItemVariantIds("stone_floor", itemVariants), [
+  "stone_floor:grass",
+  "stone_floor:wooden_deck",
+]);
+assert.equal(
+  plannerItemVariantId("stone_floor", "stone_floor:wooden_deck", itemVariants),
+  "stone_floor:wooden_deck",
+);
+assert.equal(plannerItemVariantId("stone_floor", "rustic_fence:iron", itemVariants), "");
 
 console.log("planner tests passed");

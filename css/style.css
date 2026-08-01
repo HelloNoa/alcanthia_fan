@@ -689,6 +689,16 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-modes button.active { background: var(--accent); border-color: var(--accent); }
 .pl-hint { color: var(--muted); font-size: 12px; }
 .pl-enh { margin-bottom: 10px; }
+.pl-skin-control { display: flex; align-items: center; gap: 8px; width: min(390px, 100%); margin-bottom: 10px;
+  color: var(--muted); font-size: 13px; }
+.pl-skin-control > span:first-child { flex: 0 0 auto; }
+.pl-skin-control > span:last-child { flex: 1 1 auto; min-width: 0; }
+.pl-skin-picker { width: 100%; min-width: 0; }
+.pl-skin-picker .adv-pick { background: var(--panel); padding: 5px 7px; font-size: 12px; }
+.pl-skin-picker .adv-item-option-code { display: none; }
+.pl-plant-skin-control { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; }
+.pl-plant-skin-control > span:first-child { flex: 0 0 58px; color: var(--muted); }
+.pl-plant-skin-control > span:last-child { flex: 1 1 auto; min-width: 0; }
 .pl-cell { background: #14131f; }              /* 미개간 = 어두움 */
 .pl-cell.tilled { background: #3a2c1e; }       /* 개간된 흙 = 갈색 */
 .pl-enhb { position: absolute; left: 0; top: 0; font-size: 8px; font-weight: 700;
@@ -1021,6 +1031,20 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   repeating-linear-gradient(0deg, #8a5a2b 0 1px, #d9a063 1px 2px, #b07b43 2px 5px); }
 /* 뿌리장벽: 굵은 보라 (지표 효과 차단) */
 .pl-fc.bar { background: linear-gradient(#a48cff, #6f4fe0); box-shadow: 0 0 4px #8c6cff; }
+.pl-fc[data-variant="rustic_fence:stone_pillar"] { background: repeating-linear-gradient(90deg, #777 0 3px, #aaa 3px 5px); }
+.pl-fc-l[data-variant="rustic_fence:stone_pillar"], .pl-fc-r[data-variant="rustic_fence:stone_pillar"] {
+  background: repeating-linear-gradient(0deg, #777 0 3px, #aaa 3px 5px);
+}
+.pl-fc[data-variant="rustic_fence:stone_wall"] { background: #777; box-shadow: inset 0 0 0 1px #aaa, 0 0 2px rgba(0,0,0,.7); }
+.pl-fc[data-variant="rustic_fence:rose_vine"] { background: repeating-linear-gradient(90deg, #36734f 0 4px, #d76a91 4px 6px); }
+.pl-fc-l[data-variant="rustic_fence:rose_vine"], .pl-fc-r[data-variant="rustic_fence:rose_vine"] {
+  background: repeating-linear-gradient(0deg, #36734f 0 4px, #d76a91 4px 6px);
+}
+.pl-fc[data-variant="rustic_fence:iron"] { background: repeating-linear-gradient(90deg, #333943 0 2px, #a8b0b9 2px 3px); }
+.pl-fc-l[data-variant="rustic_fence:iron"], .pl-fc-r[data-variant="rustic_fence:iron"] {
+  background: repeating-linear-gradient(0deg, #333943 0 2px, #a8b0b9 2px 3px);
+}
+.pl-fc.bar[data-variant="root_barrier:swamp_thicket"] { background: linear-gradient(#6e9e5c, #315f46); box-shadow: 0 0 4px #477d58; }
 
 @media (max-width: 640px) {
   .pl-badge-toggle { min-height: 28px; padding: 0 7px; font-size: 12px; }

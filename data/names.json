@@ -345,6 +345,7 @@
 "red_flower_blue_petal": "red_flower_blue_petal",
 "red_flower_yellow_petal": "red_flower_yellow_petal",
 "herb_golden_petal": "herb_golden_petal",
+"herb_pink_sunset": "herb_pink_sunset",
 "herb_summer_mint": "herb_summer_mint",
 "red_flower_hibiscus": "red_flower_hibiscus",
 "red_flower_starlit": "red_flower_starlit",
@@ -367,6 +368,7 @@
 "star_flower_starlit": "star_flower_starlit",
 "star_flower_runic": "star_flower_runic",
 "fire_vine_golden": "fire_vine_golden",
+"fire_vine_pink_sunset": "fire_vine_pink_sunset",
 "fire_vine_starlit": "fire_vine_starlit",
 "fire_vine_runic": "fire_vine_runic",
 "sprawling_vine_pink_bloom": "sprawling_vine_pink_bloom",
@@ -384,6 +386,7 @@
 "sunset_bush_starlit": "sunset_bush_starlit",
 "sunset_bush_runic": "sunset_bush_runic",
 "crystal_succulent_golden": "crystal_succulent_golden",
+"crystal_succulent_pink_sunset": "crystal_succulent_pink_sunset",
 "crystal_succulent_starlit": "crystal_succulent_starlit",
 "crystal_succulent_runic": "crystal_succulent_runic",
 "nightshade_sprout_starlit": "nightshade_sprout_starlit",
@@ -398,13 +401,19 @@
 "fairy_lantern:crystal_flower": "fairy_lantern_crystal_flower",
 "witch_scarecrow:fearstalk": "witch_scarecrow_fearstalk",
 "witch_scarecrow:parasol": "witch_scarecrow_parasol",
+"witch_scarecrow:pink_lace_parasol": "witch_scarecrow_pink_lace_parasol",
 "working_shelf:study_desk": "study_desk",
+"pedestal:sunbed": "pedestal_sunbed",
 "stone_floor:cobblestone": "cobblestone_floor",
 "stone_floor:grass": "grass_floor",
 "stone_floor:grass_stone": "grass_stone_floor",
+"stone_floor:wooden_deck": "wooden_deck_floor",
+"flower_trellis_arch:iron": "flower_trellis_arch_iron",
 "rustic_fence:stone_pillar": "rustic_fence_stone_pillar",
 "rustic_fence:stone_wall": "stone_wall_edge",
+"rustic_fence:iron": "rustic_fence_iron",
 "rustic_fence:rose_vine": "rose_vine_fence",
+"root_barrier:swamp_thicket": "root_barrier_swamp_bush",
 "stone_floor:flower_meadow": "flower_meadow_floor",
 "stone_floor:tilled_soil": "tilled_soil_floor",
 "water_channel:edge_upper_left": "water_channel_edge_upper_left",
@@ -423,6 +432,7 @@
 "storage_chest:blue": "storage_chest_blue",
 "storage_chest:rune": "storage_chest_rune",
 "storage_chest:travel_bag": "storage_chest_travel_bag",
+"storage_chest:picnic": "storage_chest_picnic",
 "hourglass:crystal_orb": "hourglass_crystal_orb",
 "town_teleporter:cottage_well": "town_teleporter_cottage"
 },
@@ -447,10 +457,20 @@
 "name": "비치 파라솔",
 "sprite": "witch_scarecrow_parasol"
 },
+"witch_scarecrow:pink_lace_parasol": {
+"itemCode": "witch_scarecrow",
+"name": "핑크 레이스 양산",
+"sprite": "witch_scarecrow_pink_lace_parasol"
+},
 "working_shelf:study_desk": {
 "itemCode": "working_shelf",
 "name": "책상",
 "sprite": "study_desk"
+},
+"pedestal:sunbed": {
+"itemCode": "pedestal",
+"name": "선베드",
+"sprite": "pedestal_sunbed"
 },
 "stone_floor:cobblestone": {
 "itemCode": "stone_floor",
@@ -467,6 +487,16 @@
 "name": "잔디 석판",
 "sprite": "grass_stone_floor"
 },
+"stone_floor:wooden_deck": {
+"itemCode": "stone_floor",
+"name": "나무 데크",
+"sprite": "wooden_deck_floor"
+},
+"flower_trellis_arch:iron": {
+"itemCode": "flower_trellis_arch",
+"name": "철제 아치",
+"sprite": "flower_trellis_arch_iron"
+},
 "rustic_fence:stone_pillar": {
 "itemCode": "rustic_fence",
 "name": "신전 돌울타리",
@@ -477,10 +507,20 @@
 "name": "돌벽",
 "sprite": "stone_wall_edge"
 },
+"rustic_fence:iron": {
+"itemCode": "rustic_fence",
+"name": "철제 울타리",
+"sprite": "rustic_fence_iron"
+},
 "rustic_fence:rose_vine": {
 "itemCode": "rustic_fence",
 "name": "꽃덩굴 울타리",
 "sprite": "rose_vine_fence"
+},
+"root_barrier:swamp_thicket": {
+"itemCode": "root_barrier",
+"name": "늪지 덤불",
+"sprite": "root_barrier_swamp_bush"
 },
 "stone_floor:flower_meadow": {
 "itemCode": "stone_floor",
@@ -571,6 +611,11 @@
 "itemCode": "storage_chest",
 "name": "여행가방 차원상자",
 "sprite": "storage_chest_travel_bag"
+},
+"storage_chest:picnic": {
+"itemCode": "storage_chest",
+"name": "피크닉 차원상자",
+"sprite": "storage_chest_picnic"
 },
 "hourglass:crystal_orb": {
 "itemCode": "hourglass",
@@ -997,13 +1042,19 @@
 "fairy_lantern_crystal_flower": "items/ornament",
 "witch_scarecrow_fearstalk": "items/ornament",
 "witch_scarecrow_parasol": "items/ornament",
+"witch_scarecrow_pink_lace_parasol": "items/ornament",
 "study_desk": "items/ornament",
+"pedestal_sunbed": "items/ornament",
 "cobblestone_floor": "items/ornament",
 "grass_floor": "items/ornament",
 "grass_stone_floor": "items/ornament",
+"wooden_deck_floor": "items/ornament",
+"flower_trellis_arch_iron": "items/ornament",
 "rustic_fence_stone_pillar": "items/ornament",
 "stone_wall_edge": "items/ornament",
+"rustic_fence_iron": "items/ornament",
 "rose_vine_fence": "items/ornament",
+"root_barrier_swamp_bush": "items/ornament",
 "flower_meadow_floor": "items/ornament",
 "tilled_soil_floor": "items/ornament",
 "water_channel_edge_upper_left": "items/ornament",
@@ -1022,6 +1073,7 @@
 "storage_chest_blue": "items/ornament",
 "storage_chest_rune": "items/ornament",
 "storage_chest_travel_bag": "items/ornament",
+"storage_chest_picnic": "items/ornament",
 "hourglass_crystal_orb": "items/ornament",
 "town_teleporter_cottage": "items/ornament"
 }

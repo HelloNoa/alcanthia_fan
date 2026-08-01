@@ -68,6 +68,25 @@ for (const code of ["vine_tendril", "aquifer_potion", "reversion_potion"]) {
 for (const id of ["reputation_good_neighbor", "reputation_troublemaker"]) {
   assert.equal(gameData.achievements.some((achievement) => achievement.id === id), true);
 }
+for (const skinId of [
+  "herb_pink_sunset",
+  "fire_vine_pink_sunset",
+  "crystal_succulent_pink_sunset",
+]) {
+  assert.equal(names.skins[skinId], skinId);
+}
+for (const [variantId, itemCode] of Object.entries({
+  "witch_scarecrow:pink_lace_parasol": "witch_scarecrow",
+  "pedestal:sunbed": "pedestal",
+  "stone_floor:wooden_deck": "stone_floor",
+  "flower_trellis_arch:iron": "flower_trellis_arch",
+  "rustic_fence:iron": "rustic_fence",
+  "root_barrier:swamp_thicket": "root_barrier",
+  "storage_chest:picnic": "storage_chest",
+})) {
+  assert.equal(names.itemVariants[variantId]?.itemCode, itemCode);
+  assert.equal(names.itemVariantSprites[variantId], names.itemVariants[variantId]?.sprite);
+}
 assert.equal(
   progression.tutorialGoals.some((goal) => goal.id === "collect_growth_potion_ingredients"),
   false,
