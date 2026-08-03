@@ -478,6 +478,7 @@ function levelCalc(body) {
 // 시작강화 S → 최종 T 1개에 필요한 시작 아이템 ≈ (1+1/p)^(T−S)  [실패 회수 반영]
 async function evCalc(body) {
   const g = await gamedata();
+  const testItems = new Set(g.test_items || []);
   // 레시피 역인덱스 {inputs, req} (양조 req=0, 제작 req=requiredLevel) — 자기참조(순환) 제외
   const recipeOf = {};
   for (const r of g.brew_recipes || []) if (r.inputs?.length && !r.inputs.includes(r.output)) recipeOf[r.output] ??= { in: r.inputs, req: 0 };
@@ -500,6 +501,7 @@ async function evCalc(body) {
   // 강화 가능 아이템: 수확물(강화불가)·시험용 제외, 레시피/가치/판매가 있거나 장비(다이아 셉터 등)
   const craftable = Object.keys(g.items || {})
     .filter((c) => g.items[c] && g.items[c].type !== "produce"
+      && !testItems.has(c) && g.items[c].test !== true
       && !/^aging_/.test(c) && !(g.items[c].name || "").includes("시험용")
       && (recipeOf[c] || g.items[c].brewDuration_ms || g.item_values?.[c] != null || g.sell_price?.[c] != null || g.equipment_stats?.[c]))
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));

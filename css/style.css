@@ -650,6 +650,13 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-cell:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
 .pl-cic { width: 100%; height: 100%; position: relative; }
 .pl-cic img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: var(--pl-filter, none); }
+/* 게임의 모닥불 연성 배치 비율: 불 뒤, 매달린 솥, 받침대 순서 */
+.pl-campfire-base { position: absolute; left: 21.52%; top: 8.35%; width: 56.96%; height: 56.96%; z-index: 3; }
+.pl-cauldron-stack { position: absolute; left: 20.6%; top: -16.09%; width: 58.8%; height: 58.8%; z-index: 4;
+  filter: drop-shadow(0 2px 1px rgba(0,0,0,.55)); }
+.pl-cauldron-support { position: absolute; left: 14.72%; top: -34.9%; width: 70.56%; height: 105.84%;
+  z-index: 5; pointer-events: none; }
+.pl-enhb.pl-cauldron-enhb { left: auto; right: 0; z-index: 6; border-radius: 0 0 0 3px; }
 .pl-cic::after { content: ""; position: absolute; inset: 4px; border-radius: 50%;
   background: var(--pl-aura, transparent); opacity: var(--pl-aura-opacity, 0);
   mix-blend-mode: screen; pointer-events: none; }
@@ -672,6 +679,8 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .pl-summary h3 small { color: var(--muted); font-weight: 400; font-size: 11px; }
 .d-row { font-size: 13px; padding: 2px 0; color: var(--ink); }
 .d-row b { color: var(--ink); } .d-row b.up { color: var(--buy); } .d-row b.down, .d-row.down { color: var(--sell); }
+.pl-stacked-cauldron { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pl-stacked-cauldron .chip { flex: none; padding: 3px 8px; font-size: 11px; }
 .pl-sum-list { display: flex; flex-direction: column; gap: 6px; }
 .pl-sum { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .pl-sic { width: 22px; height: 22px; flex: none; }

@@ -374,6 +374,10 @@ export async function renderCodex(view, sub) {
         const stat = g.equipment_stats?.[code];
         const recs = craftByOut[code] || [];
         const rows = [["분류", ITEM_TAB_POTIONS.has(code) ? "변성 도구" : TYPE[it.type] || it.type]];
+        const spriteKey = N.itemSprites?.[code] || code;
+        const isOrnament = N.itemFolders?.[spriteKey] === "items/ornament";
+        if (stat) rows.push(["귀속", "모험가 장착 시 귀속"]);
+        else if (isOrnament) rows.push(["귀속", "텃밭 설치 시 귀속"]);
         if ((brewByOut[code] || recs.length) && it.brewDuration_ms) rows.push(["제작시간", fmtDuration(craftTime(code))]);
         if (recs.length) rows.push(["필요레벨", recs.map((r) => `Lv ${r.requiredLevel || 0}`).join(" / ")]);
         const uses = (useByIn[code] || [])

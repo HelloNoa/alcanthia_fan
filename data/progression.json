@@ -352,7 +352,7 @@
       "id": "enhance_growth_potion",
       "title": "성장포션 강화하기",
       "description": "같은 포션 두 개를 가마솥에 넣으면 더 높은 강화도의 포션을 만들 수 있습니다. 성장포션 두 개를 넣어 강화해보세요.",
-      "action": "inventory",
+      "action": "cauldron",
       "required": true,
       "rewards": [
         {
@@ -1401,6 +1401,57 @@
           "itemCode": "frenzy_potion",
           "enhancement": 0,
           "count": 10
+        }
+      ]
+    },
+    {
+      "id": "hestia_trusted_helper",
+      "npcId": "hestia",
+      "title": "오랜 신뢰의 보답",
+      "description": "합금 6종을 1개씩 헤스티아에게 가져다주세요.",
+      "repeat": "none",
+      "previous": [],
+      "unlock": [
+        "헤스티아 의뢰 누적 50회 완료"
+      ],
+      "requestItems": [
+        {
+          "itemCode": "alloy_ingot",
+          "enhancement": 0,
+          "count": 1
+        },
+        {
+          "itemCode": "arcane_alloy",
+          "enhancement": 0,
+          "count": 1
+        },
+        {
+          "itemCode": "silver_crystal",
+          "enhancement": 0,
+          "count": 1
+        },
+        {
+          "itemCode": "gilded_copper_ingot",
+          "enhancement": 0,
+          "count": 1
+        },
+        {
+          "itemCode": "platinum_ingot",
+          "enhancement": 0,
+          "count": 1
+        },
+        {
+          "itemCode": "golden_crystal",
+          "enhancement": 0,
+          "count": 1
+        }
+      ],
+      "rewards": [
+        {
+          "itemCode": "oblivion_orb",
+          "enhancement": 0,
+          "count": 1,
+          "untradable": true
         }
       ]
     }

@@ -11,9 +11,35 @@ const PEDESTAL = "pedestal";
 const LEGACY_PEDESTAL = "equipment_pedestal";
 const FARMERS_BATON = "farmers_baton";
 const WARDING_STONE = "warding_stone";
+const CAMPFIRE = "campfire";
 const PLANT_MAX_ENHANCEMENT = 12;
 const ORNAMENT_MAX_ENHANCEMENT = 40;
+const CAMPFIRE_CAULDRON_ORDER = [
+  "old_cauldron",
+  "copper_cauldron",
+  "silver_cauldron",
+  "dia_cauldron",
+  "gold_cauldron",
+  "rune_cauldron",
+];
+const CAMPFIRE_CAULDRONS = new Set(CAMPFIRE_CAULDRON_ORDER);
 const DEFAULT_SKIN_CHOICE = "__default__";
+export const plannerStackedCauldronData = (raw) => {
+  if (typeof raw === "string") raw = { code: raw };
+  if (!raw || typeof raw !== "object") return null;
+  const code = String(raw.code || raw.itemCode || "");
+  if (!CAMPFIRE_CAULDRONS.has(code)) return null;
+  return {
+    code,
+    enhancement: Math.max(0, Math.min(
+      ORNAMENT_MAX_ENHANCEMENT,
+      Math.floor(Number(raw.enhancement ?? raw.e) || 0),
+    )),
+  };
+};
+export const plannerCanStackCauldron = (cell, code) => (
+  cell?.orn === CAMPFIRE && CAMPFIRE_CAULDRONS.has(code)
+);
 export const farmersBatonRange = (enhancement = 0) =>
   Math.max(1, Math.floor(Number(enhancement) || 0) + 1);
 export const farmersBatonCovers = (sourceRow, sourceCol, targetRow, targetCol, enhancement = 0) => {
@@ -37,6 +63,15 @@ export const plannerEmitterRange = (id, enhancement = 0, rootDom = 0, vein = fal
     : 0;
   return 1 + rootBonus + enhancementBonus;
 };
+export const plannerInheritanceChance = (plantEnhancement = 0, level = 0) => {
+  const enhancement = Math.max(0, Math.floor(Number(plantEnhancement) || 0));
+  const skillLevel = Math.max(0, Math.min(5, Math.floor(Number(level) || 0)));
+  if (enhancement <= 0 || skillLevel <= 0) return 0;
+  return 1 - Math.pow(1 - 0.03 * skillLevel, enhancement);
+};
+export const plannerRevivalChance = (level = 0) => (
+  0.05 * Math.max(0, Math.min(3, Math.floor(Number(level) || 0)))
+);
 export const plannerPollProductionPerHour = ({
   pollIntervalMs,
   growTimeMs,
@@ -44,17 +79,58 @@ export const plannerPollProductionPerHour = ({
   harvests = 1,
   productionMultiplier = 1,
   yieldMultiplier = 1,
+  cycleMs,
+  revivalChance = 0,
 }) => {
   const pollMs = Math.max(1, Number(pollIntervalMs) || 1);
   const harvestCount = Math.max(0, Number(harvests) || 0);
   if (harvestCount <= 0) return 0;
-  const lifecycleMs =
-    Math.max(0, Number(growTimeMs) || 0) +
-    harvestCount * Math.max(0, Number(produceIntervalMs) || 0);
-  const occupiedPolls = Math.max(1, Math.ceil(lifecycleMs / pollMs));
-  return harvestCount * (3600000 / (occupiedPolls * pollMs))
+  const lifecycleMs = Number.isFinite(cycleMs)
+    ? Math.max(0, Number(cycleMs))
+    : Math.max(0, Number(growTimeMs) || 0) +
+      harvestCount * Math.max(0, Number(produceIntervalMs) || 0);
+  const revival = Math.max(0, Math.min(0.999999, Number(revivalChance) || 0));
+  const stopChance = 1 - revival;
+  const expectedLifetimes = 1 / stopChance;
+  let expectedOccupiedPolls = 0;
+  let runProbability = stopChance;
+  for (let lifetimes = 1; lifetimes <= 10000; lifetimes++) {
+    const occupiedPolls = Math.max(1, Math.ceil(lifetimes * lifecycleMs / pollMs));
+    expectedOccupiedPolls += runProbability * occupiedPolls;
+    runProbability *= revival;
+    if (runProbability < 1e-14) break;
+  }
+  return harvestCount * expectedLifetimes * (3600000 / (expectedOccupiedPolls * pollMs))
     * Math.max(0, Number(productionMultiplier) || 0)
     * Math.max(0, Number(yieldMultiplier) || 0);
+};
+export const plannerSunsetRipenDurationMs = ({
+  oneShot,
+  growTimeMs,
+  produceIntervalMs,
+  zoneCoeff: coeff,
+}) => {
+  const effect = Number(coeff);
+  if (!(effect > 0)) return null;
+  const baseMs = oneShot ? growTimeMs : produceIntervalMs;
+  return Math.max(0, Number(baseMs) || 0) * Math.max(0, 3 - 2 * effect / 3);
+};
+export const plannerRipenedCycleMs = ({
+  growTimeMs,
+  produceIntervalMs,
+  harvests,
+  capacity = 1,
+  ripenTimeMs,
+}) => {
+  const growMs = Math.max(0, Number(growTimeMs) || 0);
+  const intervalMs = Math.max(0, Number(produceIntervalMs) || 0);
+  const harvestCount = Math.max(0, Math.floor(Number(harvests) || 0));
+  const outputCapacity = Math.max(1, Math.floor(Number(capacity) || 1));
+  const ripenMs = Math.max(0, Number(ripenTimeMs) || 0);
+  if (harvestCount <= 0) return 0;
+  const blockedMs = Math.max(0, ripenMs - (outputCapacity - 1) * intervalMs);
+  const blockedBatches = Math.floor((harvestCount - 1) / outputCapacity);
+  return growMs + harvestCount * intervalMs + blockedBatches * blockedMs + ripenMs;
 };
 export const plannerPlantSkinIds = (plantId, skinSprites = {}) => {
   const prefix = `${String(plantId || "")}_`;
@@ -123,8 +199,9 @@ const ORN = {
   witch_scarecrow: "마녀 허수아비", crystal_fountain: "수정 분수", fairy_lantern: "요정 등불",
   mana_sprayer: "마력 분사기", farmers_baton: "새싹 지휘봉", warding_stone: "경계석",
   flower_trellis_arch: "꽃 트렐리스", star_music_box: "별조각 오르골", telescope: "망원경", town_teleporter: "마을 텔레포터",
-  working_shelf: "작업 선반", hourglass: "모래시계", campfire: "모닥불",
-  rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", storage_chest: "차원상자", pedestal: "전시대",
+  working_shelf: "작업 선반", hourglass: "모래시계", storage_chest: "차원상자",
+  levitation_chest: "부유상자", compost_bin: "퇴비함", campfire: "모닥불",
+  rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", pedestal: "전시대",
 };
 const ENHANCEABLE_ORNAMENTS = new Set(Object.keys(ORN));
 export const plannerOrnamentSupportsEnhancement = (code) =>
@@ -135,10 +212,13 @@ export const plannerOrnamentEnhancementMax = (code) =>
 const ORN_NOTE = {
   root_barrier: "지표 효과 차단 (조건 전파 막음)",
   storage_chest: "아이템 보관",
+  levitation_chest: "가까운 가마솥의 재료 보관",
+  compost_bin: "초당 아이템 1개 소모 · 인접 식물 강화도 +1",
   pedestal: "장비 전시",
   mana_sprayer: "인접 식물 포션 공급",
   farmers_baton: "주변 작물 상태 관측 및 관리",
   warding_stone: "은신한 공격자의 선공 확률 감소",
+  campfire: "가마솥을 올려 마나 대신 연료로 연성",
 };
 // 바닥재 종류 (표면 배치, CSS 텍스처)
 const FLOOR_NAMES = {
@@ -197,6 +277,7 @@ const PRODUCTION_ZONES = {
   twilight_valley: "어스름 계곡",
   crystal_mine: "수정 갱도",
   dried_spring: "메마른 샘",
+  sunset_cliff: "석양 절벽",
 };
 const PRODUCTION_ZONE_NOTES = {
   "": "텃밭 생산량에 영향을 주는 지역 효과를 적용하지 않습니다.",
@@ -208,10 +289,20 @@ const PRODUCTION_ZONE_NOTES = {
   twilight_valley: "이웃 종류 수만큼 생산 배율이 +5%×계수×종류 수 증가합니다.",
   crystal_mine: "같은 작물로 가로/세로 줄을 채우면 줄마다 +20%×계수. 이 칸은 일반 과밀 감소 대신 수정갱도 분기를 탑니다.",
   dried_spring: "풍요의 손길 추가 수확 확률 효과가 (1 + 계수)배 커집니다.",
+  sunset_cliff: "숙성되지 않던 산물도 +1로 숙성됩니다. 지속형은 기본 생산주기, 소모형은 기본 성장시간에 ×(3 - 2×계수/3)의 숙성시간이 필요합니다.",
 };
 const zoneCoeff = (opt) => opt.familiar * 0.1 + (opt.fog ? 1 : 0) + (opt.raid ? 0.5 : 0);
 const plentyMultiplier = (opt) => 1 + 0.05 * opt.plenty * (opt.zone === "dried_spring" ? 1 + zoneCoeff(opt) : 1);
-const zoneNoteHtml = (opt) => `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 추가 버프 0.5 (습격 방어 성공·수호의 향로)</span>`;
+const zoneNoteHtml = (opt) => {
+  const sunsetStatus = opt.zone !== "sunset_cliff"
+    ? ""
+    : !opt.sunsetRipen
+      ? `<br><strong>현재 즉시 수확 기준: +1 숙성을 기다리지 않아 지역 없음과 생산량이 같습니다.</strong>`
+      : zoneCoeff(opt) <= 0
+        ? `<br><strong>현재 지역효과 계수가 0이라 +1 숙성이 발동하지 않습니다.</strong>`
+        : `<br><strong>현재 숙성 수확 기준: +1 산물을 얻는 대신 대기 중 생산 정지가 반영됩니다.</strong>`;
+  return `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}${sunsetStatus}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 추가 버프 0.5 (습격 방어 성공·수호의 향로)</span>`;
+};
 
 function multiplier(pid, cond, plantCond, sameCount, diversity, opt, oneShot, crystalLineBonus) {
   let c = opt.harvest ? 1.5 : 1;
@@ -307,6 +398,9 @@ export async function renderPlanner(view) {
   // 장비 전시대에 올릴 수 있는 아이템 (장비류)
   const DISPLAY_ITEMS = Object.keys(g.equipment_stats || {})
     .map((c) => [c, g.items?.[c]?.name || c]).sort((a, b) => a[1].localeCompare(b[1]));
+  const CAULDRON_ITEMS = CAMPFIRE_CAULDRON_ORDER
+    .filter((code) => g.items?.[code])
+    .map((code) => [code, g.items[code].name || code]);
   const plants = {};
   for (const [k, v] of Object.entries(g.plants || {})) {
     if (k.startsWith("aging") || (v.name || "").includes("시험용")) continue;
@@ -358,7 +452,8 @@ export async function renderPlanner(view) {
   };
 
   // cell: null(미개간) | {p:null}(개간) | {p:id,e,skinId?}(작물)
-  //   | {orn:code,e?,variantId?}(장식물), floorVariantId와 경계 variantId는 같은 칸에 병존 가능
+  //   | {orn:code,e?,variantId?,cauldron?:{code,enhancement}}(장식물)
+  // floorVariantId, 경계 variantId, 모닥불 위 가마솥은 같은 칸에 병존 가능
   let grid = load();
   let sel = palette[0];
   let mode = "plant";
@@ -366,7 +461,7 @@ export async function renderPlanner(view) {
   const selectedSkins = new Map();
   const selectedVariants = new Map();
   let badgesVisible = loadBadgeVisibility();
-  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, uptime: 100, gust: false };
+  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, sunsetRipen: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, inheritance: 0, revival: 0, uptime: 100, gust: false };
   let condMap = null;
 
   view.innerHTML = `<h2>🌿 텃밭 배치 테스트</h2>
@@ -403,22 +498,25 @@ export async function renderPlanner(view) {
         <div class="pl-opts">
           <label class="chk"><input type="checkbox" id="pl-harvest"> 촉진포션 (×1.5)</label>
           <label class="lvlabel">과밀 저항 <input id="pl-resist" type="range" min="0" max="2" value="0"><b id="pl-resistv">0</b></label>
-          <div class="pl-sksec">지역 효과 <span class="muted">(생산량)</span></div>
+          <div class="pl-sksec">지역 효과 <span class="muted">(생산·숙성)</span></div>
           <label class="lvlabel">지역 <select id="pl-zone" class="num-in">
             ${Object.entries(PRODUCTION_ZONES).map(([id, label]) => `<option value="${id}">${label}</option>`).join("")}
           </select></label>
           <label class="lvlabel">낯익은 터 <input id="pl-familiar" type="range" min="0" max="10" value="0"><b id="pl-familiarv">0</b></label>
           <label class="chk"><input type="checkbox" id="pl-fog"> 안개 해방</label>
           <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="pl-raid"> 지역효과 +50% 버프</label>
+          <label class="chk" id="pl-sunset-ripen-wrap" style="display:none" title="즉시 자동수확을 멈추고 숙성이 끝난 산물을 수확하는 경우"><input type="checkbox" id="pl-sunset-ripen"> 숙성 완료 후 수확 (일반 산물 +1)</label>
           <div class="muted">지역효과 계수 <b id="pl-zone-coeff">0.00</b></div>
           <div class="pl-zone-note" id="pl-zone-note">${zoneNoteHtml(opt)}</div>
           <label class="lvlabel">뿌리 지배 <input id="pl-root" type="range" min="0" max="2" value="0"><b id="pl-rootv">0</b></label>
           <label class="chk"><input type="checkbox" id="pl-vein"> 맥읽기 (강화만큼 범위↑)</label>
           <label class="chk"><input type="checkbox" id="pl-sturdy"> 단단한 줄기 (강화 작물 최대생산 ×(강화+1))</label>
-          <div class="pl-sksec">생산 스킬 <span class="muted">(강화 작물에 곱연산)</span></div>
+          <div class="pl-sksec">생산 스킬 <span class="muted">(시간·토양은 강화도별 중첩)</span></div>
           <label class="lvlabel">시간 숙련 <input id="pl-time" type="range" min="0" max="10" value="0"><b id="pl-timev">0</b></label>
           <label class="lvlabel">토양 숙련 <input id="pl-soil" type="range" min="0" max="10" value="0"><b id="pl-soilv">0</b></label>
           <label class="lvlabel">풍요의 손길 <input id="pl-plenty" type="range" min="0" max="3" value="0"><b id="pl-plentyv">0</b></label>
+          <label class="lvlabel" title="강화된 작물이 산물을 만들 때 +1 강화 산물이 나올 확률">유전 <input id="pl-inheritance" type="range" min="0" max="5" value="0"><b id="pl-inheritancev">0</b></label>
+          <label class="lvlabel" title="소모형 식물의 수확이 끝날 때 레벨당 5% 확률로 같은 칸에서 재성장">부활 <input id="pl-revival" type="range" min="0" max="3" value="0"><b id="pl-revivalv">0</b></label>
           <label class="lvlabel">가동률 <input id="pl-uptime" type="range" min="50" max="100" step="5" value="100"><b id="pl-uptimev">100</b>%</label>
           <div class="pl-sksec">수분 포션 <span class="muted">(바람꽃)</span></div>
           <label class="chk"><input type="checkbox" id="pl-gust"> 질풍포션 (수분 2배속)</label>
@@ -426,7 +524,7 @@ export async function renderPlanner(view) {
           <div class="pl-cost" id="pl-cost"></div>
           <div class="pl-btns"><button class="chip" id="pl-fill">전체 개간</button><button class="chip" id="pl-clear">전체 지우기</button></div>
         </div>
-        <div class="calc-note">🌾 <b>약초 자동화</b>: 마녀 허수아비의 <b>항마</b>가 깔린 칸의 약초는 자동수확이 안 돼서 <b>번식 원천</b>으로 영구히 남습니다. <b>바람꽃</b>이 4방향 직선에서 만난 작물을 <b>그 너머 빈 칸에 복제(번식)</b>하고, <b>정령의 낫</b>이 다 자란 약초를 자동 수확해요 → 보호 약초 1개로 약초가 끝없이 번져 자동 생산. (약초·달빛버섯은 oneShot이라 <b>과밀 면제</b>)<br><span class="muted">※ 맥읽기는 바람꽃 <b>수분 범위가 아니라</b>, 번식되는 작물의 <b>최대 강화도</b>(원본·바람꽃 강화 중 작은 값)에 영향을 줍니다.<br>※ 실제 자동화 생산량은 바람꽃의 <b>60초 수분 주기</b>와 복제 작물의 <b>성장·생산 주기</b> 중 느린 쪽을 따릅니다. 밤그늘싹처럼 생산 시간이 긴 작물은 수분만으로 60초마다 수확되지 않습니다.</span></div>
+        <div class="calc-note">🌾 <b>약초 자동화</b>: 마녀 허수아비의 <b>항마</b>가 깔린 칸의 약초는 자동수확이 안 돼서 <b>번식 원천</b>으로 영구히 남습니다. <b>바람꽃</b>이 4방향 직선에서 만난 작물을 <b>그 너머 빈 칸에 복제(번식)</b>하고, <b>정령의 낫</b>이 다 자란 약초를 자동 수확해요 → 보호 약초 1개로 약초가 끝없이 번져 자동 생산. (약초·달빛버섯은 oneShot이라 <b>과밀 면제</b>)<br><span class="muted">※ 맥읽기는 바람꽃 <b>수분 범위가 아니라</b>, 번식되는 작물의 <b>최대 강화도</b>(원본·바람꽃 강화 중 작은 값)에 영향을 줍니다.<br>※ 실제 자동화 생산량은 바람꽃의 <b>60초 수분 주기</b>와 복제 작물의 <b>성장·생산 주기</b> 중 느린 쪽을 따릅니다. <b>부활</b>에 성공한 소모형 작물은 다음 수분을 기다리지 않고 같은 칸에서 재성장합니다.</span></div>
         <div class="pl-detail" id="pl-detail"></div>
         <div class="pl-summary" id="pl-summary"></div>
         <div class="pl-summary pl-poll" id="pl-pollsum"></div>
@@ -511,8 +609,11 @@ export async function renderPlanner(view) {
     }));
   };
   const updateEnhControl = (kind, key) => {
-    const supported = kind === "plant" || (kind === "orn" && plannerOrnamentSupportsEnhancement(key));
-    const max = kind === "plant" ? PLANT_MAX_ENHANCEMENT : plannerOrnamentEnhancementMax(key);
+    const supported = kind === "plant" || kind === "cauldron"
+      || (kind === "orn" && plannerOrnamentSupportsEnhancement(key));
+    const max = kind === "plant"
+      ? PLANT_MAX_ENHANCEMENT
+      : kind === "cauldron" ? ORNAMENT_MAX_ENHANCEMENT : plannerOrnamentEnhancementMax(key);
     const input = view.querySelector("#pl-enh");
     input.max = String(max || PLANT_MAX_ENHANCEMENT);
     if (supported && enh > max) {
@@ -521,7 +622,8 @@ export async function renderPlanner(view) {
       view.querySelector("#pl-enhv").textContent = String(enh);
     }
     enhControl.style.display = mode === "plant" && supported ? "" : "none";
-    if (key === FARMERS_BATON) enhLabel.textContent = "지휘봉 강화";
+    if (kind === "cauldron") enhLabel.textContent = "가마솥 강화";
+    else if (key === FARMERS_BATON) enhLabel.textContent = "지휘봉 강화";
     else if (key === WARDING_STONE) enhLabel.textContent = "경계석 강화";
     else if (kind === "orn") enhLabel.textContent = FENCES.has(key) ? "경계 강화" : "장식물 강화";
     else enhLabel.textContent = "작물 강화";
@@ -535,7 +637,8 @@ export async function renderPlanner(view) {
     else {
       const ic = document.createElement("span"); ic.className = "pl-pic";
       if (kind === "floor") { ic.className = "pl-pic pl-fpic"; itemIcon(ic, key); }  // 실제 스프라이트(다이아) → CSS로 정렬
-      else if (kind === "orn") itemIcon(ic, key); else plantIcon(ic, plants[key].spriteKey || key);
+      else if (kind === "orn" || kind === "cauldron") itemIcon(ic, key);
+      else plantIcon(ic, plants[key].spriteKey || key);
       b.appendChild(ic);
       b.insertAdjacentHTML("beforeend", `<span>${label}</span>`);
     }
@@ -551,6 +654,8 @@ export async function renderPlanner(view) {
   palette.forEach((k) => palBox.appendChild(palItem(k, plants[k].name, "plant")));
   ornBox.insertAdjacentHTML("beforeend", `<span class="pl-orn-lbl">장식물</span>`);
   Object.entries(ORN).forEach(([k, l]) => ornBox.appendChild(palItem(k, l, "orn")));
+  ornBox.insertAdjacentHTML("beforeend", `<span class="pl-orn-lbl">모닥불 위 가마솥</span>`);
+  CAULDRON_ITEMS.forEach(([code, label]) => ornBox.appendChild(palItem(code, label, "cauldron")));
   ornBox.insertAdjacentHTML("beforeend", `<span class="pl-orn-lbl">바닥재</span>`);
   FLOOR_PALETTE.forEach((k) => ornBox.appendChild(palItem(k, FLOOR_NAMES[k], "floor")));
   let effectSel = POTION_EFFECTS[0].id;
@@ -587,6 +692,12 @@ export async function renderPlanner(view) {
     fences: cell && cell.fences,
     cond: cell?.cond?.length ? [...cell.cond] : undefined,
   });
+  const keepCampfireCauldron = (cell, nextOrnament) => {
+    const cauldron = cell?.orn === CAMPFIRE && nextOrnament === CAMPFIRE
+      ? plannerStackedCauldronData(cell.cauldron)
+      : null;
+    return cauldron ? { cauldron } : {};
+  };
   const keepPlantCond = (cell, pid) => cell?.p === pid && cell.plantCond?.length ? { plantCond: [...cell.plantCond] } : {};
   const cleanCell = (cell) => {
     if (!cell) return cell;
@@ -594,6 +705,9 @@ export async function renderPlanner(view) {
     if (!cell.plantCond?.length) delete cell.plantCond;
     if (cell.cond) cell.cond = COND_ORDER.filter((x) => cell.cond.includes(x));
     if (cell.plantCond) cell.plantCond = PLANT_COND_ORDER.filter((x) => cell.plantCond.includes(x));
+    const cauldron = cell.orn === CAMPFIRE ? plannerStackedCauldronData(cell.cauldron) : null;
+    if (cauldron) cell.cauldron = cauldron;
+    else delete cell.cauldron;
     return cell;
   };
   const setList = (cell, prop, vals) => {
@@ -668,6 +782,12 @@ export async function renderPlanner(view) {
         }
         if (!Object.keys(cell.fences).length) delete cell.fences;
       }
+      else if (kind === "cauldron") {
+        if (!plannerCanStackCauldron(cell, sel)) return;
+        const current = plannerStackedCauldronData(cell.cauldron);
+        if (current?.code === sel && current.enhancement === enh) delete cell.cauldron;
+        else cell.cauldron = { code: sel, enhancement: enh };
+      }
       else if (kind === "orn") {
         const enhanceable = plannerOrnamentSupportsEnhancement(sel);
         const variantId = plannerItemVariantId(sel, selectedVariants.get(sel), itemVariants);
@@ -681,6 +801,7 @@ export async function renderPlanner(view) {
             ...(enhanceable && enh > 0 ? { e: enh } : {}),
             ...(variantId ? { variantId } : {}),
             ...keep(cell),
+            ...keepCampfireCauldron(cell, sel),
           };
       }
       else {
@@ -859,7 +980,33 @@ export async function renderPlanner(view) {
     const harvests = opt.zone === "golden_fields" && isFinite(sturdyHarvests)
       ? Math.floor(sturdyHarvests * (1 + 0.5 * zc))
       : sturdyHarvests;
-    const cycle = growEff + harvests * intervalEff;
+    const sunsetRipenMode = opt.zone === "sunset_cliff" && opt.sunsetRipen;
+    const nativeRipen = sunsetRipenMode ? prod?.ripen : null;
+    const syntheticRipenTime = sunsetRipenMode && !nativeRipen
+      ? plannerSunsetRipenDurationMs({
+          oneShot: P.oneShot,
+          growTimeMs: P.growTime_ms,
+          produceIntervalMs: prod?.interval_ms,
+          zoneCoeff: zc,
+        })
+      : null;
+    const ripenTime = nativeRipen
+      ? Math.max(0, Number(nativeRipen.duration_ms) || 0)
+      : syntheticRipenTime;
+    const ripened = ripenTime !== null;
+    const outputCode = nativeRipen?.itemCode || prod?.itemCode;
+    // 작물 강화도는 유전 확률에만 관여하며 산물 강화도로 직접 이어지지 않는다.
+    const outputEnh = ripened && !nativeRipen ? 1 : 0;
+    const inheritanceChance = plannerInheritanceChance(z.e, opt.inheritance);
+    const cycle = ripened
+      ? plannerRipenedCycleMs({
+          growTimeMs: growEff,
+          produceIntervalMs: intervalEff,
+          harvests,
+          capacity: prod?.max,
+          ripenTimeMs: ripenTime,
+        })
+      : growEff + harvests * intervalEff;
     const yieldMul = m * plentyMultiplier(opt) * (opt.uptime / 100); // 풍요의손길 · 가동률
     const perHour = prod && !gated && !paused && cycle > 0 ? (harvests / cycle) * 3600000 * yieldMul : 0;
     return {
@@ -868,10 +1015,24 @@ export async function renderPlanner(view) {
       dryBlocked: aridBlocked, aridBlocked, toxicBlocked,
       waterKilled, fireProtected: waterKills(z.p, P) && cond.has("arid"),
       perHour, harvests, growEff, intervalEff, cycle,
+      sunsetRipenMode, ripened, nativeRipen: Boolean(nativeRipen), ripenTime,
+      outputCode, outputEnh, inheritanceChance,
     };
   };
   const stat = (r, c) => statFor(r, c, effectivePlantAt(r, c), effectivePlantAt);
   const autoHarvestBlocked = (st) => st?.cond?.has("anti_magic") || st?.plantCond?.has("anti_magic");
+  const addProduction = (totals, code, enhancement, amount) => {
+    if (!code || !(amount > 0)) return;
+    const key = `${code}\u0000${enhancement || 0}`;
+    const entry = totals.get(key);
+    if (entry) entry.amount += amount;
+    else totals.set(key, { code, enhancement: enhancement || 0, amount });
+  };
+  const addStatProduction = (totals, st, amount) => {
+    const inherited = Math.max(0, Math.min(1, st?.inheritanceChance || 0));
+    addProduction(totals, st?.outputCode, st?.outputEnh, amount * (1 - inherited));
+    addProduction(totals, st?.outputCode, (st?.outputEnh || 0) + 1, amount * inherited);
+  };
   const propagatedEnh = (src, wind) => opt.vein ? Math.min(src.e || 0, wind.e || 0) : 0;
   const pollTargets = () => {
     const targets = new Map();
@@ -916,7 +1077,7 @@ export async function renderPlanner(view) {
     const changed = !win || win.minR !== want.minR || win.maxR !== want.maxR || win.minC !== want.minC || win.maxC !== want.maxC;
     if (changed) buildWindow(want);
     const poll = pollSet();
-    const totals = {};
+    const totals = new Map();
     let planted = 0, tilled = 0;
     let blockedProduction = 0;
     const showSlots = mode === "till" && hasField();
@@ -965,10 +1126,37 @@ export async function renderPlanner(view) {
       }
       if (poll.has(r * CANVAS + c)) el.classList.add("poll");
       if (z.orn) {
-        const ic = document.createElement("span");
-        ic.className = "pl-cic";
-        itemIcon(ic, variantSpriteFor(z.orn, z.variantId));
-        el.appendChild(ic);
+        const stackedCauldron = z.orn === CAMPFIRE
+          ? plannerStackedCauldronData(z.cauldron)
+          : null;
+        if (stackedCauldron) {
+          const rig = document.createElement("span");
+          rig.className = "pl-cic pl-cauldron-rig";
+          const fireIcon = document.createElement("span");
+          fireIcon.className = "pl-campfire-base";
+          itemIcon(fireIcon, variantSpriteFor(z.orn, z.variantId));
+          rig.appendChild(fireIcon);
+          const cauldronIcon = document.createElement("span");
+          cauldronIcon.className = "pl-cauldron-stack";
+          cauldronIcon.title = `${g.items?.[stackedCauldron.code]?.name || stackedCauldron.code} +${stackedCauldron.enhancement}`;
+          itemIcon(cauldronIcon, stackedCauldron.code);
+          rig.appendChild(cauldronIcon);
+          const supportIcon = document.createElement("span");
+          supportIcon.className = "pl-cauldron-support";
+          supportIcon.setAttribute("aria-hidden", "true");
+          loadImg(supportIcon, [`${CDN}/items/cauldrons/cauldron_support_sticks.png`], "");
+          rig.appendChild(supportIcon);
+          el.appendChild(rig);
+          if (stackedCauldron.enhancement > 0) {
+            el.insertAdjacentHTML("beforeend", `<span class="pl-enhb pl-cauldron-enhb">+${stackedCauldron.enhancement}</span>`);
+          }
+          el.classList.add("has-cauldron");
+        } else {
+          const ic = document.createElement("span");
+          ic.className = "pl-cic";
+          itemIcon(ic, variantSpriteFor(z.orn, z.variantId));
+          el.appendChild(ic);
+        }
         if (z.orn === PEDESTAL && z.display) {   // 전시대 위 아이템
           const di = document.createElement("span"); di.className = "pl-disp"; itemIcon(di, z.display); el.appendChild(di);
         }
@@ -1011,7 +1199,7 @@ export async function renderPlanner(view) {
         `<span class="pl-mult ${st.m > 1 ? "up" : "down"}">×${st.m.toFixed(st.m < 10 ? 1 : 0)}</span>`);
       if (st.perHour > 0 && (z.p || !st.P.oneShot)) {
         if (autoHarvestBlocked(st)) blockedProduction++;
-        else totals[st.prod.itemCode] = (totals[st.prod.itemCode] || 0) + st.perHour;
+        else addStatProduction(totals, st, st.perHour);
       }
     }
     renderSummary(totals, planted, tilled, blockedProduction);
@@ -1019,12 +1207,13 @@ export async function renderPlanner(view) {
   };
 
   const renderSummary = (totals, planted, tilled, blockedProduction = 0) => {
-    const ent = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    let html = `<h3>생산 요약 <small>(개간 ${tilled} · 작물 ${planted} · 자동수확 기준 · 시간당)</small></h3>`;
+    const ent = [...totals.values()].sort((a, b) => b.amount - a.amount);
+    const harvestMode = opt.zone === "sunset_cliff" && opt.sunsetRipen ? "숙성 수확 기준" : "자동수확 기준";
+    let html = `<h3>생산 요약 <small>(개간 ${tilled} · 작물 ${planted} · ${harvestMode} · 시간당)</small></h3>`;
     if (!ent.length) html += `<p class="muted">생산물 없음</p>`;
-    else html += `<div class="pl-sum-list">${ent.map(([code, n]) =>
+    else html += `<div class="pl-sum-list">${ent.map(({ code, enhancement, amount }) =>
       `<div class="pl-sum"><span class="pl-sic" data-ic="${code}"></span>
-        <span class="pl-sname">${g.items?.[code]?.name || code}</span><b>${n.toFixed(1)}/시간</b></div>`).join("")}</div>`;
+        <span class="pl-sname">${g.items?.[code]?.name || code}${enhancement > 0 ? ` <span class="pl-enhb-inl">+${enhancement}</span>` : ""}</span><b>${amount.toFixed(1)}/시간</b></div>`).join("")}</div>`;
     if (blockedProduction > 0) {
       html += `<p class="muted">항마가 깔린 작물 ${blockedProduction}칸은 자동수확 제외로 생산 요약에서 뺐습니다.</p>`;
     }
@@ -1034,7 +1223,7 @@ export async function renderPlanner(view) {
 
   // 바람꽃 수분 기반 일회성 작물 자동화 생산 (항마 보호 원천 + 너머 빈칸 필요)
   const pollProduction = () => {
-    const out = {};
+    const out = new Map();
     if (!grid.flat().some((z) => z && z.p === "wind_blossom")) return out;
     const windZoneMult = opt.zone === "wind_corridor" ? Math.max(0.01, 1 - 0.1 * zoneCoeff(opt)) : 1;
     const pollIntervalMs = 60000 * (opt.gust ? 0.5 : 1) * windZoneMult; // 질풍포션 → 2배속
@@ -1046,7 +1235,6 @@ export async function renderPlanner(view) {
       if (!(srcCond.has("anti_magic") || srcPlantCond.has("anti_magic"))) continue; // 원천은 항마 보호 필요
       const cloneStat = statFor(tr, tc, clone, effectivePlantAt);
       if (!cloneStat?.prod || cloneStat.gated || cloneStat.paused || autoHarvestBlocked(cloneStat)) continue;
-      const code = sp.produces[0].itemCode;
       const perHour = plannerPollProductionPerHour({
         pollIntervalMs,
         growTimeMs: cloneStat.growEff,
@@ -1054,19 +1242,22 @@ export async function renderPlanner(view) {
         harvests: cloneStat.harvests,
         productionMultiplier: cloneStat.m,
         yieldMultiplier: plentyMultiplier(opt) * (opt.uptime / 100),
+        cycleMs: cloneStat.cycle,
+        revivalChance: plannerRevivalChance(opt.revival),
       });
-      out[code] = (out[code] || 0) + perHour;
+      addStatProduction(out, cloneStat, perHour);
     }
     return out;
   };
   const renderPollSum = () => {
     const autoOut = pollProduction();
-    const autoEnt = Object.entries(autoOut).sort((a, b) => b[1] - a[1]);
+    const autoEnt = [...autoOut.values()].sort((a, b) => b.amount - a.amount);
     if (!autoEnt.length) { pollsum.innerHTML = ""; return; }
-    pollsum.innerHTML = `<h3>🌾 일회성 작물 수분 자동화 <small>(작물 점유시간 반영 · 시간당)</small></h3>` +
-      `<div class="pl-sum-list">${autoEnt.map(([code, n]) =>
+    const revival = plannerRevivalChance(opt.revival);
+    pollsum.innerHTML = `<h3>🌾 일회성 작물 수분 자동화 <small>(작물 점유시간${revival > 0 ? ` · 부활 ${(revival * 100).toFixed(0)}%` : ""} 반영 · 시간당)</small></h3>` +
+      `<div class="pl-sum-list">${autoEnt.map(({ code, enhancement, amount }) =>
         `<div class="pl-sum"><span class="pl-sic" data-ic="${code}"></span>
-          <span class="pl-sname">${g.items?.[code]?.name || code}</span><b>${n.toFixed(1)}/시간</b></div>`).join("")}</div>`;
+          <span class="pl-sname">${g.items?.[code]?.name || code}${enhancement > 0 ? ` <span class="pl-enhb-inl">+${enhancement}</span>` : ""}</span><b>${amount.toFixed(1)}/시간</b></div>`).join("")}</div>`;
     pollsum.querySelectorAll(".pl-sic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
   };
 
@@ -1117,6 +1308,9 @@ export async function renderPlanner(view) {
       );
     };
     if (orn) {
+      const stackedCauldron = orn.orn === CAMPFIRE
+        ? plannerStackedCauldronData(cell?.cauldron)
+        : null;
       let eff;
       if (orn.orn === FARMERS_BATON) {
         const range = farmersBatonRange(orn.e);
@@ -1132,6 +1326,15 @@ export async function renderPlanner(view) {
           <div class="d-row">단일 경계석 효과 <b>은신 선공 확률 ×${(stealthMultiplier * 100).toFixed(1)}%</b></div>
           <div class="d-row">은신 선공 확률 감소 <b class="up">${(reduction * 100).toFixed(1)}%</b></div>
           <div class="d-row muted">습격 시뮬레이터는 여러 개 중 최고 강화도 경계석 1개만 적용합니다.</div>`;
+      } else if (orn.orn === CAMPFIRE) {
+        const cauldronName = stackedCauldron
+          ? g.items?.[stackedCauldron.code]?.name || stackedCauldron.code
+          : "";
+        eff = `<div class="d-row">강화 <b>+${orn.e || 0}</b> · 사용 가능 연료 <b>+0~+${orn.e || 0}</b></div>
+          <div class="d-row">가마솥을 올려 마나 대신 연료로 연성</div>
+          ${stackedCauldron
+            ? `<div class="d-row pl-stacked-cauldron"><span>올린 가마솥 <b>${cauldronName} +${stackedCauldron.enhancement}</b></span><button class="chip" id="pl-cauldron-remove" type="button">내리기</button></div>`
+            : `<div class="d-row muted">올린 가마솥 없음</div>`}`;
       } else {
         const enhancementLine = `<div class="d-row">강화 <b>+${orn.e || 0}</b></div>`;
         eff = enhancementLine + (EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
@@ -1164,6 +1367,15 @@ export async function renderPlanner(view) {
         },
       );
       mountFloorAppearance();
+      const cauldronRemove = detail.querySelector("#pl-cauldron-remove");
+      if (cauldronRemove) {
+        cauldronRemove.onclick = () => {
+          delete cell.cauldron;
+          recompute();
+          save();
+          showDetail(r, c);
+        };
+      }
       const displayMount = detail.querySelector("#pl-disp-picker");
       if (displayMount) {
         const displayPicker = createSearchPicker({
@@ -1210,6 +1422,22 @@ export async function renderPlanner(view) {
       lines += st.prod.interval_ms >= 1000
         ? `<div class="d-row">생산주기 <b>${fmtDuration(st.prod.interval_ms)}</b> · 수명 ${life}</div>`
         : `<div class="d-row">즉시생산 <span class="muted">(성장 ${fmtDuration(st.growEff)})</span> · 수명 ${life}</div>`;
+      if (st.ripened) {
+        const outputName = g.items?.[st.outputCode]?.name || st.outputCode;
+        lines += `<div class="d-row up">${st.nativeRipen ? "기존 숙성" : "석양 숙성"} <b>${fmtDuration(st.ripenTime)}</b></div>
+          <div class="d-row">숙성 산물 <b>${outputName}${st.outputEnh > 0 ? ` +${st.outputEnh}` : ""}</b></div>`;
+      } else if (st.sunsetRipenMode && st.zoneCoeff <= 0) {
+        lines += `<div class="d-row down">지역효과 계수가 0이라 +1 숙성이 적용되지 않습니다.</div>`;
+      }
+      if (st.inheritanceChance > 0) {
+        const inherited = st.inheritanceChance * 100;
+        const baseLabel = st.outputEnh > 0 ? `+${st.outputEnh}` : "0강";
+        lines += `<div class="d-row">유전 산물 <b>${baseLabel} ${(100 - inherited).toFixed(1)}% · +${st.outputEnh + 1} ${inherited.toFixed(1)}%</b></div>`;
+      }
+      if (st.P.oneShot && opt.revival > 0) {
+        const revival = plannerRevivalChance(opt.revival);
+        lines += `<div class="d-row">부활 <b>${(revival * 100).toFixed(0)}%</b> <span class="muted">(수분 복제 작물은 성공 시 다음 수분 대기 없이 재성장)</span></div>`;
+      }
       const pauseWhy = st.waterKilled
         ? "물 공급(불씨덩굴 물 취약)"
         : st.aridBlocked
@@ -1300,12 +1528,25 @@ export async function renderPlanner(view) {
   const updateZoneCoeff = () => {
     view.querySelector("#pl-zone-coeff").textContent = zoneCoeff(opt).toFixed(2);
     view.querySelector("#pl-zone-note").innerHTML = zoneNoteHtml(opt);
+    view.querySelector("#pl-sunset-ripen-wrap").style.display = opt.zone === "sunset_cliff" ? "" : "none";
     recompute();
   };
-  view.querySelector("#pl-zone").onchange = (e) => { opt.zone = e.target.value; updateZoneCoeff(); };
+  view.querySelector("#pl-zone").onchange = (e) => {
+    const enteringSunset = opt.zone !== "sunset_cliff" && e.target.value === "sunset_cliff";
+    opt.zone = e.target.value;
+    if (enteringSunset) {
+      opt.sunsetRipen = true;
+      view.querySelector("#pl-sunset-ripen").checked = true;
+    }
+    updateZoneCoeff();
+  };
   view.querySelector("#pl-familiar").oninput = (e) => { opt.familiar = +e.target.value; view.querySelector("#pl-familiarv").textContent = opt.familiar; updateZoneCoeff(); };
   view.querySelector("#pl-fog").onchange = (e) => { opt.fog = e.target.checked; updateZoneCoeff(); };
   view.querySelector("#pl-raid").onchange = (e) => { opt.raid = e.target.checked; updateZoneCoeff(); };
+  view.querySelector("#pl-sunset-ripen").onchange = (e) => {
+    opt.sunsetRipen = e.target.checked;
+    updateZoneCoeff();
+  };
   view.querySelector("#pl-root").oninput = (e) => { opt.rootDom = +e.target.value; view.querySelector("#pl-rootv").textContent = opt.rootDom; recompute(); };
   view.querySelector("#pl-vein").onchange = (e) => { opt.vein = e.target.checked; recompute(); };
   view.querySelector("#pl-sturdy").onchange = (e) => { opt.sturdy = e.target.checked; recompute(); };
@@ -1313,7 +1554,8 @@ export async function renderPlanner(view) {
   const skSlider = (id, key) => view.querySelector(id).oninput = (e) => {
     opt[key] = +e.target.value; view.querySelector(id + "v").textContent = e.target.value; recompute();
   };
-  skSlider("#pl-time", "timeM"); skSlider("#pl-soil", "soilM"); skSlider("#pl-plenty", "plenty"); skSlider("#pl-uptime", "uptime");
+  skSlider("#pl-time", "timeM"); skSlider("#pl-soil", "soilM"); skSlider("#pl-plenty", "plenty");
+  skSlider("#pl-inheritance", "inheritance"); skSlider("#pl-revival", "revival"); skSlider("#pl-uptime", "uptime");
   // 밭 프리셋: 초기 5×5(25칸) → 다이아몬드 확장. 추가칸 = 링 4r (r4:+16, r5:+20, r6:+24, r7:+28)
   // 누적: 25 → 41 → 61 → 85 → 113, 강화석 비용 = max(0, 중심거리-3)
   const CTR = CENTER;
@@ -1401,6 +1643,11 @@ export async function renderPlanner(view) {
         if (variantId) cell.variantId = variantId;
         else delete cell.variantId;
       } else delete cell.variantId;
+      const stackedCauldron = cell.orn === CAMPFIRE
+        ? plannerStackedCauldronData(cell.cauldron)
+        : null;
+      if (stackedCauldron) cell.cauldron = stackedCauldron;
+      else delete cell.cauldron;
       if (cell.floor) {
         const variantId = plannerItemVariantId(cell.floor, cell.floorVariantId, itemVariants);
         if (variantId) cell.floorVariantId = variantId;
@@ -1436,7 +1683,7 @@ export async function renderPlanner(view) {
   // ── 배치 압축 인코딩 (바이너리 → url-safe base64).
   // v2: 바닥재·울타리, v3: 전시대 전시 아이템, v4: 포션 효과,
   // v5: 장식물 강화도, v6: 울타리·장벽 강화도, v7: 작물 외형,
-  // v8: 장식물·바닥재·경계 외형
+  // v8: 장식물·바닥재·경계 외형, v9: 모닥불 위 가마솥
   function encodeGrid() {
     let minR = CANVAS, maxR = -1, minC = CANVAS, maxC = -1;
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) if (grid[r][c]) {
@@ -1446,8 +1693,10 @@ export async function renderPlanner(view) {
     const h = maxR - minR + 1, w = maxC - minC + 1;
     const pl = [], orn = [], disp = [], plantSkins = [], itemVariantIds = [], vals = [], floors = [], fences = [];
     const dispVals = [], soilVals = [], plantVals = [], ornEnhVals = [], fenceEnhVals = [], skinVals = [], itemVariantVals = [];
+    const cauldronVals = [], cauldronEnhVals = [];
     let hasFloor = false, hasFence = false, hasDisp = false;
     let hasSoilFx = false, hasPlantFx = false, hasOrnEnh = false, hasFenceEnh = false, hasPlantSkin = false, hasItemVariant = false;
+    let hasCampfireCauldron = false;
     const itemVariantValue = (itemCode, rawVariantId) => {
       const variantId = plannerItemVariantId(itemCode, rawVariantId, itemVariants);
       if (!variantId) return 0;
@@ -1498,11 +1747,21 @@ export async function renderPlanner(view) {
         const fence = fenceData(z?.fences?.[side]);
         itemVariantVals.push(itemVariantValue(fence?.code, fence?.variantId));
       });
+      const stackedCauldron = z?.orn === CAMPFIRE
+        ? plannerStackedCauldronData(z.cauldron)
+        : null;
+      const cauldronIndex = stackedCauldron
+        ? CAMPFIRE_CAULDRON_ORDER.indexOf(stackedCauldron.code)
+        : -1;
+      cauldronVals.push(cauldronIndex + 1);
+      cauldronEnhVals.push(stackedCauldron?.enhancement || 0);
+      if (cauldronIndex >= 0) hasCampfireCauldron = true;
     }
     const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0) | (hasDisp ? 4 : 0)
       | (hasSoilFx ? 8 : 0) | (hasPlantFx ? 16 : 0) | (hasOrnEnh ? 32 : 0)
       | (hasFenceEnh ? 64 : 0) | (hasPlantSkin ? 128 : 0);
-    const ver = hasItemVariant ? 8 : hasPlantSkin ? 7 : hasFenceEnh ? 6 : hasOrnEnh ? 5 : (hasSoilFx || hasPlantFx) ? 4 : hasDisp ? 3 : 2;
+    const ver = hasCampfireCauldron ? 9 : hasItemVariant ? 8 : hasPlantSkin ? 7
+      : hasFenceEnh ? 6 : hasOrnEnh ? 5 : (hasSoilFx || hasPlantFx) ? 4 : hasDisp ? 3 : 2;
     const bytes = [ver, minR, minC, h, w, flags, pl.length];
     const wrStr = (id) => { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); };
     for (const id of pl) wrStr(id);
@@ -1519,9 +1778,13 @@ export async function renderPlanner(view) {
       bytes.push(plantSkins.length); for (const id of plantSkins) wrStr(id);
       skinVals.forEach((v) => bytes.push(v));
     }
-    if (hasItemVariant) {
+    if (ver >= 8) {
       bytes.push(itemVariantIds.length); for (const id of itemVariantIds) wrStr(id);
       itemVariantVals.forEach((v) => bytes.push(v));
+    }
+    if (ver >= 9) {
+      cauldronVals.forEach((v) => bytes.push(v));
+      cauldronEnhVals.forEach((v) => bytes.push(v));
     }
     let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
     return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -1532,7 +1795,7 @@ export async function renderPlanner(view) {
     const b = []; for (let k = 0; k < bin.length; k++) b.push(bin.charCodeAt(k));
     let i = 0;
     const ver = b[i++];
-    if (ver < 1 || ver > 8) return null;
+    if (ver < 1 || ver > 9) return null;
     const minR = b[i++], minC = b[i++], h = b[i++], w = b[i++];
     const flags = ver >= 2 ? b[i++] : 0;
     const pl = [], orn = [];
@@ -1611,6 +1874,19 @@ export async function renderPlanner(view) {
             : "";
           if (variantId && cell) cell.fences[side] = { ...fence, variantId };
         });
+      });
+    }
+    if (ver >= 9) {
+      const cauldronValues = cells.map(() => b[i++] || 0);
+      const cauldronEnhancements = cells.map(() => b[i++] || 0);
+      cells.forEach(([gr, gc], index) => {
+        const cell = g[gr]?.[gc];
+        const code = CAMPFIRE_CAULDRON_ORDER[cauldronValues[index] - 1];
+        const cauldron = plannerStackedCauldronData({
+          code,
+          enhancement: cauldronEnhancements[index],
+        });
+        if (cell?.orn === CAMPFIRE && cauldron) cell.cauldron = cauldron;
       });
     }
     return g;

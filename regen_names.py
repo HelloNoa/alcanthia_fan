@@ -146,13 +146,13 @@ def parse_shop_prices(s):
 def parse_recipes_for_values(s):
     m = re.search(
         r"const\s+([A-Za-z0-9_$]+)=\[\.\.\.([A-Za-z0-9_$]+)\.map"
-        r"\(\(\[e,t\]\)=>\(\{inputs:\[e\[0\],e\[1\]\],requiredLevel:0,outputs:\[t\]\}\)\),"
-        r"\.\.\.([A-Za-z0-9_$]+)\.map",
+        r"\(\(\[([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\]\)=>\(\{inputs:\[\3\[0\],\3\[1\]\],"
+        r"requiredLevel:0,outputs:\[\4\]\}\)\),\.\.\.([A-Za-z0-9_$]+)\.map",
         s,
     )
     if not m:
         return []
-    recipe_var, brew_var, craft_var = m.groups()
+    recipe_var, brew_var, _input_var, _output_var, craft_var = m.groups()
     recipes = []
 
     brew_src = extract_assignment(s, brew_var)
@@ -393,6 +393,19 @@ ITEM_PERK_OVERRIDES = {
     "leyline_stitching_needle": "사용 시 습격으로 억제된 지역 효과 즉시 복구",
     "witch_paint_pot": "사용 시 닉네임 색상 변경 · +0 15색, +1 30색, +2 이상 45색",
     "farmers_baton": "텃밭에 설치 가능 · 주변 작물 상태 관측 및 관리 · +1부터 강화도+1 거리",
+    "campfire": "텃밭에 설치 가능 · 가마솥을 올려 마나 대신 연료로 연성 · 일반 연성은 장작, 묶음 연성은 잉걸 사용 · 장식물 강화도 이하 연료 사용 · 연성시간 ×0.9^연료 강화도",
+    "levitation_chest": "텃밭에 설치 가능 · 가까운 가마솥의 재료 상자 · 보관 슬롯 6×(강화도+1)",
+    "compost_bin": "텃밭에 설치 가능 · 초당 아이템 1개를 소모해 인접 식물 강화도 +1 · 보관 슬롯 6×(강화도+1)",
+}
+
+# 게임 번들에서 test 플래그를 유지하지만 실제 플레이에 공개된 예외가 있다.
+PUBLIC_TEST_ITEM_CODES = {"guardian_censer"}
+INDEXED_TEST_ITEM_CODES = {
+    "aging_red_flower_seed",
+    "aging_sunset_bush_seed",
+    "growth_elixir",
+    "poison_fang",
+    *PUBLIC_TEST_ITEM_CODES,
 }
 
 
@@ -419,6 +432,8 @@ def parse_item_catalog(s):
             "prefix": js_string_field(obj, "prefix"),
             "description": js_string_field(obj, "description") or "",
         }
+        if code not in PUBLIC_TEST_ITEM_CODES and re.search(r"\btest:(?:!0|true)\b", obj):
+            row["test"] = True
         perk = ITEM_PERK_OVERRIDES.get(code)
         if perk is None:
             raw_perk = js_field_value(obj, "perk") or ""
@@ -572,10 +587,15 @@ def parse_quests(s, gd, allowed_repeats=("daily", "weekly")):
             parts.append("모험 1회 이상")
         for z in re.findall(r"clearedZones(?:\?\.|\.)([a-zA-Z0-9_]+)!=null", text):
             parts.append(f"{zone_name(z)} 클리어")
-        for a in re.findall(r"!!e\.hiredAdventurers\.([a-zA-Z0-9_]+)", text):
+        for a in re.findall(
+            r"!![A-Za-z_$][A-Za-z0-9_$]*\.hiredAdventurers(?:\?\.|\.)([a-zA-Z0-9_]+)",
+            text,
+        ):
             parts.append(f"{npc_name(a)} 고용")
         for qid, n in re.findall(r"completedCount\.([a-zA-Z0-9_]+)\?\?0\)>=([0-9]+)", text):
             parts.append(f"{title_by_id.get(qid, qid)} {n}회 완료")
+        for npc_id, n in re.findall(r'npcId==="([a-zA-Z0-9_]+)".*?\),0\)>=([0-9]+)', text):
+            parts.append(f"{npc_name(npc_id)} 의뢰 누적 {n}회 완료")
         if not parts and "!0" in text:
             parts.append("기본")
         return list(dict.fromkeys(parts))
@@ -711,18 +731,24 @@ def update_gamedata(s):
         if code in stored_items:
             for key in ("name", "type", "brewDuration_ms", "prefix", "description"):
                 stored_items[code][key] = item[key]
+            stored_items[code].pop("test", None)
             if "perk" in item:
                 stored_items[code]["perk"] = item["perk"]
         else:
-            stored_items[code] = item
+            stored_items[code] = {key: value for key, value in item.items() if key != "test"}
+    test_items = set(gd.get("test_items") or [])
+    test_items.update(code for code, item in catalog.items() if item.get("test"))
+    test_items.difference_update(PUBLIC_TEST_ITEM_CODES)
+    gd["test_items"] = sorted(test_items)
     dia_shop = parse_dia_shop(s)
     if dia_shop:
         gd["dia_shop"] = dia_shop
     else:
         dia_shop = gd.setdefault("dia_shop", {})
         print("skip gamedata dia_shop: 번들에서 다이아 상점을 추출하지 못함")
-    if not sync_recipe(gd, s, "farmers_baton", "special"):
-        print("skip gamedata farmers_baton recipe: 번들에서 제작법을 추출하지 못함")
+    for output in ("farmers_baton", "levitation_chest", "compost_bin"):
+        if not sync_recipe(gd, s, output, "special"):
+            print(f"skip gamedata {output} recipe: 번들에서 제작법을 추출하지 못함")
     special_source = gd.setdefault("special_source", {})
     for code in ("guardian_censer", "leyline_stitching_needle"):
         special_source[code] = "📌 현재 게임 데이터에 제작법·고정 상점 판매 없음"
@@ -911,6 +937,8 @@ def main():
         o = s[b:match_fwd(s, b) + 1]
         if 'spriteKey:"' not in o or 'type:"' not in o:
             continue
+        if code not in INDEXED_TEST_ITEM_CODES and re.search(r"\btest:(?:!0|true)\b", o):
+            continue
         t = field(o, "type")
         if t not in ("seed", "produce", "potion", "equipment", "tool", "general", "material", "ingredient"):
             continue
@@ -1006,7 +1034,9 @@ def main():
         "itemFolders": item_folders,
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    json.dump(data, open(OUT, "w"), ensure_ascii=False, indent=0)
+    with open(OUT, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=0)
+        f.write("\n")
     print(f"wrote {OUT}")
     for k, v in data.items():
         print(f"  {k}: {len(v)}")
