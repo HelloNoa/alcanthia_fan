@@ -966,12 +966,15 @@ def main():
                 themes[k] = field(v, "name")
     zones.update(themes)
 
-    # 스킨: skinId -> spriteKey
+    # 작물 외형: skinId -> spriteKey / 게임 표시명
     skins = {}
-    for sid, _pid, sk in re.findall(
-        r'\{id:"([a-z0-9_]+)",[^{}]*?plantId:"([a-z0-9_]+)",[^{}]*?spriteKey:"([a-z0-9_]+)"', s
+    skin_names = {}
+    for sid, _pid, name, sk in re.findall(
+        r'\{id:"([a-z0-9_]+)",[^{}]*?plantId:"([a-z0-9_]+)",'
+        r'[^{}]*?name:"([^"]+)",[^{}]*?spriteKey:"([a-z0-9_]+)"', s
     ):
         skins[sid] = sk
+        skin_names[sid] = name
     item_variant_sprites = {}
     item_variants = {}
     for sid, code, name, sk in re.findall(
@@ -1027,6 +1030,7 @@ def main():
         "skills": skills,
         "zones": zones,
         "skins": skins,
+        "skinNames": skin_names,
         "itemVariantSprites": item_variant_sprites,
         "itemVariants": item_variants,
         "adventurers": adventurers,

@@ -165,7 +165,14 @@ const PLANT_SKIN_LABELS = {
   planter: "화분",
   potted: "화분",
 };
-const plannerPlantSkinLabel = (plantId, skinId) => {
+const plannerPlantSkinLabel = (plantId, skinId, displayName = "", plantName = "") => {
+  const exactName = String(displayName || "").trim();
+  const plantSuffix = plantName ? ` ${plantName}` : "";
+  if (exactName) {
+    return plantSuffix && exactName.endsWith(plantSuffix)
+      ? exactName.slice(0, -plantSuffix.length)
+      : exactName;
+  }
   const suffix = skinId.slice(String(plantId).length + 1);
   return PLANT_SKIN_LABELS[suffix]
     || suffix.split("_").filter(Boolean).join(" ")
@@ -408,6 +415,7 @@ export async function renderPlanner(view) {
   }
   const palette = Object.keys(plants);
   const skinSprites = N.skins || {};
+  const skinNames = N.skinNames || {};
   const skinIdsByPlant = Object.fromEntries(
     palette.map((plantId) => [plantId, plannerPlantSkinIds(plantId, skinSprites)]),
   );
@@ -428,7 +436,7 @@ export async function renderPlanner(view) {
     },
     ...(skinIdsByPlant[plantId] || []).map((skinId) => ({
       code: skinId,
-      label: plannerPlantSkinLabel(plantId, skinId),
+      label: plannerPlantSkinLabel(plantId, skinId, skinNames[skinId], plants[plantId]?.name),
       spriteKey: skinSprites[skinId],
     })),
   ];

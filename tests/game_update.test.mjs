@@ -105,11 +105,22 @@ for (const skinId of [
 ]) {
   assert.equal(names.skins[skinId], skinId);
 }
+for (const [skinId, skinName] of Object.entries({
+  red_flower_pink_bouquet: "분홍꽃다발 붉은꽃",
+  red_flower_pink_tulip: "분홍튤립 붉은꽃",
+})) {
+  assert.equal(names.skins[skinId], skinId);
+  assert.equal(names.skinNames[skinId], skinName);
+}
 for (const [variantId, itemCode] of Object.entries({
   "witch_scarecrow:pink_lace_parasol": "witch_scarecrow",
   "pedestal:sunbed": "pedestal",
+  "working_shelf:pink_vanity": "working_shelf",
+  "telescope:pink_heart": "telescope",
   "stone_floor:wooden_deck": "stone_floor",
   "flower_trellis_arch:iron": "flower_trellis_arch",
+  "flower_trellis_arch:stone": "flower_trellis_arch",
+  "flower_trellis_arch:temple": "flower_trellis_arch",
   "rustic_fence:iron": "rustic_fence",
   "root_barrier:swamp_thicket": "root_barrier",
   "storage_chest:picnic": "storage_chest",

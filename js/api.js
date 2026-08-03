@@ -26,11 +26,17 @@ export const api = {
   version:    () => get("/version"),
 };
 
+const loadStaticJson = async (path) => {
+  const res = await fetch(path, { cache: "no-cache" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
+
 // 라벨용 이름 맵 (한 번 로드)
 let _names = null;
 export async function names() {
   if (_names) return _names;
-  try { _names = await (await fetch("./data/names.json")).json(); }
+  try { _names = await loadStaticJson("./data/names.json"); }
   catch { _names = { plants: {}, items: {}, skills: {}, zones: {} }; }
   return _names;
 }
@@ -39,7 +45,7 @@ export async function names() {
 let _gd = null;
 export async function gamedata() {
   if (_gd) return _gd;
-  try { _gd = await (await fetch("./data/gamedata.json")).json(); }
+  try { _gd = await loadStaticJson("./data/gamedata.json"); }
   catch { _gd = {}; }
   return _gd;
 }
@@ -48,7 +54,7 @@ export async function gamedata() {
 let _progression = null;
 export async function progression() {
   if (_progression) return _progression;
-  try { _progression = await (await fetch("./data/progression.json")).json(); }
+  try { _progression = await loadStaticJson("./data/progression.json"); }
   catch { _progression = { tutorialGoals: [], oneTimeQuests: [] }; }
   return _progression;
 }
