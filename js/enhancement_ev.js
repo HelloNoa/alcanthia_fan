@@ -7,6 +7,7 @@ export function enhancementMaterialFlow({
   successRate,
   bonusRate = 0,
   sourceBonusRate = 0,
+  failureRestoreRate = 0,
   goal = "exact",
 }) {
   if (typeof successRate !== "function") throw new TypeError("successRate must be a function");
@@ -16,6 +17,7 @@ export function enhancementMaterialFlow({
   target = Math.max(start, Math.floor(Number(target) || 0));
   const bonus = clamp01(bonusRate);
   const sourceBonus = clamp01(sourceBonusRate);
+  const restore = clamp01(failureRestoreRate);
   const supply = Array(target - start + 1).fill(0);
   const levels = [];
   let targetYield = 0;
@@ -37,13 +39,15 @@ export function enhancementMaterialFlow({
     const available = supply[level - start];
     if (!(available > 0)) continue;
     const p = clamp01(successRate(level));
-    // 한 번에 2개를 쓰고 실패 시 1개를 돌려받으므로 시도당 기대 순소모는 1+p다.
-    const attempts = available / (1 + p);
+    // 성공은 2개를 소모하고, 일반 실패는 1개를 회수한다.
+    // 잊힌 성터가 발동한 실패는 2개 모두 반환하므로 시도당 기대 순소모에서 제외한다.
+    const netConsumption = 1 + p - (1 - p) * restore;
+    const attempts = netConsumption > 0 ? available / netConsumption : 0;
     const normalOutput = attempts * p * (1 - bonus);
     const bonusOutput = attempts * p * bonus;
     addOutput(level + 1, normalOutput);
     addOutput(level + 2, bonusOutput);
-    levels.push({ level, available, successRate: p, attempts, normalOutput, bonusOutput });
+    levels.push({ level, available, successRate: p, failureRestoreRate: restore, attempts, normalOutput, bonusOutput });
   }
 
   return {

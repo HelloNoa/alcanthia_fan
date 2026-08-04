@@ -542,6 +542,7 @@ async function evCalc(body) {
               <option value="">기타 (효과 없음)</option>
               <option value="golden_fields">금빛들판 (제작 성공률)</option>
               <option value="sunset_cliff">석양절벽 (성공 결과 +1)</option>
+              <option value="forgotten_fortress">잊힌 성터 (실패 재료 반환)</option>
             </select>
           </label>
           <label class="lvlabel">낯익은 터 <input id="ev-famG" type="range" min="0" max="10" value="0"><b id="ev-famGv">0</b></label>
@@ -560,7 +561,8 @@ async function evCalc(body) {
         <div class="calc-note">💡 강화 = <b>같은 강화도 아이템 2개 합성 → +1</b> (성공률 p). <b>실패 시 1개만 회수</b>(1개 손실).<br>
           성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 지역효과가 없으면 단계별 필요량은 <code>1+1/p</code>배.<br>
           <b>2차 전개</b>: 기본 제작 산출은 +0, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.<br>
-          금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적하며, <b>정확히 최종 강화도인 결과만 집계</b>하고 초과 결과는 제외합니다.</div>
+          금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적하며, <b>정확히 최종 강화도인 결과만 집계</b>하고 초과 결과는 제외합니다.<br>
+          잊힌 성터는 강화 실패 시 <b>10%×지역효과 계수</b> 확률로 재료 2개를 모두 반환합니다.</div>
       </div>
     </div>`;
   const q = (id) => body.querySelector(id);
@@ -575,7 +577,7 @@ async function evCalc(body) {
   restoreNumber("#ev-start", "start", 0, 99);
   restoreNumber("#ev-brew", "brew", 0, 2);
   restoreNumber("#ev-target", "target", 0, 99);
-  if (["", "golden_fields", "sunset_cliff"].includes(savedEvState.zone)) q("#ev-zone").value = savedEvState.zone;
+  if (["", "golden_fields", "sunset_cliff", "forgotten_fortress"].includes(savedEvState.zone)) q("#ev-zone").value = savedEvState.zone;
   if (typeof savedEvState.fog === "boolean") q("#ev-fog").checked = savedEvState.fog;
   if (typeof savedEvState.zoneBuff === "boolean") q("#ev-zoneBuff").checked = savedEvState.zoneBuff;
   if (typeof savedEvState.self === "boolean") q("#ev-self").checked = savedEvState.self;
@@ -587,6 +589,7 @@ async function evCalc(body) {
     + (q("#ev-zoneBuff")?.checked ? 0.5 : 0);
   const craftBuff = () => q("#ev-zone")?.value === "golden_fields" ? Math.min(2.25, 1 + 0.5 * zoneCoeff()) : 1;
   const sunsetBonusRate = () => q("#ev-zone")?.value === "sunset_cliff" ? Math.min(1, 0.05 * zoneCoeff()) : 0;
+  const fortressRestoreRate = () => q("#ev-zone")?.value === "forgotten_fortress" ? Math.min(1, 0.1 * zoneCoeff()) : 0;
   // reqLevel R을 강화가능 입력들에 분배 (입력별 강화비용 최소화)
   const bestSplit = (R, costFns) => {
     if (costFns.length === 0) return [];
@@ -762,6 +765,7 @@ async function evCalc(body) {
     q("#ev-famGv").textContent = famG;
     const craftRateBuff = craftBuff();
     const sunsetRate = sunsetBonusRate();
+    const restoreRate = fortressRestoreRate();
     q("#ev-brew-row").style.display = potion ? "" : "none";
     q("#ev-start-row").style.display = potion ? "none" : "";   // 포션은 양조 작물 강화도가 시작점 → 시작 강화도 숨김
     // 단계 k(→k+1) 성공률. 자가강화면 도구 솥 강화도 = max(솥강화도, k)
@@ -770,13 +774,14 @@ async function evCalc(body) {
     const materialFlow = (start, target, sourceBonusRate = 0, goal = "exact") => {
       start = Math.max(0, Math.floor(start || 0));
       target = Math.max(start, Math.floor(target || 0));
-      const key = `${start}:${target}:${sourceBonusRate}:${goal}`;
+      const key = `${start}:${target}:${sourceBonusRate}:${restoreRate}:${goal}`;
       if (!flowMemo.has(key)) flowMemo.set(key, enhancementMaterialFlow({
         start,
         target,
         successRate: pAt,
         bonusRate: sunsetRate,
         sourceBonusRate,
+        failureRestoreRate: restoreRate,
         goal,
       }));
       return flowMemo.get(key);
@@ -846,6 +851,7 @@ async function evCalc(body) {
       const brewP = pAt(baseE);
       q("#ev-out").innerHTML = `
         ${t > baseE ? `<div class="ev-res"><span>합성 성공률 (시작 단계)</span><b>${(brewP * 100).toFixed(1)}%</b></div>` : ""}
+        ${restoreRate > 0 && t > baseE ? `<div class="ev-res"><span>잊힌 성터 실패 재료 반환률</span><b>${pct(restoreRate)}</b></div>` : ""}
         ${sunsetRate > 0 ? `<div class="ev-res"><span>석양 발동률 (성공 결과)</span><b>${pct(sunsetRate)}</b></div>
         <div class="ev-res"><span>양조 산출 +${baseE}</span><b>${pct(1 - sunsetRate)}</b></div>
         <div class="ev-res"><span>석양 양조 산출 +${baseE + 1}</span><b>${pct(sunsetRate)}</b></div>
@@ -878,6 +884,7 @@ async function evCalc(body) {
     q("#ev-out").innerHTML = `
       ${levels > 0 ? `<div class="ev-res"><span>강화 성공률 (1회)</span><b>${rateTxt}</b></div>` : ""}
       ${hasCraft && craftRateBuff > 1 ? `<div class="ev-res"><span>금빛들판 제작 성공률</span><b>×${craftRateBuff.toFixed(2)}</b></div>` : ""}
+      ${restoreRate > 0 ? `<div class="ev-res"><span>잊힌 성터 실패 재료 반환률</span><b>${pct(restoreRate)}</b></div>` : ""}
       ${sunsetRate > 0 ? `<div class="ev-res"><span>석양 발동률 (성공 결과)</span><b>${pct(sunsetRate)}</b></div>
       ${hasCraft && s === 0 ? `<div class="ev-res"><span>제작 산출 +0 / +1</span><b>${pct(1 - sunsetRate)} / ${pct(sunsetRate)}</b></div>` : ""}
       ${levels > 0 ? `<div class="ev-res"><span>시작 단계 실패 (+${s} 회수)</span><b>${pct(1 - pS)}</b></div>

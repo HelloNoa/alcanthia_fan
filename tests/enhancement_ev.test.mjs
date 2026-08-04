@@ -48,6 +48,13 @@ const rate = () => p;
 
 closeTo(enhancementMaterialFlow({ start: 0, target: 3, successRate: rate }).expectedInputs, step ** 3);
 
+// 잊힌 성터: 실패 중 restore 비율은 재료 2개를 모두 반환해 순소모가 없다.
+const restore = 0.25;
+const restoredStep = (1 + p - (1 - p) * restore) / p;
+closeTo(enhancementMaterialFlow({
+  start: 0, target: 3, successRate: rate, failureRestoreRate: restore,
+}).expectedInputs, restoredStep ** 3);
+
 const varyingRates = [0.5, 0.6, 0.7];
 closeTo(enhancementMaterialFlow({
   start: 0, target: 3, successRate: (level) => varyingRates[level],
