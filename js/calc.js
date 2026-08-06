@@ -5,6 +5,7 @@ import { raidSim } from "./raid.js";
 import { defaultEnhancementMaterialPrice } from "./calc_prices.js";
 import { enhancementMaterialFlow } from "./enhancement_ev.js";
 import { createSearchPicker } from "./search_picker.js";
+import { ENHANCEMENT_EV_STORE, loadEnhancementEvState } from "./calc_state.js";
 
 export async function renderCalc(view, sub) {
   view.innerHTML = `<h2>🧮 계산기</h2>
@@ -507,13 +508,7 @@ async function evCalc(body) {
     .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const itemCodeByInput = new Map();
   for (const c of craftable) { itemCodeByInput.set(nameOf(c), c); itemCodeByInput.set(c, c); }
-  const EV_STORE = "alc_enhancement_ev_v1";
-  const savedEvState = (() => {
-    try {
-      const value = JSON.parse(localStorage.getItem(EV_STORE) || "null");
-      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    } catch { return {}; }
-  })();
+  const savedEvState = loadEnhancementEvState();
   // 원재료 가격(골드) — 일반 상점 품목은 구매가, 나머지는 게임 가치/판매가. 사용자가 덮어쓰면 priceState
   const priceState = {};
   for (const [code, value] of Object.entries(savedEvState.prices || {})) {
@@ -722,7 +717,7 @@ async function evCalc(body) {
   const saveState = () => {
     const numberOf = (id) => Math.max(0, Math.floor(+q(id).value || 0));
     try {
-      localStorage.setItem(EV_STORE, JSON.stringify({
+      localStorage.setItem(ENHANCEMENT_EV_STORE, JSON.stringify({
         item: itemCodeByInput.get(q("#ev-item").value.trim()) || "",
         cauldron: numberOf("#ev-cauldron"),
         wick: Math.min(10, numberOf("#ev-wick")),

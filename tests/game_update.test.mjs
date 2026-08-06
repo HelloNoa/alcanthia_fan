@@ -86,9 +86,50 @@ for (const [output, inputs, requiredLevel] of [
 assert.equal(gameData.sell_price.engraving_stone, 500);
 assert.equal(gameData.sell_price.polishing_powder, 250);
 assert.equal(gameData.sell_price.dia_box_30, 300000);
+for (const [code, price] of Object.entries({
+  moonlight_mushroom: 15,
+  crystal_leaf: 75,
+  nightshade_root: 500,
+  hallucination_spore: 40,
+  antidote_potion: 50,
+  frenzy_potion: 40,
+  stealth_potion: 40,
+  corrosion_potion: 150,
+  foresight_potion: 140,
+  explosion_potion: 170,
+  daydream_potion: 140,
+  vitality_elixir: 30,
+  freeze_potion: 190,
+  insight_potion: 190,
+  resonance_potion: 400,
+  shatter_potion: 250,
+  refraction_potion: 280,
+  encroachment_potion: 800,
+  nightmare_potion: 750,
+  anti_magic_potion: 850,
+  contagion_potion: 850,
+  curse_potion: 800,
+})) {
+  assert.equal(gameData.sell_price[code], price, `${code} shop sell price`);
+}
+for (const code of [
+  "poison_flower_seed",
+  "moonlight_mushroom_seed",
+  "star_flower_seed",
+  "fire_vine_seed",
+  "wind_blossom_seed",
+  "sunlight_flower_seed",
+  "illusion_fern_seed",
+  "sunset_bush_seed",
+  "crystal_succulent_seed",
+  "nightshade_sprout_seed",
+  "sprawling_vine_seed",
+]) {
+  assert.equal(code in gameData.sell_price, false, `${code} is no longer shop-sellable`);
+}
 assert.equal(gameData.item_values.aquifer_potion, 510);
 assert.equal(gameData.item_output_values.aquifer_potion, 750);
-assert.equal(gameData.item_values.reversion_potion, 1500);
+assert.equal(gameData.item_values.reversion_potion, 1000);
 assert.equal(gameData.item_output_values.mana_sprayer, 3730050);
 assert.equal(gameData.item_output_values.cauldron_controller, 3936600);
 for (const code of ["vine_tendril", "aquifer_potion", "reversion_potion"]) {

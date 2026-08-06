@@ -16,6 +16,11 @@ const GARDEN_PADDING = 2;
 const GARDEN_SCROLL_GUTTER = 8;
 const GARDEN_VIEW_STORE = "alc_garden_view";
 const gardenResizeObservers = new WeakMap();
+const SNAPSHOT_LIMITED_PRODUCE = new Set([
+  "herb",
+  "moonlight_mushroom",
+  "nightshade_root",
+]);
 const GARDEN_EDGE_SIDES = [
   ["upperRight", "t", "위"],
   ["lowerRight", "r", "오른쪽"],
@@ -152,6 +157,14 @@ export function gardenAchievementModifier(profile) {
   return typeof modifier === "string" ? modifier.trim() : "";
 }
 
+export function gardenSnapshotLimitedProduce(profile) {
+  const production = Array.isArray(profile?.production) ? profile.production : [];
+  return [...new Set(production.flatMap((entry) => {
+    const code = parseItemKey(entry?.itemKey).code;
+    return SNAPSHOT_LIMITED_PRODUCE.has(code) ? [code] : [];
+  }))];
+}
+
 function appendGardenStat(container, label, value) {
   const stat = document.createElement("span");
   stat.append(document.createTextNode(`${label} `));
@@ -273,7 +286,7 @@ export async function renderGarden(container, profile, label) {
         layer.className = "pl-fences garden-fences";
         edges.forEach((edge) => {
           const marker = document.createElement("i");
-          marker.className = `pl-fc pl-fc-${edge.side}${edge.code === "root_barrier" ? " bar" : ""}`;
+          marker.className = `pl-fc pl-fc-${edge.side}${edge.code === "root_barrier" ? " bar" : ""}${edge.code === "flower_trellis_arch" ? " trellis" : ""}`;
           marker.dataset.edgeCode = edge.code;
           marker.dataset.enhancement = String(edge.enhancement);
           layer.appendChild(marker);
@@ -426,13 +439,20 @@ export async function renderGarden(container, profile, label) {
     observer.observe(container);
   }
 
-  // 시간당 생산량
+  // 게임 공개 프로필이 제공하는 조회 시점 생산량
   if (profile.production?.length) {
     const sec = document.createElement("div");
     sec.className = "info-sec";
     const h3 = document.createElement("h3");
-    h3.textContent = "⏱️ 시간당 생산량";
+    h3.textContent = "⏱️ 서버 스냅샷 생산량";
     sec.appendChild(h3);
+    const snapshotLimited = new Set(gardenSnapshotLimitedProduce(profile));
+    if (snapshotLimited.size) {
+      const note = document.createElement("p");
+      note.className = "garden-production-note";
+      note.textContent = "게임 공개 프로필이 현재 살아 있는 식물만 계산한 값입니다. 약초·달빛버섯·밤그늘뿌리는 이후 바람꽃이 복제할 식물과 부활 반복이 빠져 실제 장기 생산량보다 낮습니다.";
+      sec.appendChild(note);
+    }
     const list = document.createElement("div");
     list.className = "kv-list";
     [...profile.production]
@@ -443,6 +463,10 @@ export async function renderGarden(container, profile, label) {
         const nm = N.items?.[code] || code;
         const kv = document.createElement("span");
         kv.className = "kv";
+        if (snapshotLimited.has(code)) {
+          kv.classList.add("snapshot-limited");
+          kv.title = "바람꽃의 이후 복제와 부활 반복이 포함되지 않은 조회 시점 수치";
+        }
         loadImg(kv, itemURLs(N, sk), "", "kv-icon");
         kv.insertAdjacentHTML("beforeend", `${nm} <b>${Math.round(p.perHour).toLocaleString()}/h</b>`);
         list.appendChild(kv);

@@ -8,6 +8,7 @@ const {
   gardenGridLayout,
   gardenPopularity,
   gardenProfileIntro,
+  gardenSnapshotLimitedProduce,
   gardenSurfaceItem,
 } = await import("../js/garden.js");
 
@@ -35,6 +36,20 @@ assert.equal(gardenPopularity({ popularity: 0 }), 0);
 assert.equal(gardenPopularity({ popularity: "200" }), 200);
 assert.equal(gardenPopularity({ popularity: "unknown" }), null);
 assert.equal(gardenPopularity({}), null);
+
+assert.deepEqual(gardenSnapshotLimitedProduce(null), []);
+assert.deepEqual(
+  gardenSnapshotLimitedProduce({
+    production: [
+      { itemKey: "herb+5", perHour: 214 },
+      { itemKey: "red_flower_leaf+5", perHour: 1_200 },
+      { itemKey: "moonlight_mushroom+5", perHour: 48 },
+      { itemKey: "herb+5", perHour: 200 },
+      { itemKey: "nightshade_root", perHour: 1 },
+    ],
+  }),
+  ["herb", "moonlight_mushroom", "nightshade_root"],
+);
 
 const square21 = Array.from({ length: 21 }, () => Array(21).fill(null));
 assert.deepEqual(gardenGridLayout(square21, 500), { rows: 21, cols: 21, cellSize: 32 });

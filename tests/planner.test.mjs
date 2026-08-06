@@ -6,6 +6,9 @@ const {
   farmersBatonRange,
   plannerEmitterRange,
   plannerCanStackCauldron,
+  plannerDeduplicateSharedFences,
+  plannerFitGrid,
+  plannerGridFromGardenProfile,
   plannerItemVariantId,
   plannerItemVariantIds,
   plannerInheritanceChance,
@@ -18,6 +21,7 @@ const {
   plannerRipenedCycleMs,
   plannerStackedCauldronData,
   plannerSunsetRipenDurationMs,
+  plannerToggleSharedFence,
 } = await import("../js/planner.js");
 
 assert.equal(farmersBatonRange(0), 1);
@@ -165,5 +169,225 @@ assert.equal(
   "stone_floor:wooden_deck",
 );
 assert.equal(plannerItemVariantId("stone_floor", "rustic_fence:iron", itemVariants), "");
+
+const sharedFenceGrid = [
+  [{ p: null }, { p: null }],
+  [{ p: null }, { p: null }],
+];
+assert.equal(plannerToggleSharedFence(sharedFenceGrid, 0, 0, "r", {
+  code: "rustic_fence",
+  enhancement: 2,
+}), true);
+assert.deepEqual(sharedFenceGrid[0][0].fences.r, {
+  code: "rustic_fence",
+  enhancement: 2,
+});
+assert.equal(sharedFenceGrid[0][1].fences, undefined);
+assert.equal(plannerToggleSharedFence(sharedFenceGrid, 0, 1, "l", {
+  code: "rustic_fence",
+  enhancement: 2,
+}), false);
+assert.equal(sharedFenceGrid[0][0].fences, undefined);
+assert.equal(sharedFenceGrid[0][1].fences, undefined);
+
+plannerToggleSharedFence(sharedFenceGrid, 0, 0, "b", {
+  code: "rustic_fence",
+  enhancement: 1,
+});
+assert.equal(plannerToggleSharedFence(sharedFenceGrid, 1, 0, "t", {
+  code: "flower_trellis_arch",
+  enhancement: 5,
+}), true);
+assert.equal(sharedFenceGrid[0][0].fences, undefined);
+assert.deepEqual(sharedFenceGrid[1][0].fences.t, {
+  code: "flower_trellis_arch",
+  enhancement: 5,
+});
+
+const duplicateFenceGrid = [
+  [
+    {
+      p: null,
+      fences: {
+        t: { code: "flower_trellis_arch", enhancement: 3 },
+        r: { code: "rustic_fence", enhancement: 1 },
+        b: { code: "root_barrier", enhancement: 2 },
+      },
+    },
+    { p: null, fences: { l: { code: "rustic_fence", enhancement: 5 } } },
+  ],
+  [
+    { p: null, fences: { t: { code: "root_barrier", enhancement: 7 } } },
+    { p: null },
+  ],
+];
+assert.deepEqual(plannerDeduplicateSharedFences(duplicateFenceGrid), {
+  count: 3,
+  removed: 2,
+});
+assert.deepEqual(duplicateFenceGrid[0][0].fences, {
+  t: { code: "flower_trellis_arch", enhancement: 3 },
+  r: { code: "rustic_fence", enhancement: 1 },
+  b: { code: "root_barrier", enhancement: 2 },
+});
+assert.equal(duplicateFenceGrid[0][1].fences, undefined);
+assert.equal(duplicateFenceGrid[1][0].fences, undefined);
+
+const importedDuplicateBoundary = plannerGridFromGardenProfile({
+  grid: [[
+    {
+      cultivated: true,
+      edges: { lowerRight: { itemKey: "flower_trellis_arch+2" } },
+    },
+    {
+      cultivated: true,
+      edges: { upperLeft: { itemKey: "flower_trellis_arch+2" } },
+    },
+  ]],
+}, { canvas: 2 });
+assert.equal(importedDuplicateBoundary.stats.fences, 1);
+assert.deepEqual(importedDuplicateBoundary.grid[0][0].fences, {
+  r: { code: "flower_trellis_arch", enhancement: 2 },
+});
+assert.equal(importedDuplicateBoundary.grid[0][1].fences, undefined);
+
+const importedGarden = plannerGridFromGardenProfile({
+  defaultPlantSkins: { herb: "herb_starlit" },
+  grid: [
+    [
+      { cultivated: true, plant: { id: "unknown_plant", enhancement: 2 } },
+      {
+        cultivated: true,
+        plant: { id: "herb", enhancement: 14 },
+        surface: { itemKey: "water_channel+2" },
+        edges: {
+          upperRight: { itemKey: "root_barrier+2" },
+          lowerRight: { itemKey: "rustic_fence+1" },
+          upperLeft: {
+            itemKey: "flower_trellis_arch+5",
+            variantId: "flower_trellis_arch:iron",
+          },
+        },
+      },
+    ],
+    [
+      null,
+      null,
+      {
+        cultivated: true,
+        ornament: {
+          items: [
+            { itemKey: "pedestal+2", variantId: "pedestal:marble" },
+            { itemKey: "earth_breath+3~t" },
+          ],
+        },
+        surface: { itemKey: "stone_floor+0", variantId: "stone_floor:wooden_deck" },
+      },
+    ],
+    [
+      {
+        cultivated: false,
+        ornament: {
+          items: [
+            { itemKey: "campfire+4" },
+            { itemKey: "copper_cauldron+7" },
+          ],
+        },
+        edges: {
+          lowerLeft: { itemKey: "rustic_fence+3" },
+          upperLeft: { itemKey: "root_barrier+4" },
+        },
+      },
+    ],
+  ],
+}, {
+  canvas: 7,
+  plantData: { herb: {} },
+  skinSprites: { herb_starlit: "herb_starlit" },
+  itemVariants: {
+    "pedestal:marble": { itemCode: "pedestal" },
+    "stone_floor:wooden_deck": { itemCode: "stone_floor" },
+    "flower_trellis_arch:iron": { itemCode: "flower_trellis_arch" },
+  },
+});
+
+assert.deepEqual(importedGarden.stats, {
+  tiles: 4,
+  plants: 1,
+  ornaments: 2,
+  floors: 2,
+  fences: 5,
+  displays: 1,
+  cauldrons: 1,
+});
+assert.deepEqual(importedGarden.skipped, [
+  { kind: "plant", code: "unknown_plant", count: 1 },
+]);
+assert.deepEqual(importedGarden.grid[2][3], {
+  p: "herb",
+  e: 12,
+  skinId: "herb_starlit",
+  floor: "water_channel",
+  fences: {
+    t: { code: "root_barrier", enhancement: 2 },
+    r: { code: "rustic_fence", enhancement: 1 },
+    l: {
+      code: "flower_trellis_arch",
+      enhancement: 5,
+      variantId: "flower_trellis_arch:iron",
+    },
+  },
+});
+assert.deepEqual(importedGarden.grid[3][4], {
+  orn: "pedestal",
+  e: 2,
+  variantId: "pedestal:marble",
+  display: "earth_breath",
+  floor: "stone_floor",
+  floorVariantId: "stone_floor:wooden_deck",
+});
+assert.deepEqual(importedGarden.grid[4][2], {
+  orn: "campfire",
+  e: 4,
+  cauldron: { code: "copper_cauldron", enhancement: 7 },
+  fences: {
+    b: { code: "rustic_fence", enhancement: 3 },
+    l: { code: "root_barrier", enhancement: 4 },
+  },
+});
+assert.throws(
+  () => plannerGridFromGardenProfile({ grid: [[{}, {}, {}]] }, { canvas: 2 }),
+  /배치판 2×2를 초과/,
+);
+
+const trimmedGarden = plannerGridFromGardenProfile({
+  grid: [
+    [{ cultivated: false }, { cultivated: false }, { cultivated: false }, { cultivated: false }],
+    [{ cultivated: false }, { cultivated: true }, { cultivated: true }, { cultivated: false }],
+    [{ cultivated: false }, { cultivated: false }, { cultivated: false }, { cultivated: false }],
+  ],
+}, { canvas: 2 });
+assert.equal(trimmedGarden.width, 2);
+assert.equal(trimmedGarden.height, 1);
+assert.equal(trimmedGarden.stats.tiles, 2);
+
+const largeGarden = Array.from({ length: 29 }, () => Array(29).fill(null));
+largeGarden[0][14] = { cultivated: true };
+largeGarden[14][0] = { cultivated: true };
+largeGarden[14][28] = { cultivated: true };
+largeGarden[28][14] = { cultivated: true };
+const importedLargeGarden = plannerGridFromGardenProfile({ grid: largeGarden }, { canvas: 33 });
+assert.equal(importedLargeGarden.width, 29);
+assert.equal(importedLargeGarden.height, 29);
+assert.equal(importedLargeGarden.stats.tiles, 4);
+assert.deepEqual(importedLargeGarden.grid[2][16], { p: null });
+assert.deepEqual(importedLargeGarden.grid[30][16], { p: null });
+
+const oldPlannerGrid = Array.from({ length: 27 }, () => Array(27).fill(null));
+oldPlannerGrid[13][13] = { p: "herb", e: 5 };
+const migratedPlannerGrid = plannerFitGrid(oldPlannerGrid, 33);
+assert.deepEqual(migratedPlannerGrid[16][16], { p: "herb", e: 5 });
+assert.equal(migratedPlannerGrid.length, 33);
+assert.equal(migratedPlannerGrid.every((row) => row.length === 33), true);
 
 console.log("planner tests passed");

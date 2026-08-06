@@ -624,6 +624,11 @@ function selectTab(key) {
   (TABS[main] || TABS.garden).run(sub);
 }
 
+window.addEventListener("alcanthia:navigate", (event) => {
+  const route = event.detail?.route;
+  if (typeof route === "string" && TABS[route.split("/")[0]]) selectTab(route);
+});
+
 // 프록시 주소 표시/변경
 function mountProxyBadge() {
   const el = $("#proxy");

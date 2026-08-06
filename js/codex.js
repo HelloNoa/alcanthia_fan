@@ -2,6 +2,7 @@ import { gamedata, names } from "./api.js";
 import { RANDOM_EFFECTS } from "./random_effects.js";
 import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievementIcon, fmtDuration, fmtMinutes } from "./sprites.js";
 import { createSearchPicker } from "./search_picker.js";
+import { saveEnhancementEvItem } from "./calc_state.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
@@ -150,6 +151,22 @@ export async function renderCodex(view, sub) {
     card.appendChild(row);
   };
 
+  const addEnhancementShortcut = (card, code) => {
+    const actions = document.createElement("div");
+    actions.className = "cx-actions";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cx-ev-shortcut";
+    button.textContent = "🎲 강화 기댓값";
+    button.title = `${N.items?.[code] || code} 강화 기댓값 계산기로 이동`;
+    button.onclick = () => {
+      saveEnhancementEvItem(code);
+      window.dispatchEvent(new CustomEvent("alcanthia:navigate", { detail: { route: "calc/ev" } }));
+    };
+    actions.appendChild(button);
+    card.appendChild(actions);
+  };
+
   const render = (key, q = "") => {
     q = q.trim();
     const match = (name) => !q || (name || "").includes(q);
@@ -257,6 +274,7 @@ export async function renderCodex(view, sub) {
         }
         sourceRow(card, code);
         if (trans) card.insertAdjacentHTML("beforeend", `<div class="cx-perk">🔀 변성 · ${trans}</div>`);
+        if (brewByOut[code]) addEnhancementShortcut(card, code);
         grid.appendChild(card);
       });
     } else if (key === "skills") {
@@ -402,6 +420,7 @@ export async function renderCodex(view, sub) {
         }
         recs.forEach((r, idx) => ingRow(card, recs.length > 1 ? `제작 ${idx + 1}` : "제작", r.inputs));
         sourceRow(card, code);
+        if (recs.length) addEnhancementShortcut(card, code);
         if (it.perk) card.insertAdjacentHTML("beforeend", `<div class="cx-perk">✨ ${fmtFormula(it.perk)}</div>`);
         const gem = g.gem_effects?.[code];
         if (gem) card.insertAdjacentHTML("beforeend",

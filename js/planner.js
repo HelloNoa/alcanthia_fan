@@ -1,10 +1,11 @@
-import { gamedata, names } from "./api.js";
+import { api, gamedata, names } from "./api.js";
 import { wardingStoneMultiplier } from "./raid_profile.js";
 import { plantIcon, itemIcon, fmtDuration, loadImg, CDN } from "./sprites.js";
 import { createSearchPicker } from "./search_picker.js";
+import { parseItemKey } from "./item_key.js";
 
-const CANVAS = 27;
-const CENTER = (CANVAS - 1) / 2; // 13
+const CANVAS = 33;
+const CENTER = (CANVAS - 1) / 2; // 16
 const STORE = "alc_planner_v3";
 const BADGE_STORE = "alc_planner_badges";
 const PEDESTAL = "pedestal";
@@ -241,9 +242,233 @@ const LEGACY_FLOOR_VARIANTS = {
   flower_meadow_floor: "stone_floor:flower_meadow",
   tilled_soil_floor: "stone_floor:tilled_soil",
 };
+const GARDEN_EDGE_TO_PLANNER_SIDE = {
+  upperRight: "t",
+  lowerRight: "r",
+  lowerLeft: "b",
+  upperLeft: "l",
+};
+
+const gardenItemData = (raw) => {
+  const itemKey = typeof raw === "string" ? raw : raw?.itemKey;
+  if (!itemKey) return null;
+  const parsed = parseItemKey(itemKey);
+  return parsed.code ? parsed : null;
+};
+
+const gardenVariantId = (raw, itemCode, itemVariants) => {
+  const candidate = String(
+    raw?.variantId || raw?.appearanceId || raw?.skinId || "",
+  );
+  return plannerItemVariantId(itemCode, candidate, itemVariants);
+};
+
+const gardenCellHasLayoutContent = (cell) => {
+  if (!cell) return false;
+  if (cell.cultivated !== false) return true;
+  if (cell.plant?.id || gardenItemData(cell.surface)) return true;
+  if (Array.isArray(cell.ornament?.items) && cell.ornament.items.some((item) => gardenItemData(item))) return true;
+  return Object.values(cell.edges || {}).some((edge) => gardenItemData(edge));
+};
+
+export function plannerFitGrid(source, canvas = CANVAS) {
+  const size = Math.max(1, Math.floor(Number(canvas) || CANVAS));
+  const output = Array.from({ length: size }, () => Array(size).fill(null));
+  if (!Array.isArray(source)) return output;
+
+  const occupied = [];
+  for (let row = 0; row < source.length; row++) {
+    const sourceRow = Array.isArray(source[row]) ? source[row] : [];
+    for (let col = 0; col < sourceRow.length; col++) {
+      if (sourceRow[col]) occupied.push([row, col, sourceRow[col]]);
+    }
+  }
+  if (!occupied.length) return output;
+
+  const rows = occupied.map(([row]) => row);
+  const cols = occupied.map(([, col]) => col);
+  const minRow = Math.min(...rows), maxRow = Math.max(...rows);
+  const minCol = Math.min(...cols), maxCol = Math.max(...cols);
+  const height = maxRow - minRow + 1, width = maxCol - minCol + 1;
+  if (height > size || width > size) {
+    throw new Error(`배치 크기 ${width}×${height}가 작업영역 ${size}×${size}를 초과합니다.`);
+  }
+
+  const rowOffset = Math.floor((size - height) / 2) - minRow;
+  const colOffset = Math.floor((size - width) / 2) - minCol;
+  for (const [row, col, cell] of occupied) output[row + rowOffset][col + colOffset] = cell;
+  return output;
+}
+
+export function plannerGridFromGardenProfile(profile, {
+  canvas = CANVAS,
+  plantData = {},
+  skinSprites = {},
+  itemVariants = {},
+} = {}) {
+  const size = Math.max(1, Math.floor(Number(canvas) || CANVAS));
+  const source = Array.isArray(profile?.grid) ? profile.grid : [];
+  const occupied = [];
+  for (let row = 0; row < source.length; row++) {
+    const sourceRow = Array.isArray(source[row]) ? source[row] : [];
+    for (let col = 0; col < sourceRow.length; col++) {
+      if (gardenCellHasLayoutContent(sourceRow[col])) occupied.push([row, col, sourceRow[col]]);
+    }
+  }
+
+  const grid = Array.from({ length: size }, () => Array(size).fill(null));
+  const stats = {
+    tiles: 0,
+    plants: 0,
+    ornaments: 0,
+    floors: 0,
+    fences: 0,
+    displays: 0,
+    cauldrons: 0,
+  };
+  if (!occupied.length) return { grid, stats, skipped: [] };
+
+  const rows = occupied.map(([row]) => row);
+  const cols = occupied.map(([, col]) => col);
+  const minRow = Math.min(...rows);
+  const maxRow = Math.max(...rows);
+  const minCol = Math.min(...cols);
+  const maxCol = Math.max(...cols);
+  const height = maxRow - minRow + 1;
+  const width = maxCol - minCol + 1;
+  if (height > size || width > size) {
+    throw new Error(`텃밭 크기 ${width}×${height}가 배치판 ${size}×${size}를 초과합니다.`);
+  }
+
+  const rowOffset = Math.floor((size - height) / 2) - minRow;
+  const colOffset = Math.floor((size - width) / 2) - minCol;
+  const supportedPlants = new Set(Object.keys(plantData || {}));
+  const defaultPlantSkins = profile?.defaultPlantSkins || {};
+  const skippedCounts = new Map();
+  const skip = (kind, code) => {
+    const key = `${kind}:${code || "unknown"}`;
+    skippedCounts.set(key, (skippedCounts.get(key) || 0) + 1);
+  };
+  const validVariant = (raw, code) => gardenVariantId(raw, code, itemVariants);
+
+  for (const [sourceRow, sourceCol, sourceCell] of occupied) {
+    const target = { p: null };
+
+    const surface = gardenItemData(sourceCell.surface);
+    if (surface) {
+      if (Object.hasOwn(FLOOR_NAMES, surface.code)) {
+        target.floor = surface.code;
+        const variantId = validVariant(sourceCell.surface, surface.code);
+        if (variantId) target.floorVariantId = variantId;
+        stats.floors += 1;
+      } else {
+        skip("surface", surface.code);
+      }
+    }
+
+    const fences = {};
+    for (const [edge, side] of Object.entries(GARDEN_EDGE_TO_PLANNER_SIDE)) {
+      const rawEdge = sourceCell.edges?.[edge];
+      const parsed = gardenItemData(rawEdge);
+      if (!parsed) continue;
+      if (!FENCES.has(parsed.code)) {
+        skip("edge", parsed.code);
+        continue;
+      }
+      const variantId = validVariant(rawEdge, parsed.code);
+      fences[side] = {
+        code: parsed.code,
+        enhancement: Math.max(0, Math.min(
+          ORNAMENT_MAX_ENHANCEMENT,
+          Math.floor(Number(parsed.enhancement) || 0),
+        )),
+        ...(variantId ? { variantId } : {}),
+      };
+      stats.fences += 1;
+    }
+    if (Object.keys(fences).length) target.fences = fences;
+
+    const ornamentItems = Array.isArray(sourceCell.ornament?.items)
+      ? sourceCell.ornament.items
+      : [];
+    const baseOrnament = gardenItemData(ornamentItems[0]);
+    if (baseOrnament) {
+      if (Object.hasOwn(ORN, baseOrnament.code)) {
+        target.orn = baseOrnament.code;
+        delete target.p;
+        const enhancement = Math.max(0, Math.min(
+          plannerOrnamentEnhancementMax(baseOrnament.code),
+          Math.floor(Number(baseOrnament.enhancement) || 0),
+        ));
+        if (enhancement) target.e = enhancement;
+        const variantId = validVariant(ornamentItems[0], baseOrnament.code)
+          || validVariant(sourceCell.ornament, baseOrnament.code);
+        if (variantId) target.variantId = variantId;
+        stats.ornaments += 1;
+
+        const stackedItem = gardenItemData(ornamentItems[1]);
+        if (baseOrnament.code === PEDESTAL && stackedItem) {
+          target.display = stackedItem.code;
+          stats.displays += 1;
+        } else if (baseOrnament.code === CAMPFIRE && stackedItem) {
+          const cauldron = plannerStackedCauldronData(stackedItem);
+          if (cauldron) {
+            target.cauldron = cauldron;
+            stats.cauldrons += 1;
+          } else {
+            skip("stacked", stackedItem.code);
+          }
+        } else if (ornamentItems.length > 1) {
+          for (const rawItem of ornamentItems.slice(1)) {
+            const extra = gardenItemData(rawItem);
+            if (extra) skip("stacked", extra.code);
+          }
+        }
+      } else {
+        skip("ornament", baseOrnament.code);
+      }
+    } else if (sourceCell.plant?.id) {
+      const plant = sourceCell.plant;
+      if (supportedPlants.has(plant.id)) {
+        target.p = plant.id;
+        target.e = Math.max(0, Math.min(
+          PLANT_MAX_ENHANCEMENT,
+          Math.floor(Number(plant.enhancement) || 0),
+        ));
+        const skinId = plannerPlantSkinId(
+          plant.id,
+          plant.skinId || defaultPlantSkins[plant.id],
+          skinSprites,
+        );
+        if (skinId) target.skinId = skinId;
+        stats.plants += 1;
+      } else {
+        skip("plant", plant.id);
+      }
+    }
+
+    const hasLayoutContent = sourceCell.cultivated !== false
+      || target.p || target.orn || target.floor || target.fences;
+    if (!hasLayoutContent) continue;
+    grid[sourceRow + rowOffset][sourceCol + colOffset] = target;
+    stats.tiles += 1;
+  }
+
+  stats.fences = plannerDeduplicateSharedFences(grid).count;
+
+  const skipped = [...skippedCounts.entries()].map(([key, count]) => {
+    const separator = key.indexOf(":");
+    return {
+      kind: key.slice(0, separator),
+      code: key.slice(separator + 1),
+      count,
+    };
+  });
+  return { grid, stats, skipped, width, height };
+}
 // 공유 인코딩 순서 (모듈 레벨 — decodeGrid가 load 초기에 호출되므로 TDZ 방지)
 const FLOOR_ORDER = Object.keys(FLOOR_NAMES);   // 인덱스+1 = 바닥재 종류
-const FENCE_ORDER = ["rustic_fence", "root_barrier"];
+const FENCE_ORDER = ["rustic_fence", "root_barrier", "flower_trellis_arch"];
 const FENCES = new Set(FENCE_ORDER);
 const SIDES = ["t", "r", "b", "l"];
 const SIDE_KR = { t: "위", r: "오른쪽", b: "아래", l: "왼쪽" };
@@ -274,6 +499,82 @@ const fenceData = (raw) => {
   if (variantId) normalized.variantId = variantId;
   return normalized;
 };
+const OPPOSITE_SIDE = { t: "b", r: "l", b: "t", l: "r" };
+const SIDE_STEP = {
+  t: [-1, 0],
+  r: [0, 1],
+  b: [1, 0],
+  l: [0, -1],
+};
+const plannerFenceBoundaryKey = (row, col, side) => {
+  if (side === "t") return `h:${row}:${col}`;
+  if (side === "b") return `h:${row + 1}:${col}`;
+  if (side === "l") return `v:${row}:${col}`;
+  if (side === "r") return `v:${row}:${col + 1}`;
+  return "";
+};
+const plannerSharedFenceRefs = (grid, row, col, side) => {
+  const cell = grid?.[row]?.[col];
+  if (!cell || !SIDE_STEP[side]) return [];
+  const refs = [{ cell, side }];
+  const [dr, dc] = SIDE_STEP[side];
+  const neighbor = grid?.[row + dr]?.[col + dc];
+  if (neighbor) refs.push({ cell: neighbor, side: OPPOSITE_SIDE[side] });
+  return refs;
+};
+const deleteFenceRef = ({ cell, side }) => {
+  if (!cell?.fences) return;
+  delete cell.fences[side];
+  if (!Object.keys(cell.fences).length) delete cell.fences;
+};
+const sameFence = (left, right) => left?.code === right?.code
+  && left?.enhancement === right?.enhancement
+  && (left?.variantId || "") === (right?.variantId || "");
+
+export function plannerToggleSharedFence(grid, row, col, side, rawFence) {
+  const refs = plannerSharedFenceRefs(grid, row, col, side);
+  const next = fenceData(rawFence);
+  if (!refs.length || !next || !FENCES.has(next.code)) return false;
+  const removeOnly = refs.some((ref) => sameFence(fenceData(ref.cell.fences?.[ref.side]), next));
+  refs.forEach(deleteFenceRef);
+  if (removeOnly) return false;
+  const target = refs[0].cell;
+  target.fences = target.fences || {};
+  target.fences[side] = next;
+  return true;
+}
+
+export function plannerDeduplicateSharedFences(grid) {
+  const seen = new Set();
+  let count = 0;
+  let removed = 0;
+  if (!Array.isArray(grid)) return { count, removed };
+  for (let row = 0; row < grid.length; row++) {
+    const cells = Array.isArray(grid[row]) ? grid[row] : [];
+    for (let col = 0; col < cells.length; col++) {
+      const cell = cells[col];
+      if (!cell?.fences || typeof cell.fences !== "object") continue;
+      for (const side of SIDES) {
+        const fence = fenceData(cell.fences[side]);
+        if (!fence || !FENCES.has(fence.code)) {
+          delete cell.fences[side];
+          continue;
+        }
+        const key = plannerFenceBoundaryKey(row, col, side);
+        if (seen.has(key)) {
+          delete cell.fences[side];
+          removed += 1;
+          continue;
+        }
+        seen.add(key);
+        cell.fences[side] = fence;
+        count += 1;
+      }
+      if (!Object.keys(cell.fences).length) delete cell.fences;
+    }
+  }
+  return { count, removed };
+}
 const PRODUCTION_ZONES = {
   "": "지역 없음",
   misty_swamp: "안개 습지",
@@ -402,8 +703,8 @@ function plantVisual(st) {
 
 export async function renderPlanner(view) {
   const [g, N] = await Promise.all([gamedata(), names()]);
-  // 장비 전시대에 올릴 수 있는 아이템 (장비류)
-  const DISPLAY_ITEMS = Object.keys(g.equipment_stats || {})
+  // 실제 텃밭의 전시대에는 장비 외 보상 아이템도 올라갈 수 있다.
+  const DISPLAY_ITEMS = Object.keys(g.items || {})
     .map((c) => [c, g.items?.[c]?.name || c]).sort((a, b) => a[1].localeCompare(b[1]));
   const CAULDRON_ITEMS = CAMPFIRE_CAULDRON_ORDER
     .filter((code) => g.items?.[code])
@@ -529,6 +830,7 @@ export async function renderPlanner(view) {
           <div class="pl-sksec">수분 포션 <span class="muted">(바람꽃)</span></div>
           <label class="chk"><input type="checkbox" id="pl-gust"> 질풍포션 (수분 2배속)</label>
           <label class="lvlabel">밭 프리셋 <select id="pl-preset" class="num-in"></select></label>
+          <button class="chip pl-import-open" id="pl-import-open" type="button">👤 유저 텃밭 가져오기</button>
           <div class="pl-cost" id="pl-cost"></div>
           <div class="pl-btns"><button class="chip" id="pl-fill">전체 개간</button><button class="chip" id="pl-clear">전체 지우기</button></div>
         </div>
@@ -547,7 +849,20 @@ export async function renderPlanner(view) {
           <div id="pl-share-msg" class="muted pl-share-msg"></div>
         </div>
       </div>
-    </div>`;
+    </div>
+    <dialog class="pl-import-dialog" id="pl-import-dialog">
+      <div class="pl-import-dialog-inner">
+        <div class="pl-import-head">
+          <h3>유저 텃밭 가져오기</h3>
+          <button type="button" id="pl-import-close" aria-label="닫기" title="닫기">×</button>
+        </div>
+        <form class="pl-import-search" id="pl-import-form">
+          <input id="pl-import-query" type="search" autocomplete="off" placeholder="닉네임 또는 유저 ID" aria-label="가져올 유저 검색">
+          <button type="submit">검색</button>
+        </form>
+        <div class="pl-import-results" id="pl-import-results" aria-live="polite"></div>
+      </div>
+    </dialog>`;
 
   const palBox = view.querySelector("#pl-pal");
   const ornBox = view.querySelector("#pl-pal-orn");
@@ -776,19 +1091,12 @@ export async function renderPlanner(view) {
       } // 표면 바닥재 (작물 유지·종류 변경)
       else if (FENCES.has(sel)) {                                // 경계 토글 (클릭한 변)
         const s = ev ? sideOf(ev) : "t";
-        cell.fences = cell.fences || {};
-        const current = fenceData(cell.fences[s]);
         const variantId = plannerItemVariantId(sel, selectedVariants.get(sel), itemVariants);
-        if (current?.code === sel && current.enhancement === enh && (current.variantId || "") === variantId) {
-          delete cell.fences[s];
-        } else {
-          cell.fences[s] = {
-            code: sel,
-            enhancement: enh,
-            ...(variantId ? { variantId } : {}),
-          };
-        }
-        if (!Object.keys(cell.fences).length) delete cell.fences;
+        plannerToggleSharedFence(grid, r, c, s, {
+          code: sel,
+          enhancement: enh,
+          ...(variantId ? { variantId } : {}),
+        });
       }
       else if (kind === "cauldron") {
         if (!plannerCanStackCauldron(cell, sel)) return;
@@ -1078,6 +1386,7 @@ export async function renderPlanner(view) {
   };
 
   const recompute = () => {
+    plannerDeduplicateSharedFences(grid);
     buildConds();
     buildBatonMap();
     virtualPollMap = pollTargets();
@@ -1113,7 +1422,8 @@ export async function renderPlanner(view) {
           const fence = fenceData(rawFence);
           if (!fence) continue;
           const marker = document.createElement("i");
-          marker.className = `pl-fc pl-fc-${s}${fence.code === "root_barrier" ? " bar" : ""}`;
+          marker.className = `pl-fc pl-fc-${s}${fence.code === "root_barrier" ? " bar" : ""}${fence.code === "flower_trellis_arch" ? " trellis" : ""}`;
+          marker.dataset.fence = fence.code;
           const variantId = plannerItemVariantId(fence.code, fence.variantId, itemVariants);
           if (variantId) marker.dataset.variant = variantId;
           fc.appendChild(marker);
@@ -1602,6 +1912,191 @@ export async function renderPlanner(view) {
   };
   presetSel.onchange = () => { const v = presetSel.value; if (v === "") return showCost(0, false); applyPreset(+v); showCost(+v, true); };
 
+  const importDialog = view.querySelector("#pl-import-dialog");
+  const importOpen = view.querySelector("#pl-import-open");
+  const importClose = view.querySelector("#pl-import-close");
+  const importForm = view.querySelector("#pl-import-form");
+  const importQuery = view.querySelector("#pl-import-query");
+  const importResults = view.querySelector("#pl-import-results");
+  const importSubmit = importForm.querySelector("button[type='submit']");
+  const userIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+  const compactUserId = (value) => {
+    const id = String(value || "");
+    return id.length > 18 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
+  };
+  const profileQuery = (value) => {
+    const candidate = String(value || "").trim().replace(/^ID\s*[:：]?\s*/i, "");
+    return userIdPattern.test(candidate) ? { userId: candidate } : { nickname: candidate };
+  };
+  const setImportStatus = (message, className = "muted") => {
+    importResults.replaceChildren();
+    const status = document.createElement("p");
+    status.className = className;
+    status.textContent = message;
+    importResults.appendChild(status);
+  };
+  const skippedLabel = ({ kind, code, count }) => {
+    const kindName = {
+      plant: "작물",
+      ornament: "장식물",
+      surface: "바닥재",
+      edge: "경계",
+      stacked: "겹침 아이템",
+    }[kind] || kind;
+    const name = plants[code]?.name || g.items?.[code]?.name || code;
+    return `${kindName} ${name} ${count}개`;
+  };
+  const loadGardenPreview = async (query, fallbackName = "") => {
+    setImportStatus("텃밭 불러오는 중…");
+    try {
+      const payload = await api.garden(query);
+      const profile = payload?.profile || payload;
+      const imported = plannerGridFromGardenProfile(profile, {
+        plantData: plants,
+        skinSprites,
+        itemVariants,
+      });
+      const nickname = profile?.nickname || payload?.nickname || fallbackName || "이름 없음";
+      importResults.replaceChildren();
+
+      const preview = document.createElement("section");
+      preview.className = "pl-import-preview";
+      const title = document.createElement("h4");
+      title.textContent = `${nickname}의 텃밭`;
+      const stats = document.createElement("div");
+      stats.className = "pl-import-stats";
+      [
+        `경작칸 ${imported.stats.tiles}`,
+        `작물 ${imported.stats.plants}`,
+        `장식물 ${imported.stats.ornaments}`,
+        `바닥재 ${imported.stats.floors}`,
+        `경계 ${imported.stats.fences}`,
+      ].forEach((text) => {
+        const item = document.createElement("span");
+        item.textContent = text;
+        stats.appendChild(item);
+      });
+      preview.append(title, stats);
+
+      if (!imported.stats.tiles) {
+        const empty = document.createElement("p");
+        empty.className = "pl-import-error";
+        empty.textContent = "가져올 수 있는 텃밭 배치가 없습니다.";
+        preview.appendChild(empty);
+      }
+      if (imported.skipped.length) {
+        const warning = document.createElement("p");
+        warning.className = "pl-import-warning";
+        warning.textContent = `지원하지 않는 항목은 빈 흙으로 가져옵니다: ${imported.skipped.map(skippedLabel).join(" · ")}`;
+        preview.appendChild(warning);
+      }
+
+      const note = document.createElement("p");
+      note.className = "pl-import-note";
+      note.textContent = "현재 배치를 교체합니다. 저장 슬롯과 지역·스킬 설정은 유지되며, 작물 상태와 토양 포션 효과는 제외됩니다.";
+      preview.appendChild(note);
+
+      const actions = document.createElement("div");
+      actions.className = "pl-import-actions";
+      const applyButton = document.createElement("button");
+      applyButton.type = "button";
+      applyButton.className = "chip direct";
+      applyButton.textContent = "프리셋 적용";
+      applyButton.disabled = imported.stats.tiles === 0;
+      applyButton.onclick = () => {
+        grid = normalizeGrid(imported.grid);
+        recompute();
+        save();
+        presetSel.value = "";
+        showCost(0, false);
+        detail.innerHTML = `<h3>칸 정보</h3><p class="muted">칸에 마우스를 올리면 상세가 표시됩니다</p>`;
+        hint.textContent = `${nickname}의 텃밭 ${imported.stats.tiles}칸을 가져왔습니다.`;
+        importDialog.close();
+      };
+      const searchAgain = document.createElement("button");
+      searchAgain.type = "button";
+      searchAgain.className = "chip";
+      searchAgain.textContent = "다시 검색";
+      searchAgain.onclick = () => {
+        importResults.replaceChildren();
+        importQuery.focus();
+      };
+      actions.append(applyButton, searchAgain);
+      preview.appendChild(actions);
+      importResults.appendChild(preview);
+    } catch (error) {
+      setImportStatus(error?.message || String(error), "pl-import-error");
+    }
+  };
+  const appendUserChoice = ({ nickname, userId, direct = false }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pl-import-user";
+    const name = document.createElement("strong");
+    name.textContent = direct ? `‘${nickname}’ 정확히 불러오기` : nickname || "닉네임 없음";
+    button.appendChild(name);
+    if (userId) {
+      const id = document.createElement("small");
+      id.textContent = `ID ${compactUserId(userId)}`;
+      id.title = `유저 ID: ${userId}`;
+      button.appendChild(id);
+    }
+    button.onclick = () => loadGardenPreview(
+      userId ? { userId } : { nickname },
+      nickname,
+    );
+    importResults.appendChild(button);
+  };
+  const searchGardenUsers = async (value) => {
+    const query = profileQuery(value);
+    if (!query.userId && !query.nickname) return;
+    importSubmit.disabled = true;
+    if (query.userId) {
+      await loadGardenPreview(query);
+      importSubmit.disabled = false;
+      return;
+    }
+    setImportStatus("유저 검색 중…");
+    try {
+      const list = await api.search(query.nickname);
+      importResults.replaceChildren();
+      appendUserChoice({ nickname: query.nickname, direct: true });
+      const seen = new Set();
+      for (const user of Array.isArray(list) ? list : []) {
+        const userId = user.user_id || user.userId || "";
+        if (!userId || seen.has(userId)) continue;
+        seen.add(userId);
+        appendUserChoice({
+          nickname: user.nickname || "닉네임 없음",
+          userId,
+        });
+      }
+      if (!seen.size) {
+        const empty = document.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "공개 검색 결과가 없습니다.";
+        importResults.appendChild(empty);
+      }
+    } catch (error) {
+      setImportStatus(error?.message || String(error), "pl-import-error");
+    } finally {
+      importSubmit.disabled = false;
+    }
+  };
+  importOpen.onclick = () => {
+    importResults.replaceChildren();
+    importDialog.showModal();
+    requestAnimationFrame(() => importQuery.focus());
+  };
+  importClose.onclick = () => importDialog.close();
+  importDialog.onclick = (event) => {
+    if (event.target === importDialog) importDialog.close();
+  };
+  importForm.onsubmit = (event) => {
+    event.preventDefault();
+    searchGardenUsers(importQuery.value.trim());
+  };
+
   view.querySelector("#pl-clear").onclick = () => { grid = blank(); recompute(); save(); presetSel.value = ""; showCost(0, false); };
   view.querySelector("#pl-fill").onclick = () => {
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) if (!grid[r][c]) grid[r][c] = { p: null };
@@ -1620,17 +2115,28 @@ export async function renderPlanner(view) {
   function blank() { return Array.from({ length: CANVAS }, () => Array(CANVAS).fill(null)); }
   function defaultGrid() {
     const gg = blank();
-    for (let r = 11; r <= 15; r++) for (let c = 11; c <= 15; c++) gg[r][c] = { p: null }; // 초기 5×5 (중심 13,13)
+    for (let r = CENTER - 2; r <= CENTER + 2; r++) for (let c = CENTER - 2; c <= CENTER + 2; c++) gg[r][c] = { p: null };
     return gg;
   }
   function load() {
     const p = new URLSearchParams(location.search).get("plan");
     if (p) { const g0 = decodeGrid(p); if (g0) return normalizeGrid(g0); }     // 공유 링크
-    try { const a = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(a) && a.length === CANVAS) return normalizeGrid(a); } catch {}
+    try {
+      const a = JSON.parse(localStorage.getItem(STORE));
+      if (Array.isArray(a)) {
+        const normalized = normalizeGrid(a);
+        localStorage.setItem(STORE, JSON.stringify(normalized));
+        return normalized;
+      }
+    } catch {}
     return defaultGrid();
   }
-  function save() { try { localStorage.setItem(STORE, JSON.stringify(grid)); } catch {} }
-  function normalizeGrid(g) {
+  function save() {
+    plannerDeduplicateSharedFences(grid);
+    try { localStorage.setItem(STORE, JSON.stringify(grid)); } catch {}
+  }
+  function normalizeGrid(source) {
+    const g = plannerFitGrid(source);
     for (const row of g) for (const cell of row || []) {
       if (!cell) continue;
       if (cell.orn === LEGACY_PEDESTAL) cell.orn = PEDESTAL;
@@ -1685,6 +2191,7 @@ export async function renderPlanner(view) {
       cell.plantCond = PLANT_COND_ORDER.filter((x) => Array.isArray(cell.plantCond) && cell.plantCond.includes(x));
       if (!cell.plantCond.length) delete cell.plantCond;
     }
+    plannerDeduplicateSharedFences(g);
     return g;
   }
 
