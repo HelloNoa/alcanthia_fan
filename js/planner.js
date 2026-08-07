@@ -210,6 +210,7 @@ const ORN = {
   working_shelf: "작업 선반", hourglass: "모래시계", storage_chest: "차원상자",
   levitation_chest: "부유상자", compost_bin: "퇴비함", campfire: "모닥불",
   rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", pedestal: "전시대",
+  whispering_tea_table: "속삭임 찻상", starlight_garden_trophy: "별빛 정원 트로피",
 };
 const ENHANCEABLE_ORNAMENTS = new Set(Object.keys(ORN));
 export const plannerOrnamentSupportsEnhancement = (code) =>
@@ -227,6 +228,8 @@ const ORN_NOTE = {
   farmers_baton: "주변 작물 상태 관측 및 관리",
   warding_stone: "은신한 공격자의 선공 확률 감소",
   campfire: "가마솥을 올려 마나 대신 연료로 연성",
+  whispering_tea_table: "설치한 텃밭에서 채팅 가능",
+  starlight_garden_trophy: "제1회 텃밭 꾸미기 콘테스트 수상 기념품",
 };
 // 바닥재 종류 (표면 배치, CSS 텍스처)
 const FLOOR_NAMES = {
@@ -586,6 +589,7 @@ const PRODUCTION_ZONES = {
   crystal_mine: "수정 갱도",
   dried_spring: "메마른 샘",
   sunset_cliff: "석양 절벽",
+  guild_corridor: "결사의 회랑",
 };
 const PRODUCTION_ZONE_NOTES = {
   "": "텃밭 생산량에 영향을 주는 지역 효과를 적용하지 않습니다.",
@@ -598,6 +602,7 @@ const PRODUCTION_ZONE_NOTES = {
   crystal_mine: "같은 작물로 가로/세로 줄을 채우면 줄마다 +20%×계수. 이 칸은 일반 과밀 감소 대신 수정갱도 분기를 탑니다.",
   dried_spring: "풍요의 손길 추가 수확 확률 효과가 (1 + 계수)배 커집니다.",
   sunset_cliff: "숙성되지 않던 산물도 +1로 숙성됩니다. 지속형은 기본 생산주기, 소모형은 기본 성장시간에 ×(3 - 2×계수/3)의 숙성시간이 필요합니다.",
+  guild_corridor: "지역 효과가 아직 밝혀지지 않아 생산량 보정은 적용하지 않습니다.",
 };
 const zoneCoeff = (opt) => opt.familiar * 0.1 + (opt.fog ? 1 : 0) + (opt.raid ? 0.5 : 0);
 const plentyMultiplier = (opt) => 1 + 0.05 * opt.plenty * (opt.zone === "dried_spring" ? 1 + zoneCoeff(opt) : 1);

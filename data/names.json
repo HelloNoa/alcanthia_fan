@@ -67,6 +67,10 @@
 "sprawling_vine": {
 "name": "너울덩굴",
 "sprite": "sprawling_vine"
+},
+"black_thorn": {
+"name": "검은 가시",
+"sprite": "black_thorn"
 }
 },
 "items": {
@@ -266,7 +270,19 @@
 "beast_horn": "짐승뿔",
 "dia_scepter": "다이아 셉터",
 "dia_plate": "다이아 플레이트",
-"tablet_shield": "석판 방패"
+"tablet_shield": "석판 방패",
+"binding_token": "결속의 증표",
+"black_thorn_sapling": "검은 가시 묘목",
+"black_sap": "검은 수액",
+"depletion_potion": "고갈포션",
+"backflow_potion": "역류포션",
+"veil_potion": "장막포션",
+"starlight_garden_trophy": "별빛 정원 트로피",
+"garden_contest_ticket": "텃밭 콘테스트 참가권",
+"whispering_tea_table": "속삭임 찻상",
+"record_fragment_7": "기록 조각 7",
+"record_fragment_8": "기록 조각 8",
+"hungry_wedge": "굶주린 쐐기"
 },
 "skills": {
 "magic_scythe": "혼령낫",
@@ -341,7 +357,8 @@
 "default": "기본",
 "cherry_blossom": "벚꽃",
 "night_sky": "밤하늘",
-"tropical_cove": "열대 해변"
+"tropical_cove": "열대 해변",
+"guild_corridor": "결사의 회랑"
 },
 "skins": {
 "red_flower_blue_petal": "red_flower_blue_petal",
@@ -932,7 +949,19 @@
 "beast_horn": "beast_horn",
 "dia_scepter": "dia_scepter",
 "dia_plate": "dia_plate",
-"tablet_shield": "tablet_shield"
+"tablet_shield": "tablet_shield",
+"binding_token": "binding_token",
+"black_thorn_sapling": "black_thorn_sapling",
+"black_sap": "black_sap",
+"depletion_potion": "depletion_potion",
+"backflow_potion": "backflow_potion",
+"veil_potion": "veil_potion",
+"starlight_garden_trophy": "starlight_garden_trophy",
+"garden_contest_ticket": "garden_contest_ticket",
+"whispering_tea_table": "whispering_tea_table",
+"record_fragment_7": "record_fragment",
+"record_fragment_8": "record_fragment",
+"hungry_wedge": "hungry_wedge"
 },
 "itemFolders": {
 "herb_seed": "plants/seeds",
@@ -1168,6 +1197,16 @@
 "storage_chest_travel_bag": "items/ornament",
 "storage_chest_picnic": "items/ornament",
 "hourglass_crystal_orb": "items/ornament",
-"town_teleporter_cottage": "items/ornament"
+"town_teleporter_cottage": "items/ornament",
+"binding_token": "items/materials",
+"black_thorn_sapling": "plants/seeds",
+"black_sap": "plants/produce",
+"depletion_potion": "potions",
+"backflow_potion": "potions",
+"veil_potion": "potions",
+"starlight_garden_trophy": "items/ornament",
+"garden_contest_ticket": "items/materials",
+"whispering_tea_table": "items/ornament",
+"hungry_wedge": "items/materials"
 }
 }

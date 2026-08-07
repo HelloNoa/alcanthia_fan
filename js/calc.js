@@ -3,9 +3,10 @@ import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
 import { advSim } from "./adventure.js";
 import { raidSim } from "./raid.js";
 import { defaultEnhancementMaterialPrice } from "./calc_prices.js";
-import { enhancementMaterialFlow } from "./enhancement_ev.js";
+import { enhancementGoalForTarget, enhancementMaterialFlow, formatExpectedQuantity } from "./enhancement_ev.js";
 import { createSearchPicker } from "./search_picker.js";
 import { ENHANCEMENT_EV_STORE, loadEnhancementEvState } from "./calc_state.js";
+import { enhancementAttemptBaseMs, enhancementTimeCatalog } from "./time_calc.js";
 
 export async function renderCalc(view, sub) {
   view.innerHTML = `<h2>🧮 계산기</h2>
@@ -65,13 +66,12 @@ async function timeCalc(body) {
   const crops = Object.entries(plants)
     .filter(([id, p]) => !/^aging_/.test(id) && !(p.name || "").includes("시험용"));
   const potions = Object.entries(g.items || {}).filter(([, it]) => it.type === "potion");
-  const cauldrons = Object.entries(g.items || {})
-    .filter(([c, it]) => it.type === "tool" && it.brewDuration_ms
-      && (c.includes("cauldron") || c === "cauldron_controller" || (it.name || "").includes("가마솥")))
-    .sort((a, b) => a[1].brewDuration_ms - b[1].brewDuration_ms || a[1].name.localeCompare(b[1].name));
+  const enhancementItems = enhancementTimeCatalog(g);
   let selectedCrop = crops[0]?.[0] || "";
   let selectedPotion = potions[0]?.[0] || "";
-  let selectedCauldron = cauldrons[0]?.[0] || "";
+  let selectedEnhancementItem = enhancementItems.some(({ code }) => code === "copper_cauldron")
+    ? "copper_cauldron"
+    : (enhancementItems[0]?.code || "");
 
   body.innerHTML = `
     <div class="calc-grid">
@@ -121,7 +121,7 @@ async function timeCalc(body) {
         시간 = 포션 기본시간 × 2^(N−1) × (1−0.01×불꽃)^(가마솥강화+1) × 존배수 × 화염포션(선택)</p>
       </div>
       <div class="calc-card">
-        <h3>🛠️ 가마솥 강화 시간</h3>
+        <h3>🛠️ 아이템 강화 시간</h3>
         <div class="calc-row">
           <div id="tcItemPicker"></div>
         </div>
@@ -226,7 +226,7 @@ async function timeCalc(body) {
     }
   };
   const tcOut = () => {
-    const c = selectedCauldron;
+    const c = selectedEnhancementItem;
     const fl = +body.querySelector("#tcFlame").value, toolE = +body.querySelector("#tcToolE").value;
     const itemE = +body.querySelector("#tcItemE").value;
     const famG = +body.querySelector("#tcFamG").value, fog = body.querySelector("#tcFog").checked;
@@ -239,7 +239,7 @@ async function timeCalc(body) {
     body.querySelector("#tcFamGv").textContent = famG;
     body.querySelector("#tcFireEv").textContent = fireE;
     const t = famG * 0.1 + (fog ? 1 : 0) + (zoneBuff ? 0.5 : 0);
-    const base = g.items[c]?.brewDuration_ms ? g.items[c].brewDuration_ms * Math.pow(2, itemE) : null;
+    const base = enhancementAttemptBaseMs(g, c, itemE);
     const zm = zoneMult(zone, t, false);
     const fireMult = fireOn ? Math.pow(0.9, fireE + 1) : 1;
     const adj = base ? Math.round(base * factor(0.01, fl, toolE) * zm * fireMult) : null;
@@ -299,12 +299,17 @@ async function timeCalc(body) {
   installPicker(
     "#tcItemPicker",
     "tcItem",
-    selectedCauldron,
-    cauldrons.map(([code, item]) => ({ code, label: item.name || code })),
-    "가마솥 이름 검색",
-    "강화 시간을 계산할 가마솥",
+    selectedEnhancementItem,
+    enhancementItems.map(({ code, item, typeLabel }) => ({
+      code,
+      label: item.name || code,
+      detail: `${typeLabel} · 기본 ${fmtDuration(item.brewDuration_ms)}`,
+      keywords: `${typeLabel} ${item.type || ""}`,
+    })),
+    "아이템 이름·종류 검색",
+    "강화 시간을 계산할 아이템",
     (holder, choice, cls) => itemIcon(holder, choice.code, cls),
-    (code) => { selectedCauldron = code; tcOut(); },
+    (code) => { selectedEnhancementItem = code; tcOut(); },
   );
 
   body.querySelectorAll("#soil,#seedE").forEach((e) => e.oninput = cropOut);
@@ -556,7 +561,7 @@ async function evCalc(body) {
         <div class="calc-note">💡 강화 = <b>같은 강화도 아이템 2개 합성 → +1</b> (성공률 p). <b>실패 시 1개만 회수</b>(1개 손실).<br>
           성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 지역효과가 없으면 단계별 필요량은 <code>1+1/p</code>배.<br>
           <b>2차 전개</b>: 기본 제작 산출은 +0, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.<br>
-          금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적하며, <b>정확히 최종 강화도인 결과만 집계</b>하고 초과 결과는 제외합니다.<br>
+          금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적합니다. <b>최종 목표 +0은 +0 이상 결과를 모두 집계</b>하고, +1 이상 목표는 정확히 해당 강화도인 결과만 집계합니다.<br>
           잊힌 성터는 강화 실패 시 <b>10%×지역효과 계수</b> 확률로 재료 2개를 모두 반환합니다.</div>
       </div>
     </div>`;
@@ -781,11 +786,7 @@ async function evCalc(body) {
       }));
       return flowMemo.get(key);
     };
-    const fmtFlow = (n) => {
-      if (!Number.isFinite(n)) return "도달 불가";
-      const digits = n < 0.1 ? 3 : n < 10 ? 2 : n < 1000 ? 1 : 0;
-      return n.toLocaleString("ko-KR", { minimumFractionDigits: 0, maximumFractionDigits: digits });
-    };
+    const fmtFlow = formatExpectedQuantity;
     const renderFlowProgress = (flow, start, target, sourceBonusRate, source) => {
       if (target - start < 2 || !Number.isFinite(flow.expectedInputs)) return "";
       const scale = flow.expectedInputs;
@@ -837,7 +838,9 @@ async function evCalc(body) {
       const t = Math.max(0, Math.floor(+q("#ev-target").value || 0));
       const k = Math.max(0, Math.min(2, Math.floor(+q("#ev-brew").value || 0)));
       const baseE = Math.min(t, k);
-      const brewFlow = materialFlow(baseE, t, sunsetRate, "exact");
+      const targetGoal = enhancementGoalForTarget(t);
+      const targetRequirement = targetGoal === "atLeast" ? `+${t} 이상` : `정확히 +${t}`;
+      const brewFlow = materialFlow(baseE, t, sunsetRate, targetGoal);
       const brews = brewFlow.expectedInputs;
       if (item !== lastItem || baseE !== lastBrew) { renderBrewPrices(item, baseE); lastItem = item; lastBrew = baseE; }
       fEl.innerHTML = "";
@@ -853,13 +856,13 @@ async function evCalc(body) {
         ${t > baseE ? `<div class="ev-res"><span>일반 합성 (+${baseE}→+${baseE + 1})</span><b>${pct(brewP * (1 - sunsetRate))}</b></div>
         <div class="ev-res"><span>석양 대성공 (+${baseE}→+${baseE + 2})</span><b>${pct(brewP * sunsetRate)}</b></div>` : ""}` : ""}
         ${renderFlowProgress(brewFlow, baseE, t, sunsetRate, { label: "양조", suffix: "회", generated: true })}
-        <div class="ev-res big"><span>정확히 +${t} ${nameOf(item)} <span class="muted">· 장기 기댓값</span></span><b>양조 ${fmt(brews)}번</b></div>`;
+        <div class="ev-res big"><span>${targetRequirement} ${nameOf(item)} <span class="muted">· 장기 기댓값</span></span><b>양조 ${fmt(brews)}번</b></div>`;
       let totalCost = 0;
       const rows = Object.entries(dict).sort((a, b) => b[1] - a[1]).map(([code, n]) => {
-        const cnt = Math.ceil(n), cost = cnt * priceOf(code); totalCost += cost;
-        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">+${baseE} ${nameOf(code)}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
+        const cost = n * priceOf(code); totalCost += cost;
+        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">+${baseE} ${nameOf(code)}</span><b>${fmtFlow(n)}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
       }).join("");
-      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(+${baseE} 작물 양조 → +${t} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
+      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 기댓값 <span class="muted">(+${baseE} 작물 양조 → ${targetRequirement} ${nameOf(item)} 1개 · 소수는 재시도 포함 장기 평균)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
         <div class="ev-raw-list">${rows}</div>`;
       rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
       saveState();
@@ -870,7 +873,9 @@ async function evCalc(body) {
     const levels = t - s;
     const hasCraft = !!item && !leaf(item, new Set());
     const sourceBonus = hasCraft && s === 0 ? sunsetRate : 0;
-    const targetFlow = materialFlow(s, t, sourceBonus, "exact");
+    const targetGoal = enhancementGoalForTarget(t);
+    const targetRequirement = targetGoal === "atLeast" ? `+${t} 이상` : `정확히 +${t}`;
+    const targetFlow = materialFlow(s, t, sourceBonus, targetGoal);
     const items = targetFlow.expectedInputs;
     const pS = pAt(s), pT1 = pAt(Math.max(s, t - 1));
     const rateTxt = self && levels > 1 ? `${(pS * 100).toFixed(1)}% → ${(pT1 * 100).toFixed(1)}%` : `${(pS * 100).toFixed(2)}%`;
@@ -888,7 +893,7 @@ async function evCalc(body) {
       ${renderFlowProgress(targetFlow, s, t, sourceBonus, hasCraft && s === 0
         ? { label: "제작 결과", suffix: "개", generated: true }
         : { label: `+${s} 재료`, suffix: "개", generated: false })}
-      <div class="ev-res big"><span>정확히 +${t} ${label} 1개 <span class="muted">· 장기 기댓값</span></span><b>${sourceNeedTxt}</b></div>`;
+      <div class="ev-res big"><span>${targetRequirement} ${label} 1개 <span class="muted">· 장기 기댓값</span></span><b>${sourceNeedTxt}</b></div>`;
     if (item) {  // 레시피 없는 원재료(각인석 등)도 자기 자신을 원재료로 전개
       const auto = q("#ev-auto").checked;
       if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, multFor); lastItem = item; lastStart = s; }
@@ -906,13 +911,13 @@ async function evCalc(body) {
       const ent = Object.entries(base.dict).map(([k, v]) => [k, v * mult]).sort((a, b) => b[1] - a[1]);
       let totalCost = 0;
       const rows = ent.map(([code, n]) => {
-        const cnt = Math.ceil(n), cost = cnt * priceOf(code); totalCost += cost;
+        const cost = n * priceOf(code); totalCost += cost;
         // 강화 대상 자신이 재료(장비·도구 등 leaf)면 시작 강화도 +s를 명시 — 필요 개수 줄과 일관
         const nm = code === item ? `+${s} ${nameOf(code)}` : nameOf(code);
-        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nm}</span><b>${cnt.toLocaleString()}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
+        return `<div class="ev-raw-i"><span class="ev-raw-ic" data-ic="${code}"></span><span class="ev-raw-n">${nm}</span><b>${fmtFlow(n)}개</b><span class="ev-raw-cost">${fmt(cost)} G</span></div>`;
       }).join("");
-      const targetPath = hasCraft && s === 0 ? `제작→정확히 +${t}` : `+${s}→정확히 +${t}`;
-      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 <span class="muted">(${targetPath} ${nameOf(item)} 1개)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
+      const targetPath = hasCraft && s === 0 ? `제작→${targetRequirement}` : `+${s}→${targetRequirement}`;
+      rawEl.innerHTML = `<div class="ev-raw-h">📦 원재료 기댓값 <span class="muted">(${targetPath} ${nameOf(item)} 1개 · 소수는 재시도 포함 장기 평균)</span> · 총 비용 <b class="ev-cost">${fmt(totalCost)} G</b></div>
         <div class="ev-raw-list">${rows}</div>`;
       rawEl.querySelectorAll(".ev-raw-ic[data-ic]").forEach((e) => itemIcon(e, e.dataset.ic));
     } else { rawEl.innerHTML = ""; fEl.innerHTML = ""; q("#ev-prices").innerHTML = ""; lastItem = null; }

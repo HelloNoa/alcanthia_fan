@@ -10,6 +10,7 @@ const STATUS_NAMES = {
   poison: "중독", stun: "스턴", sleep: "수면", heal_block: "회복 불가", cc_immune: "CC 면역",
   undying: "불사", afterimage: "잔상", frozen: "빙결", blind: "실명", splash: "공명",
   damage_reflect: "반사", dmg_cap: "피해 상한", def_pierce: "관통", anti_magic: "항마",
+  potion_guard: "장막", backflow: "역류",
 };
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));

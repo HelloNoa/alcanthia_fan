@@ -53,7 +53,10 @@ export function adventurerIcon(el, spriteKey, cls = "ic") {
   loadImg(el, [`${CDN}/npc/${spriteKey}.png`], "", cls);
 }
 export function achievementIcon(el, iconKey, cls = "ic") {
-  loadImg(el, [`${CDN}/ui/icons/${iconKey}.png`], "", cls);
+  loadImg(el, [
+    `${CDN}/ui/icons/${iconKey}.png`,
+    `${CDN}/items/ornament/${iconKey}.png`,
+  ], "", cls);
 }
 
 // ms -> "2년 14일 1시간 30분" 류

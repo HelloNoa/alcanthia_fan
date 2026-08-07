@@ -1,5 +1,15 @@
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 
+export function enhancementGoalForTarget(target) {
+  return Math.max(0, Math.floor(Number(target) || 0)) === 0 ? "atLeast" : "exact";
+}
+
+export function formatExpectedQuantity(value) {
+  if (!Number.isFinite(value)) return "도달 불가";
+  const digits = value < 0.1 ? 3 : value < 10 ? 2 : value < 1000 ? 1 : 0;
+  return value.toLocaleString("ko-KR", { minimumFractionDigits: 0, maximumFractionDigits: digits });
+}
+
 // 장기 반복 시 강화도별 기대 공급량을 흘려 정확한 목표 강화도 산출률을 구한다.
 export function enhancementMaterialFlow({
   start = 0,

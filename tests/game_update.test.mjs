@@ -42,6 +42,22 @@ const expectedItems = {
     perk: "텃밭에 설치 가능 · 초당 아이템 1개를 소모해 인접 식물 강화도 +1 · 보관 슬롯 6×(강화도+1)",
     folder: "items/ornament",
   },
+  binding_token: { name: "결속의 증표", folder: "items/materials" },
+  black_thorn_sapling: { name: "검은 가시 묘목", folder: "plants/seeds" },
+  black_sap: { name: "검은 수액", folder: "plants/produce" },
+  depletion_potion: { name: "고갈포션", folder: "potions" },
+  backflow_potion: { name: "역류포션", folder: "potions" },
+  veil_potion: { name: "장막포션", folder: "potions" },
+  whispering_tea_table: {
+    name: "속삭임 찻상",
+    perk: "텃밭에 설치 가능 · 설치한 텃밭에서 채팅 가능",
+    folder: "items/ornament",
+  },
+  starlight_garden_trophy: {
+    name: "별빛 정원 트로피",
+    perk: "텃밭에 설치 가능",
+    folder: "items/ornament",
+  },
 };
 
 for (const [code, expected] of Object.entries(expectedItems)) {
@@ -79,6 +95,29 @@ for (const [output, inputs, requiredLevel] of [
       recipe.output === output
       && recipe.requiredLevel === requiredLevel
       && recipe.inputs.join(",") === inputs),
+    true,
+  );
+}
+for (const [output, inputs, requiredLevel] of [
+  ["gilded_copper_ingot", "binding_token,purification_potion", 2],
+  ["whispering_tea_table", "working_shelf,binding_token", 5],
+]) {
+  assert.equal(
+    gameData.recipes_full.some((recipe) =>
+      recipe.output === output
+      && recipe.requiredLevel === requiredLevel
+      && recipe.inputs.join(",") === inputs),
+    true,
+  );
+}
+for (const [output, inputs] of [
+  ["depletion_potion", "black_sap,blue_moss"],
+  ["backflow_potion", "black_sap,nightshade_root"],
+  ["veil_potion", "vine_tendril,black_sap"],
+]) {
+  assert.equal(
+    gameData.brew_recipes.some((recipe) =>
+      recipe.output === output && recipe.inputs.join(",") === inputs),
     true,
   );
 }
@@ -180,6 +219,27 @@ assert.equal(
   progression.tutorialGoals.find((goal) => goal.id === "enhance_growth_potion")?.action,
   "cauldron",
 );
+const recordFragmentRewards = [
+  ...(progression.tutorialGoals || []),
+  ...(progression.oneTimeQuests || []),
+  ...(gameData.quests || []),
+].flatMap((quest) => (quest.rewards || [])
+  .filter((reward) => reward.itemCode?.startsWith("record_fragment_"))
+  .map((reward) => [reward.itemCode, quest.title]));
+assert.deepEqual(recordFragmentRewards, [
+  ["record_fragment_1", "메아리동굴 클리어"],
+  ["record_fragment_2", "별빛 고원 클리어"],
+  ["record_fragment_3", "어스름 계곡 클리어"],
+  ["record_fragment_4", "석양 절벽 클리어"],
+  ["record_fragment_5", "잊힌 성터 클리어"],
+  ["record_fragment_6", "편집된 기록"],
+  ["record_fragment_7", "마지막 기록"],
+  ["record_fragment_8", "봉인 뒤의 기록"],
+]);
+assert.equal(gameData.special_source.record_fragment_6, "📜 필수 목표 (수정 갱도 클리어 후)");
+assert.equal(gameData.special_source.record_fragment_7, "📜 필수 목표 (결사의 회랑 클리어 후)");
+assert.equal(gameData.special_source.record_fragment_8, "📜 필수 목표 (마지막 기록 확인 후)");
+assert.equal(gameData.unobtainable.includes("record_fragment_6"), false);
 const trustedHelper = progression.oneTimeQuests.find((quest) => quest.id === "hestia_trusted_helper");
 assert.deepEqual(trustedHelper?.unlock, ["헤스티아 의뢰 누적 50회 완료"]);
 assert.equal(trustedHelper?.requestItems.length, 6);
@@ -191,5 +251,55 @@ assert.deepEqual(trustedHelper?.rewards, [{
 }]);
 assert.equal(gameData.test_items.includes("test_almanac"), true);
 assert.equal("test_almanac" in names.items, false);
+
+assert.deepEqual(gameData.plants.black_thorn, {
+  name: "검은 가시",
+  spriteKey: "black_thorn",
+  growTime_ms: 75000,
+  waterInterval_ms: null,
+  maxHarvests: 16,
+  oneShot: false,
+  perk: null,
+  produces: [{ itemCode: "black_sap", interval_ms: 1800000, max: 4, ripen: null }],
+});
+assert.equal(names.plants.black_thorn?.name, "검은 가시");
+assert.equal(gameData.zones.guild_corridor?.name, "결사의 회랑");
+assert.deepEqual(gameData.zones.guild_corridor?.monsters, [
+  "guild_guard", "guild_shieldbearer", "guild_executioner", "corridor_guardian",
+]);
+assert.deepEqual(gameData.zone_cultivation.guild_corridor, {
+  cultivationItemCode: null,
+  cultivationItem_kr: null,
+  effects: [],
+});
+for (const [id, name] of Object.entries({
+  guild_guard: "결사 경비병",
+  guild_shieldbearer: "결사 방패병",
+  guild_executioner: "결사 집행관",
+  corridor_guardian: "회랑의 수호자",
+})) {
+  assert.equal(gameData.monsters[id]?.name, name);
+}
+assert.equal(
+  gameData.monsters.corridor_guardian.skills
+    .find((skill) => skill.id === "corridor_guardian_defense_command")
+    ?.effects.some((effect) => effect.status === "damage_reflect" && effect.flat === 150),
+  true,
+);
+assert.ok(Math.abs(gameData.potion_combat.gale_potion.effects[0][0].chance - 0.2) < 1e-12);
+assert.ok(Math.abs(gameData.potion_combat.gale_potion.effects[9][0].chance - (1 - 0.8 ** 10)) < 1e-12);
+assert.equal(gameData.potion_combat.depletion_potion.effects[4][0].flat, -125);
+assert.equal(gameData.potion_combat.backflow_potion.effects[2][0].percent, 150);
+assert.equal(gameData.potion_combat.veil_potion.effects[3][0].flat, 4);
+assert.equal(gameData.shop_items.includes("garden_contest_ticket"), true);
+assert.equal(gameData.shop_buy_price.garden_contest_ticket, 1000);
+assert.equal(gameData.test_items.includes("hungry_wedge"), true);
+assert.equal(
+  gameData.achievements.some((achievement) =>
+    achievement.id === "starlight_gardener"
+    && achievement.icon === "starlight_garden_trophy"
+    && achievement.hidden === true),
+  true,
+);
 
 console.log("latest game update data tests passed");

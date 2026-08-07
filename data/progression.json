@@ -1303,6 +1303,54 @@
           "count": 1
         }
       ]
+    },
+    {
+      "order": 87,
+      "id": "story_record_fragment_6",
+      "title": "편집된 기록",
+      "description": "수정 갱도에서 발견한 결사의 기록을 확인하고 기록 조각 6을 받으세요.",
+      "action": "claim",
+      "required": true,
+      "rewards": [
+        {
+          "itemCode": "record_fragment_6",
+          "enhancement": 0,
+          "count": 1,
+          "untradable": true
+        }
+      ]
+    },
+    {
+      "order": 88,
+      "id": "story_record_fragment_7",
+      "title": "마지막 기록",
+      "description": "결사의 회랑에서 발견한 마지막 기록을 확인하고 기록 조각 7을 받으세요.",
+      "action": "claim",
+      "required": true,
+      "rewards": [
+        {
+          "itemCode": "record_fragment_7",
+          "enhancement": 0,
+          "count": 1,
+          "untradable": true
+        }
+      ]
+    },
+    {
+      "order": 89,
+      "id": "story_record_fragment_8",
+      "title": "봉인 뒤의 기록",
+      "description": "마지막 기록의 모순을 확인하고 기록 조각 8을 받으세요.",
+      "action": "claim",
+      "required": true,
+      "rewards": [
+        {
+          "itemCode": "record_fragment_8",
+          "enhancement": 0,
+          "count": 1,
+          "untradable": true
+        }
+      ]
     }
   ],
   "oneTimeQuests": [

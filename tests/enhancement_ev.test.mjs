@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultEnhancementMaterialPrice } from "../js/calc_prices.js";
-import { enhancementMaterialFlow } from "../js/enhancement_ev.js";
+import { enhancementGoalForTarget, enhancementMaterialFlow, formatExpectedQuantity } from "../js/enhancement_ev.js";
 
 const closeTo = (actual, expected, epsilon = 1e-10) => {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
@@ -21,11 +21,14 @@ const expectedShopBuyPrices = {
   dissolution_potion: 2000,
   polishing_powder: 500,
   dia_box_30: 300000,
+  garden_contest_ticket: 1000,
 };
 assert.deepEqual(new Set(gameData.shop_items), new Set(Object.keys(expectedShopBuyPrices)));
 for (const [code, expected] of Object.entries(expectedShopBuyPrices)) {
   assert.equal(defaultEnhancementMaterialPrice(gameData, code), expected, `${code} shop buy price`);
-  if (!code.startsWith("dia_box_")) assert.equal(expected, gameData.sell_price[code] * 2, `${code} buy/sell ratio`);
+  if (!code.startsWith("dia_box_") && code !== "garden_contest_ticket") {
+    assert.equal(expected, gameData.sell_price[code] * 2, `${code} buy/sell ratio`);
+  }
 }
 assert.equal(defaultEnhancementMaterialPrice(gameData, "dia_box_30"), gameData.item_values.dia_box_30);
 assert.equal(defaultEnhancementMaterialPrice(gameData, "copper_scrap"), gameData.item_values.copper_scrap);
@@ -131,8 +134,11 @@ closeTo(screenshotLevel9.normalOutput * screenshotScale, 0.7687074910902216);
 closeTo(enhancementMaterialFlow({
   start: 0, target: 0, successRate: rate, sourceBonusRate: 0.1, goal: "exact",
 }).expectedInputs, 1 / 0.9);
+assert.equal(formatExpectedQuantity(1 / 0.9), "1.11");
+assert.equal(enhancementGoalForTarget(0), "atLeast");
+assert.equal(enhancementGoalForTarget(1), "exact");
 closeTo(enhancementMaterialFlow({
-  start: 0, target: 0, successRate: rate, sourceBonusRate: 0.1, goal: "atLeast",
+  start: 0, target: 0, successRate: rate, sourceBonusRate: 0.1, goal: enhancementGoalForTarget(0),
 }).expectedInputs, 1);
 
 assert.equal(enhancementMaterialFlow({

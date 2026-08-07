@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { raidWinRate, simulateRaid } from "../js/battle.js";
+import { MI, raidWinRate, simulateRaid } from "../js/battle.js";
 import { parseItemKey } from "../js/item_key.js";
 import {
   combineRaidRates,
@@ -15,6 +15,132 @@ import {
 const gameData = JSON.parse(
   fs.readFileSync(new URL("../data/gamedata.json", import.meta.url), "utf8"),
 );
+
+const bareUnit = (id, { maxMp = 100, skills = [] } = {}) => ({
+  id,
+  name: id,
+  spriteKey: "",
+  rawAtk: 10,
+  rawDef: 0,
+  baseAtk: 10,
+  baseDef: 0,
+  maxHp: 100,
+  maxMp,
+  smart: false,
+  skills,
+});
+const lowLevelPotion = (itemCode, enhancement = 0, effects) => ({
+  itemCode,
+  enhancement,
+  effects: effects || gameData.potion_combat[itemCode].effects[enhancement],
+});
+const lowLevelSide = (units, potions = []) => ({
+  units,
+  potions,
+  skills: { crystalDivination: 0, extraLoot: 0, potionPreserve: 0 },
+});
+const runLowLevelBattle = (ally, enemy, seed = 1) => {
+  // The adapter initializes the shared item-name table used by the ported engine.
+  simulateRaid({ adventurers: [], potions: [] }, { adventurers: [], potions: [] }, gameData);
+  return MI({ seed, ally, enemy, rule: "enemy_first_interleaved" });
+};
+
+test("veil blocks one direct damaging potion hit and consumes one guard", () => {
+  const attacker = lowLevelSide(
+    [bareUnit("attacker")],
+    [lowLevelPotion("explosion_potion")],
+  );
+  const defender = lowLevelSide(
+    [bareUnit("defender")],
+    [lowLevelPotion("veil_potion")],
+  );
+  const result = runLowLevelBattle(attacker, defender);
+  const explosion = result.events.find((event) =>
+    event.type === "potion_use" && event.itemCode === "explosion_potion");
+
+  assert.match(explosion.text, /장막/);
+  assert.equal(explosion.hpChanges.length, 0);
+  assert.equal(
+    explosion.snapshots.find((unit) => unit.unitId === "defender")
+      .statusEffects.some((status) => status.type === "potion_guard"),
+    false,
+  );
+});
+
+test("backflow deals fixed damage from the next actual skill MP spend", () => {
+  const mpSkill = {
+    id: "mp_skill",
+    name: "마나 기술",
+    spriteKey: "",
+    type: "status",
+    coefficient: 0,
+    mpCost: 20,
+    cooldown: 0,
+    effects: [],
+  };
+  const attacker = lowLevelSide([bareUnit("attacker", { skills: [mpSkill] })]);
+  const defender = lowLevelSide(
+    [bareUnit("defender")],
+    [lowLevelPotion("backflow_potion")],
+  );
+  const result = runLowLevelBattle(attacker, defender);
+  const skill = result.events.find((event) => event.skillId === "mp_skill");
+
+  assert.match(skill.text, /역류 10/);
+  assert.deepEqual(
+    skill.hpChanges.find((change) => change.unitId === "attacker"),
+    { unitId: "attacker", delta: -10, newHp: 90 },
+  );
+  assert.equal(
+    skill.snapshots.find((unit) => unit.unitId === "attacker")
+      .statusEffects.some((status) => status.type === "backflow"),
+    false,
+  );
+});
+
+test("depletion targets the living enemy with the most MP", () => {
+  const attacker = lowLevelSide([
+    bareUnit("low-mp", { maxMp: 40 }),
+    bareUnit("high-mp", { maxMp: 100 }),
+  ]);
+  const defender = lowLevelSide(
+    [bareUnit("defender")],
+    [lowLevelPotion("depletion_potion")],
+  );
+  const result = runLowLevelBattle(attacker, defender);
+  const depletion = result.events.find((event) =>
+    event.type === "potion_use" && event.itemCode === "depletion_potion");
+
+  assert.deepEqual(depletion.mpChanges, [{ unitId: "high-mp", delta: -25, newMp: 75 }]);
+});
+
+test("gale chance applies to dispel and removes damage-cap buffs", () => {
+  const attacker = lowLevelSide(
+    [bareUnit("attacker")],
+    [lowLevelPotion("gale_potion", 0, [{ op: "dispel", target: "enemy_all", chance: 1 }])],
+  );
+  const defender = lowLevelSide(
+    [bareUnit("defender")],
+    [lowLevelPotion("growth_potion", 0, [{
+      op: "status",
+      effectId: "test_damage_cap",
+      target: "self",
+      status: "dmg_cap",
+      flat: 10,
+      duration: 30,
+    }])],
+  );
+  const result = runLowLevelBattle(attacker, defender);
+  const gale = result.events.find((event) =>
+    event.type === "potion_use" && event.itemCode === "gale_potion");
+
+  assert.match(gale.text, /버프 해제/);
+  assert.equal(
+    gale.snapshots.find((unit) => unit.unitId === "defender")
+      .statusEffects.some((status) => status.type === "dmg_cap"),
+    false,
+  );
+});
 
 test("item key parser preserves enhancement and every top-level engraving", () => {
   const parsed = parseItemKey(

@@ -255,11 +255,11 @@ async function tabMarket() {
 }
 
 // ---------- 거주민 탭 ----------
-// 존 진행 순서 (= 존 레벨 1~14)
+// 존 진행 순서 (= 존 레벨 1~15)
 const ZONES = ["beginner_forest", "misty_swamp", "poison_jungle", "mid_cave",
   "starlight_plateau", "advanced_volcano", "wind_corridor", "golden_fields",
   "twilight_valley", "sunset_cliff", "forgotten_fortress", "crystal_mine",
-  "sleeping_roots", "dried_spring"];
+  "sleeping_roots", "dried_spring", "guild_corridor"];
 const RELOCATION_MATERIALS = {
   mist_town: "mana_crystal",
   beginner_forest: "growth_potion",
