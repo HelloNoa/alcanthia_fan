@@ -402,6 +402,7 @@ table.rank .sub { color: var(--muted); font-size: 12px; }
 .cx-rows > div { display: flex; justify-content: space-between; gap: 10px; }
 .cx-rows span { color: var(--muted); }
 .cx-rows b { text-align: right; color: var(--ink); }
+.cx-highest-record b { color: var(--gold); }
 .cx-produce { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px;
   border-top: 1px solid var(--line); font-size: 13px; color: var(--buy); }
 .cx-pic { width: 24px; height: 24px; display: inline-flex; }

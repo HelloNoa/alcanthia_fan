@@ -1,8 +1,9 @@
-import { gamedata, names } from "./api.js";
+import { api, gamedata, names } from "./api.js";
 import { RANDOM_EFFECTS } from "./random_effects.js";
 import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievementIcon, fmtDuration, fmtMinutes } from "./sprites.js";
 import { createSearchPicker } from "./search_picker.js";
 import { saveEnhancementEvItem } from "./calc_state.js";
+import { normalizeHighestItemRecords } from "./item_records.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
@@ -75,6 +76,48 @@ export async function renderCodex(view, sub) {
   const extraTestSet = new Set(["growth_elixir", "poison_fang"]);
   const isTest = (code, it) => testSet.has(code) || extraTestSet.has(code) || /^aging_/.test(code) || it?.test === true || (it?.name || "").includes("시험용");
   const ITEM_TAB_POTIONS = new Set(["condensing_flask"]);
+
+  let highestItemRecords = null;
+  let highestItemRecordsPromise = null;
+  const loadHighestItemRecords = () => {
+    if (!highestItemRecordsPromise) {
+      highestItemRecordsPromise = api.itemRecords()
+        .then((payload) => {
+          highestItemRecords = normalizeHighestItemRecords(payload);
+          return highestItemRecords;
+        })
+        .catch((error) => {
+          console.warn("최고 강화 기록을 불러오지 못했습니다.", error);
+          highestItemRecords = new Map();
+          return highestItemRecords;
+        });
+    }
+    return highestItemRecordsPromise;
+  };
+  const updateHighestItemRecord = (row, record) => {
+    if (!record) { row.hidden = true; return; }
+    row.hidden = false;
+    row.replaceChildren();
+    const label = document.createElement("span");
+    label.textContent = "최고 강화도";
+    const value = document.createElement("b");
+    value.textContent = `+${record.enhancement} · ${record.nickname || "알려지지 않음"}`;
+    row.append(label, value);
+  };
+  const addHighestItemRecord = (card, code) => {
+    const row = document.createElement("div");
+    row.className = "cx-highest-record";
+    row.dataset.itemRecord = code;
+    row.hidden = true;
+    card.querySelector(".cx-rows")?.appendChild(row);
+    if (highestItemRecords) updateHighestItemRecord(row, highestItemRecords.get(code));
+  };
+  const refreshHighestItemRecords = () => {
+    if (!highestItemRecords) return;
+    body.querySelectorAll(".cx-highest-record[data-item-record]").forEach((row) => {
+      updateHighestItemRecord(row, highestItemRecords.get(row.dataset.itemRecord));
+    });
+  };
 
   // 포션 강화(e) 효과 평가 — 게임 헬퍼 그대로 (wn=e+1, gi=⌊(e+2)/2⌋, Jt=4(e+1), YP=4^e, Oh=e×2, uy=25)
   const PHF = { wn: (e) => e + 1, ku: (e) => e + 1, gi: (e) => Math.floor((e + 2) / 2), Jt: (e) => 4 * (e + 1), YP: (e) => 4 ** e, Oh: (e) => e * 2, uy: () => 25 };
@@ -272,6 +315,7 @@ export async function renderCodex(view, sub) {
           upd();
           card.appendChild(block);
         }
+        addHighestItemRecord(card, code);
         sourceRow(card, code);
         if (trans) card.insertAdjacentHTML("beforeend", `<div class="cx-perk">🔀 변성 · ${trans}</div>`);
         if (brewByOut[code]) addEnhancementShortcut(card, code);
@@ -403,6 +447,7 @@ export async function renderCodex(view, sub) {
           .slice(0, 8);
         if (uses.length) rows.push(["사용처", uses.map((u) => `${u.kind} ${N.items?.[u.output] || u.output}`).join(" · ")]);
         const card = cxCard((ic) => itemIcon(ic, code), it.name, rows);
+        if (it.type !== "produce") addHighestItemRecord(card, code);
         // 장비: 강화도 +/- 로 스탯 변화 확인
         if (stat && (stat.atk || stat.def || stat.hp || stat.mp)) {
           const ctrl = document.createElement("div");
@@ -623,7 +668,15 @@ export async function renderCodex(view, sub) {
       return;
     }
     if (!grid.children.length) body.innerHTML = "<p class='muted'>결과 없음</p>";
-    else body.appendChild(grid);
+    else {
+      body.appendChild(grid);
+      if (key === "items" || key === "potions") {
+        if (highestItemRecords) refreshHighestItemRecords();
+        else void loadHighestItemRecords().then(() => {
+          if (cur === key) refreshHighestItemRecords();
+        });
+      }
+    }
   };
 
   view.querySelectorAll("#cxcats button").forEach((b) => {

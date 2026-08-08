@@ -19,6 +19,7 @@ export const api = {
   search:     (q) => get("/search", { q, limit: 20 }),
   residents:  (zoneId, opts = {}) => get("/residents", { zoneId, ...opts }),
   leaderboard:() => get("/leaderboard"),
+  itemRecords:() => get("/item-records"),
   price:      (itemKey) => get("/price", { itemKey }),
   orderbook:  (itemKey, limit = 12) => get("/orderbook", { itemKey, limit }),
   candles:    (itemKey, interval = "1d", limit = 30) => get("/candles", { itemKey, interval, limit }),
