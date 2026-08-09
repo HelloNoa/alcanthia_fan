@@ -617,7 +617,8 @@ function mountTabs() {
     b.onclick = () => selectTab(b.dataset.tab));
 }
 function selectTab(key) {
-  const [main, sub] = key.split("/");   // "calc/adv" → 메인 탭 + 서브탭(새로고침 유지)
+  const [routeMain, sub] = key.split("/");   // "calc/adv" → 메인 탭 + 서브탭(새로고침 유지)
+  const main = routeMain === "p" ? "planner" : routeMain;
   location.hash = key;
   $("#tabs").querySelectorAll("button").forEach((b) =>
     b.classList.toggle("active", b.dataset.tab === main));

@@ -3,6 +3,18 @@ import { wardingStoneMultiplier } from "./raid_profile.js";
 import { plantIcon, itemIcon, fmtDuration, loadImg, CDN } from "./sprites.js";
 import { createSearchPicker } from "./search_picker.js";
 import { parseItemKey } from "./item_key.js";
+import {
+  plannerCompressShareCode,
+  plannerDecompressShareCode,
+  plannerShareCodeFromLocation,
+  plannerShareHash,
+} from "./planner_share.js";
+export {
+  plannerCompressShareCode,
+  plannerDecompressShareCode,
+  plannerShareCodeFromLocation,
+  plannerShareHash,
+} from "./planner_share.js";
 
 const CANVAS = 33;
 const CENTER = (CANVAS - 1) / 2; // 16
@@ -475,6 +487,28 @@ const FENCE_ORDER = ["rustic_fence", "root_barrier", "flower_trellis_arch"];
 const FENCES = new Set(FENCE_ORDER);
 const SIDES = ["t", "r", "b", "l"];
 const SIDE_KR = { t: "위", r: "오른쪽", b: "아래", l: "왼쪽" };
+const plannerShareStringHash = (value) => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index++) {
+    hash = Math.imul(hash ^ value.charCodeAt(index), 0x01000193);
+  }
+  return hash >>> 0;
+};
+const plannerShareStringResolver = (values) => {
+  const byHash = new Map();
+  for (const rawValue of values) {
+    const value = String(rawValue || "");
+    if (!value) continue;
+    const hash = plannerShareStringHash(value);
+    const current = byHash.get(hash);
+    if (current === undefined) byHash.set(hash, value);
+    else if (current !== value) byHash.set(hash, null);
+  }
+  return {
+    canEncode: (value) => byHash.get(plannerShareStringHash(value)) === value,
+    resolve: (hash) => byHash.get(hash) || "",
+  };
+};
 function loadBadgeVisibility() {
   try {
     const saved = localStorage.getItem(BADGE_STORE);
@@ -727,6 +761,13 @@ export async function renderPlanner(view) {
   );
   const itemVariants = N.itemVariants || {};
   const itemVariantSprites = N.itemVariantSprites || {};
+  const shareStringResolvers = {
+    plants: plannerShareStringResolver(Object.keys(plants)),
+    ornaments: plannerShareStringResolver(Object.keys(ORN)),
+    displays: plannerShareStringResolver(DISPLAY_ITEMS.map(([code]) => code)),
+    plantSkins: plannerShareStringResolver(Object.keys(skinSprites)),
+    itemVariants: plannerShareStringResolver(Object.keys(itemVariants)),
+  };
   const variantItemCodes = [...new Set([
     ...Object.keys(ORN),
     ...FLOOR_PALETTE,
@@ -764,10 +805,13 @@ export async function renderPlanner(view) {
       ? itemVariantSprites[validId] || itemVariants[validId]?.sprite || validId
       : N.itemSprites?.[itemCode] || itemCode;
   };
+  const incomingSharedPlanCode = plannerShareCodeFromLocation(location);
+  const sharedPlanCode = await plannerDecompressShareCode(incomingSharedPlanCode);
 
   // cell: null(미개간) | {p:null}(개간) | {p:id,e,skinId?}(작물)
   //   | {orn:code,e?,variantId?,cauldron?:{code,enhancement}}(장식물)
   // floorVariantId, 경계 variantId, 모닥불 위 가마솥은 같은 칸에 병존 가능
+  let sharedPlanLoaded = false;
   let grid = load();
   let sel = palette[0];
   let mode = "plant";
@@ -2112,9 +2156,16 @@ export async function renderPlanner(view) {
   recompute();
   detail.innerHTML = `<h3>칸 정보</h3><p class="muted">칸에 마우스를 올리면 상세가 표시됩니다</p>`;
   // 공유 링크로 열었으면 내 플래너에 저장하고 URL 정리
-  if (new URLSearchParams(location.search).get("plan")) {
+  if (sharedPlanLoaded) {
     save();
-    try { history.replaceState(null, "", location.pathname + location.hash); } catch {}
+    try {
+      const cleanUrl = new URL(location.href);
+      cleanUrl.searchParams.delete("plan");
+      cleanUrl.hash = "#planner";
+      history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+    } catch {}
+  } else if (incomingSharedPlanCode) {
+    hint.textContent = "공유 배치 링크를 읽지 못했습니다.";
   }
 
   function blank() { return Array.from({ length: CANVAS }, () => Array(CANVAS).fill(null)); }
@@ -2124,8 +2175,13 @@ export async function renderPlanner(view) {
     return gg;
   }
   function load() {
-    const p = new URLSearchParams(location.search).get("plan");
-    if (p) { const g0 = decodeGrid(p); if (g0) return normalizeGrid(g0); }     // 공유 링크
+    if (sharedPlanCode) {
+      const sharedGrid = decodeGrid(sharedPlanCode);
+      if (sharedGrid) {
+        sharedPlanLoaded = true;
+        return normalizeGrid(sharedGrid);
+      }
+    }
     try {
       const a = JSON.parse(localStorage.getItem(STORE));
       if (Array.isArray(a)) {
@@ -2204,6 +2260,7 @@ export async function renderPlanner(view) {
   // v2: 바닥재·울타리, v3: 전시대 전시 아이템, v4: 포션 효과,
   // v5: 장식물 강화도, v6: 울타리·장벽 강화도, v7: 작물 외형,
   // v8: 장식물·바닥재·경계 외형, v9: 모닥불 위 가마솥
+  // v10: 문자열 해시와 희소 배열로 공유 링크 축소
   function encodeGrid() {
     let minR = CANVAS, maxR = -1, minC = CANVAS, maxC = -1;
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) if (grid[r][c]) {
@@ -2215,14 +2272,12 @@ export async function renderPlanner(view) {
     const dispVals = [], soilVals = [], plantVals = [], ornEnhVals = [], fenceEnhVals = [], skinVals = [], itemVariantVals = [];
     const cauldronVals = [], cauldronEnhVals = [];
     let hasFloor = false, hasFence = false, hasDisp = false;
-    let hasSoilFx = false, hasPlantFx = false, hasOrnEnh = false, hasFenceEnh = false, hasPlantSkin = false, hasItemVariant = false;
-    let hasCampfireCauldron = false;
+    let hasSoilFx = false, hasPlantFx = false, hasOrnEnh = false, hasFenceEnh = false, hasPlantSkin = false;
     const itemVariantValue = (itemCode, rawVariantId) => {
       const variantId = plannerItemVariantId(itemCode, rawVariantId, itemVariants);
       if (!variantId) return 0;
       let variantIndex = itemVariantIds.indexOf(variantId);
       if (variantIndex < 0) { variantIndex = itemVariantIds.length; itemVariantIds.push(variantId); }
-      hasItemVariant = true;
       return variantIndex + 1;
     };
     for (let r = minR; r <= maxR; r++) for (let c = minC; c <= maxC; c++) {
@@ -2275,37 +2330,68 @@ export async function renderPlanner(view) {
         : -1;
       cauldronVals.push(cauldronIndex + 1);
       cauldronEnhVals.push(stackedCauldron?.enhancement || 0);
-      if (cauldronIndex >= 0) hasCampfireCauldron = true;
     }
     const flags = (hasFloor ? 1 : 0) | (hasFence ? 2 : 0) | (hasDisp ? 4 : 0)
       | (hasSoilFx ? 8 : 0) | (hasPlantFx ? 16 : 0) | (hasOrnEnh ? 32 : 0)
       | (hasFenceEnh ? 64 : 0) | (hasPlantSkin ? 128 : 0);
-    const ver = hasCampfireCauldron ? 9 : hasItemVariant ? 8 : hasPlantSkin ? 7
-      : hasFenceEnh ? 6 : hasOrnEnh ? 5 : (hasSoilFx || hasPlantFx) ? 4 : hasDisp ? 3 : 2;
+    const ver = 10;
     const bytes = [ver, minR, minC, h, w, flags, pl.length];
-    const wrStr = (id) => { bytes.push(id.length); for (const ch of id) bytes.push(ch.charCodeAt(0)); };
-    for (const id of pl) wrStr(id);
-    bytes.push(orn.length); for (const id of orn) wrStr(id);
+    const wrVarint = (value) => {
+      let remaining = Math.max(0, Math.floor(value));
+      do {
+        let byte = remaining & 0x7f;
+        remaining = Math.floor(remaining / 128);
+        if (remaining) byte |= 0x80;
+        bytes.push(byte);
+      } while (remaining);
+    };
+    const wrSparse = (values) => {
+      const positions = [];
+      const nonzeroValues = [];
+      let previous = -1;
+      values.forEach((value, index) => {
+        if (!value) return;
+        positions.push(index - previous - 1);
+        nonzeroValues.push(value);
+        previous = index;
+      });
+      wrVarint(positions.length);
+      positions.forEach(wrVarint);
+      nonzeroValues.forEach((value) => bytes.push(value));
+    };
+    const wrStr = (id, resolver) => {
+      if (resolver.canEncode(id)) {
+        const hash = plannerShareStringHash(id);
+        bytes.push(0, hash >>> 24, (hash >>> 16) & 0xff, (hash >>> 8) & 0xff, hash & 0xff);
+        return;
+      }
+      bytes.push(id.length);
+      for (const ch of id) bytes.push(ch.charCodeAt(0));
+    };
+    for (const id of pl) wrStr(id, shareStringResolvers.plants);
+    bytes.push(orn.length); for (const id of orn) wrStr(id, shareStringResolvers.ornaments);
     vals.forEach((v) => bytes.push(v));
-    if (hasFloor) floors.forEach((v) => bytes.push(v));
-    if (hasFence) fences.forEach((v) => bytes.push(v));
-    if (hasDisp) { bytes.push(disp.length); for (const id of disp) wrStr(id); dispVals.forEach((v) => bytes.push(v)); }
-    if (hasSoilFx) soilVals.forEach((v) => bytes.push(v));
-    if (hasPlantFx) plantVals.forEach((v) => bytes.push(v));
-    if (hasOrnEnh) ornEnhVals.forEach((v) => bytes.push(v));
-    if (hasFenceEnh) fenceEnhVals.forEach((v) => bytes.push(v));
+    if (hasFloor) wrSparse(floors);
+    if (hasFence) wrSparse(fences);
+    if (hasDisp) {
+      bytes.push(disp.length);
+      for (const id of disp) wrStr(id, shareStringResolvers.displays);
+      wrSparse(dispVals);
+    }
+    if (hasSoilFx) wrSparse(soilVals);
+    if (hasPlantFx) wrSparse(plantVals);
+    if (hasOrnEnh) wrSparse(ornEnhVals);
+    if (hasFenceEnh) wrSparse(fenceEnhVals);
     if (hasPlantSkin) {
-      bytes.push(plantSkins.length); for (const id of plantSkins) wrStr(id);
-      skinVals.forEach((v) => bytes.push(v));
+      bytes.push(plantSkins.length);
+      for (const id of plantSkins) wrStr(id, shareStringResolvers.plantSkins);
+      wrSparse(skinVals);
     }
-    if (ver >= 8) {
-      bytes.push(itemVariantIds.length); for (const id of itemVariantIds) wrStr(id);
-      itemVariantVals.forEach((v) => bytes.push(v));
-    }
-    if (ver >= 9) {
-      cauldronVals.forEach((v) => bytes.push(v));
-      cauldronEnhVals.forEach((v) => bytes.push(v));
-    }
+    bytes.push(itemVariantIds.length);
+    for (const id of itemVariantIds) wrStr(id, shareStringResolvers.itemVariants);
+    wrSparse(itemVariantVals);
+    wrSparse(cauldronVals);
+    wrSparse(cauldronEnhVals);
     let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
     return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
@@ -2315,13 +2401,76 @@ export async function renderPlanner(view) {
     const b = []; for (let k = 0; k < bin.length; k++) b.push(bin.charCodeAt(k));
     let i = 0;
     const ver = b[i++];
-    if (ver < 1 || ver > 9) return null;
+    if (ver < 1 || ver > 10) return null;
     const minR = b[i++], minC = b[i++], h = b[i++], w = b[i++];
+    if (!h || !w || minR + h > CANVAS || minC + w > CANVAS) return null;
     const flags = ver >= 2 ? b[i++] : 0;
     const pl = [], orn = [];
-    const rd = (arr) => { const n = b[i++]; for (let k = 0; k < n; k++) { const len = b[i++]; let s = ""; for (let j = 0; j < len; j++) s += String.fromCharCode(b[i++]); arr.push(s); } };
-    rd(pl); rd(orn);
+    const rdVarint = () => {
+      let value = 0;
+      let factor = 1;
+      for (let count = 0; count < 5; count++) {
+        const byte = b[i++];
+        if (byte == null) return null;
+        value += (byte & 0x7f) * factor;
+        if (!(byte & 0x80)) return value;
+        factor *= 128;
+      }
+      return null;
+    };
+    const rdSparse = (length) => {
+      const count = rdVarint();
+      if (count == null || count > length) return null;
+      const positions = [];
+      let previous = -1;
+      for (let index = 0; index < count; index++) {
+        const delta = rdVarint();
+        if (delta == null) return null;
+        previous += delta + 1;
+        if (previous >= length) return null;
+        positions.push(previous);
+      }
+      if (i + count > b.length) return null;
+      const values = Array(length).fill(0);
+      for (const position of positions) {
+        const value = b[i++];
+        if (!value) return null;
+        values[position] = value;
+      }
+      return values;
+    };
+    const rdValues = (length) => {
+      if (ver >= 10) return rdSparse(length);
+      if (i + length > b.length) return null;
+      const values = b.slice(i, i + length);
+      i += length;
+      return values;
+    };
+    const rd = (arr, resolver) => {
+      const count = b[i++];
+      if (count == null) return false;
+      for (let index = 0; index < count; index++) {
+        const marker = b[i++];
+        if (marker == null) return false;
+        if (ver >= 10 && marker === 0) {
+          if (i + 4 > b.length) return false;
+          const hash = (b[i] * 0x1000000 + b[i + 1] * 0x10000 + b[i + 2] * 0x100 + b[i + 3]) >>> 0;
+          i += 4;
+          const value = resolver.resolve(hash);
+          if (!value) return false;
+          arr.push(value);
+          continue;
+        }
+        if (i + marker > b.length) return false;
+        let value = "";
+        for (let offset = 0; offset < marker; offset++) value += String.fromCharCode(b[i++]);
+        arr.push(value);
+      }
+      return true;
+    };
+    if (!rd(pl, shareStringResolvers.plants) || !rd(orn, shareStringResolvers.ornaments)) return null;
     const g = blank(); const cells = [];
+    if (i + h * w > b.length) return null;
     for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
       const v = b[i++], gr = minR + r, gc = minC + c;
       cells.push([gr, gc]);
@@ -2330,42 +2479,82 @@ export async function renderPlanner(view) {
       else if (v >= 200) g[gr][gc] = { orn: orn[v - 200] };
       else g[gr][gc] = { p: pl[Math.floor((v - 2) / 13)], e: (v - 2) % 13 };
     }
-    if (flags & 1) cells.forEach(([gr, gc]) => { const fv = b[i++]; if (fv && g[gr] && g[gr][gc]) g[gr][gc].floor = FLOOR_ORDER[fv - 1]; });
-    if (flags & 2) cells.forEach(([gr, gc]) => {
-      const fb = b[i++]; if (!fb || !(g[gr] && g[gr][gc])) return;
-      const f = {}; SIDES.forEach((s, k) => { const sv = (fb >> (k * 2)) & 3; if (sv) f[s] = FENCE_ORDER[sv - 1]; });
-      if (Object.keys(f).length) g[gr][gc].fences = f;
-    });
-    if (ver >= 3 && (flags & 4)) {   // 전시대 전시 아이템
-      const disp = []; rd(disp);
-      cells.forEach(([gr, gc]) => { const dv = b[i++]; if (dv && g[gr] && g[gr][gc]) g[gr][gc].display = disp[dv - 1]; });
-    }
-    if (ver >= 4 && (flags & 8)) cells.forEach(([gr, gc]) => {
-      const sv = b[i++]; if (!sv || !(g[gr] && g[gr][gc])) return;
-      g[gr][gc].cond = COND_ORDER.filter((cc, k) => sv & (1 << k));
-    });
-    if (ver >= 4 && (flags & 16)) cells.forEach(([gr, gc]) => {
-      const pv = b[i++]; if (!pv || !(g[gr] && g[gr][gc])) return;
-      g[gr][gc].plantCond = PLANT_COND_ORDER.filter((cc, k) => pv & (1 << k));
-    });
-    if (ver >= 5 && (flags & 32)) cells.forEach(([gr, gc]) => {
-      const enhancement = b[i++];
-      if (enhancement && g[gr]?.[gc]?.orn) g[gr][gc].e = enhancement;
-    });
-    if (ver >= 6 && (flags & 64)) cells.forEach(([gr, gc]) => {
-      SIDES.forEach((side) => {
-        const enhancement = b[i++] || 0;
-        const current = fenceData(g[gr]?.[gc]?.fences?.[side]);
-        if (enhancement && current && g[gr]?.[gc]) {
-          g[gr][gc].fences[side] = { code: current.code, enhancement };
-        }
+    if (flags & 1) {
+      const floorValues = rdValues(cells.length);
+      if (!floorValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const floorValue = floorValues[index];
+        if (floorValue && g[gr]?.[gc]) g[gr][gc].floor = FLOOR_ORDER[floorValue - 1];
       });
-    });
+    }
+    if (flags & 2) {
+      const fenceValues = rdValues(cells.length);
+      if (!fenceValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const fenceValue = fenceValues[index];
+        if (!fenceValue || !g[gr]?.[gc]) return;
+        const fences = {};
+        SIDES.forEach((side, sideIndex) => {
+          const value = (fenceValue >> (sideIndex * 2)) & 3;
+          if (value) fences[side] = FENCE_ORDER[value - 1];
+        });
+        if (Object.keys(fences).length) g[gr][gc].fences = fences;
+      });
+    }
+    if (ver >= 3 && (flags & 4)) {   // 전시대 전시 아이템
+      const displays = [];
+      if (!rd(displays, shareStringResolvers.displays)) return null;
+      const displayValues = rdValues(cells.length);
+      if (!displayValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const displayValue = displayValues[index];
+        if (displayValue && g[gr]?.[gc]) g[gr][gc].display = displays[displayValue - 1];
+      });
+    }
+    if (ver >= 4 && (flags & 8)) {
+      const soilValues = rdValues(cells.length);
+      if (!soilValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const value = soilValues[index];
+        if (value && g[gr]?.[gc]) g[gr][gc].cond = COND_ORDER.filter((condition, bit) => value & (1 << bit));
+      });
+    }
+    if (ver >= 4 && (flags & 16)) {
+      const plantValues = rdValues(cells.length);
+      if (!plantValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const value = plantValues[index];
+        if (value && g[gr]?.[gc]) g[gr][gc].plantCond = PLANT_COND_ORDER.filter((condition, bit) => value & (1 << bit));
+      });
+    }
+    if (ver >= 5 && (flags & 32)) {
+      const enhancementValues = rdValues(cells.length);
+      if (!enhancementValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const enhancement = enhancementValues[index];
+        if (enhancement && g[gr]?.[gc]?.orn) g[gr][gc].e = enhancement;
+      });
+    }
+    if (ver >= 6 && (flags & 64)) {
+      const enhancementValues = rdValues(cells.length * SIDES.length);
+      if (!enhancementValues) return null;
+      cells.forEach(([gr, gc], cellIndex) => {
+        SIDES.forEach((side, sideIndex) => {
+          const enhancement = enhancementValues[cellIndex * SIDES.length + sideIndex];
+          const current = fenceData(g[gr]?.[gc]?.fences?.[side]);
+          if (enhancement && current && g[gr]?.[gc]) {
+            g[gr][gc].fences[side] = { code: current.code, enhancement };
+          }
+        });
+      });
+    }
     if (ver >= 7 && (flags & 128)) {
       const plantSkins = [];
-      rd(plantSkins);
-      cells.forEach(([gr, gc]) => {
-        const skinValue = b[i++] || 0;
+      if (!rd(plantSkins, shareStringResolvers.plantSkins)) return null;
+      const skinValues = rdValues(cells.length);
+      if (!skinValues) return null;
+      cells.forEach(([gr, gc], index) => {
+        const skinValue = skinValues[index];
         const cell = g[gr]?.[gc];
         const skinId = cell?.p ? plannerPlantSkinId(cell.p, plantSkins[skinValue - 1], skinSprites) : "";
         if (skinId) cell.skinId = skinId;
@@ -2373,11 +2562,14 @@ export async function renderPlanner(view) {
     }
     if (ver >= 8) {
       const encodedVariants = [];
-      rd(encodedVariants);
-      cells.forEach(([gr, gc]) => {
+      if (!rd(encodedVariants, shareStringResolvers.itemVariants)) return null;
+      const variantValues = rdValues(cells.length * 6);
+      if (!variantValues) return null;
+      cells.forEach(([gr, gc], cellIndex) => {
         const cell = g[gr]?.[gc];
-        const ornamentValue = b[i++] || 0;
-        const floorValue = b[i++] || 0;
+        const valueOffset = cellIndex * 6;
+        const ornamentValue = variantValues[valueOffset];
+        const floorValue = variantValues[valueOffset + 1];
         const ornamentVariantId = cell?.orn
           ? plannerItemVariantId(cell.orn, encodedVariants[ornamentValue - 1], itemVariants)
           : "";
@@ -2386,8 +2578,8 @@ export async function renderPlanner(view) {
           : "";
         if (ornamentVariantId) cell.variantId = ornamentVariantId;
         if (floorVariantId) cell.floorVariantId = floorVariantId;
-        SIDES.forEach((side) => {
-          const variantValue = b[i++] || 0;
+        SIDES.forEach((side, sideIndex) => {
+          const variantValue = variantValues[valueOffset + sideIndex + 2];
           const fence = fenceData(cell?.fences?.[side]);
           const variantId = fence
             ? plannerItemVariantId(fence.code, encodedVariants[variantValue - 1], itemVariants)
@@ -2397,8 +2589,9 @@ export async function renderPlanner(view) {
       });
     }
     if (ver >= 9) {
-      const cauldronValues = cells.map(() => b[i++] || 0);
-      const cauldronEnhancements = cells.map(() => b[i++] || 0);
+      const cauldronValues = rdValues(cells.length);
+      const cauldronEnhancements = rdValues(cells.length);
+      if (!cauldronValues || !cauldronEnhancements) return null;
       cells.forEach(([gr, gc], index) => {
         const cell = g[gr]?.[gc];
         const code = CAMPFIRE_CAULDRON_ORDER[cauldronValues[index] - 1];
@@ -2436,9 +2629,9 @@ export async function renderPlanner(view) {
     const name = (inp.value || "").trim() || "배치 " + (Object.keys(getSlots()).length + 1);
     const s = getSlots(); s[name] = JSON.stringify(grid); setSlots(s); inp.value = ""; renderSlots(); // JSON(바닥·울타리 보존)
   };
-  const shareUrl = () => {
-    const code = encodeGrid();
-    return location.origin + location.pathname + "?plan=" + code + "#planner";
+  const shareUrl = async () => {
+    const code = await plannerCompressShareCode(encodeGrid());
+    return location.origin + location.pathname + plannerShareHash(code);
   };
   const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const copyShare = async (text, okText) => {
@@ -2447,10 +2640,16 @@ export async function renderPlanner(view) {
     catch { msg.innerHTML = `복사 실패 — 아래 내용 복사:<br><input class="pl-share-in" value="${escAttr(text)}" readonly onclick="this.select()">`; }
     setTimeout(() => { if (msg.textContent.startsWith("✅")) msg.textContent = ""; }, 4000);
   };
-  view.querySelector("#pl-share-url").onclick = () => copyShare(shareUrl(), "✅ URL 복사됨! (붙여넣기로 공유)");
-  view.querySelector("#pl-share-discord").onclick = () => {
-    const url = shareUrl();
-    copyShare(`[알칸시아 배치 보기](${url})`, "✅ Discord용 링크 복사됨!");
+  view.querySelector("#pl-share-url").onclick = async () => {
+    await copyShare(await shareUrl(), "✅ URL 복사됨! (붙여넣기로 공유)");
+  };
+  view.querySelector("#pl-share-discord").onclick = async () => {
+    const text = `<${await shareUrl()}>`;
+    if (text.length > 2000) {
+      view.querySelector("#pl-share-msg").textContent = `Discord 제한 2,000자를 넘습니다. (${text.length.toLocaleString()}자)`;
+      return;
+    }
+    await copyShare(text, "✅ Discord용 링크 복사됨!");
   };
   renderSlots();
 }

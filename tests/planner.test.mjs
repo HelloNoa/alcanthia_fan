@@ -6,6 +6,8 @@ const {
   farmersBatonRange,
   plannerEmitterRange,
   plannerCanStackCauldron,
+  plannerCompressShareCode,
+  plannerDecompressShareCode,
   plannerDeduplicateSharedFences,
   plannerFitGrid,
   plannerGridFromGardenProfile,
@@ -19,10 +21,46 @@ const {
   plannerPollProductionPerHour,
   plannerRevivalChance,
   plannerRipenedCycleMs,
+  plannerShareCodeFromLocation,
+  plannerShareHash,
   plannerStackedCauldronData,
   plannerSunsetRipenDurationMs,
   plannerToggleSharedFence,
 } = await import("../js/planner.js");
+
+assert.equal(plannerShareHash("abc_123-xyz"), "#p/abc_123-xyz");
+assert.equal(plannerShareCodeFromLocation({
+  search: "",
+  hash: "#p/abc_123-xyz",
+}), "abc_123-xyz");
+assert.equal(plannerShareCodeFromLocation({
+  search: "",
+  hash: "#planner/plan/legacy_hash_code",
+}), "legacy_hash_code");
+assert.equal(plannerShareCodeFromLocation({
+  search: "?skins=53&plan=legacy_code",
+  hash: "#planner",
+}), "legacy_code");
+assert.equal(plannerShareCodeFromLocation({
+  search: "?skins=53",
+  hash: "#planner",
+}), "");
+assert.equal(plannerShareCodeFromLocation({
+  search: "",
+  hash: `#planner/plan/${encodeURIComponent("gzu.공유")}`,
+}), "gzu.공유");
+const shareBytes = new Uint8Array(4096);
+for (let index = 0; index < shareBytes.length; index += 64) shareBytes[index] = index % 251;
+const rawShareCode = Buffer.from(shareBytes).toString("base64url");
+const compressedShareCode = await plannerCompressShareCode(rawShareCode);
+assert.match(compressedShareCode, /^z\./);
+assert.match(compressedShareCode, /^[\x21-\x7e]+$/);
+assert.doesNotMatch(compressedShareCode, /["#%()<>\\`]/);
+assert.ok(compressedShareCode.length < rawShareCode.length);
+assert.equal(await plannerDecompressShareCode(compressedShareCode), rawShareCode);
+assert.equal(await plannerDecompressShareCode(rawShareCode), rawShareCode);
+assert.equal(await plannerDecompressShareCode("z.invalid"), "");
+assert.equal(await plannerDecompressShareCode("gz.invalid"), "");
 
 assert.equal(farmersBatonRange(0), 1);
 assert.equal(farmersBatonRange(1), 2);
