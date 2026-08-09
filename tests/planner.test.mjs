@@ -8,6 +8,7 @@ const {
   plannerCanStackCauldron,
   plannerCompressShareCode,
   plannerDecompressShareCode,
+  plannerDiscordShareText,
   plannerDeduplicateSharedFences,
   plannerFitGrid,
   plannerGridFromGardenProfile,
@@ -29,6 +30,10 @@ const {
 } = await import("../js/planner.js");
 
 assert.equal(plannerShareHash("abc_123-xyz"), "#p/abc_123-xyz");
+assert.equal(
+  plannerDiscordShareText("https://example.com/#p/code"),
+  "[알칸시아 배치 보기](https://example.com/#p/code)",
+);
 assert.equal(plannerShareCodeFromLocation({
   search: "",
   hash: "#p/abc_123-xyz",

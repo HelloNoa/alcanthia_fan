@@ -6,12 +6,14 @@ import { parseItemKey } from "./item_key.js";
 import {
   plannerCompressShareCode,
   plannerDecompressShareCode,
+  plannerDiscordShareText,
   plannerShareCodeFromLocation,
   plannerShareHash,
 } from "./planner_share.js";
 export {
   plannerCompressShareCode,
   plannerDecompressShareCode,
+  plannerDiscordShareText,
   plannerShareCodeFromLocation,
   plannerShareHash,
 } from "./planner_share.js";
@@ -2644,7 +2646,7 @@ export async function renderPlanner(view) {
     await copyShare(await shareUrl(), "✅ URL 복사됨! (붙여넣기로 공유)");
   };
   view.querySelector("#pl-share-discord").onclick = async () => {
-    const text = `<${await shareUrl()}>`;
+    const text = plannerDiscordShareText(await shareUrl());
     if (text.length > 2000) {
       view.querySelector("#pl-share-msg").textContent = `Discord 제한 2,000자를 넘습니다. (${text.length.toLocaleString()}자)`;
       return;

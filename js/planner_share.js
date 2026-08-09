@@ -157,3 +157,5 @@ export const plannerShareCodeFromLocation = ({ search = "", hash = "" } = {}) =>
 };
 
 export const plannerShareHash = (code) => `${SHARE_HASH_PREFIX}${code}`;
+
+export const plannerDiscordShareText = (url) => `[알칸시아 배치 보기](${url})`;
