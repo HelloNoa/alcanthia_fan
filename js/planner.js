@@ -18,8 +18,13 @@ export {
   plannerShareHash,
 } from "./planner_share.js";
 
-const CANVAS = 33;
-const CENTER = (CANVAS - 1) / 2; // 16
+export const PLANNER_PRESET_MAX_STAGE = 20;
+export const plannerPresetRadius = (stage = 0) => {
+  const value = Math.max(0, Math.floor(Number(stage) || 0));
+  return value > 0 ? value + 3 : 0;
+};
+const CANVAS = plannerPresetRadius(PLANNER_PRESET_MAX_STAGE) * 2 + 1;
+const CENTER = (CANVAS - 1) / 2;
 const STORE = "alc_planner_v3";
 const BADGE_STORE = "alc_planner_badges";
 const PEDESTAL = "pedestal";
@@ -87,6 +92,24 @@ export const plannerInheritanceChance = (plantEnhancement = 0, level = 0) => {
 export const plannerRevivalChance = (level = 0) => (
   0.05 * Math.max(0, Math.min(3, Math.floor(Number(level) || 0)))
 );
+export const plannerEchoHarvestThreshold = (zoneEffectCoeff = 0) => {
+  const coeff = Math.max(0, Number(zoneEffectCoeff) || 0);
+  return coeff > 0 ? Math.ceil(5 / coeff) : Number.POSITIVE_INFINITY;
+};
+export const plannerEchoHarvestMultiplier = (zoneEffectCoeff = 0, sameOutputShare = 1) => {
+  const threshold = plannerEchoHarvestThreshold(zoneEffectCoeff);
+  const share = Math.max(0, Math.min(1, Number(sameOutputShare) || 0));
+  if (!Number.isFinite(threshold) || share <= 0) return 1;
+  if (share >= 1) return 1 + 1 / threshold;
+  const streakPower = Math.pow(share, threshold);
+  const bonusRate = (1 - share) * Math.pow(share, threshold - 1) / (1 - streakPower);
+  return 1 + bonusRate;
+};
+export const plannerEchoProductionMultiplier = (
+  zoneEffectCoeff = 0,
+  sameOutputShare = 1,
+  resonanceOptimized = false,
+) => plannerEchoHarvestMultiplier(zoneEffectCoeff, resonanceOptimized ? 1 : sameOutputShare);
 export const plannerPollProductionPerHour = ({
   pollIntervalMs,
   growTimeMs,
@@ -618,6 +641,7 @@ const PRODUCTION_ZONES = {
   "": "지역 없음",
   misty_swamp: "안개 습지",
   poison_jungle: "독안개 정글",
+  mid_cave: "메아리 동굴",
   advanced_volcano: "용암 협곡",
   wind_corridor: "바람의 회랑",
   golden_fields: "금빛 들판",
@@ -631,6 +655,7 @@ const PRODUCTION_ZONE_NOTES = {
   "": "텃밭 생산량에 영향을 주는 지역 효과를 적용하지 않습니다.",
   misty_swamp: "모든 칸을 습기 토양으로 계산합니다. 푸른이끼처럼 습기 조건을 보는 작물에 영향이 있습니다.",
   poison_jungle: "중독 식물도 생산하며, 중독 상태면 생산속도에 +10%×계수가 붙습니다.",
+  mid_cave: "같은 산물을 일정 횟수 연속 수확할 때마다 해당 수확 결과를 2배로 얻습니다.",
   advanced_volcano: "물에 약한 작물도 물 공급으로 죽지 않는 것으로 계산합니다.",
   wind_corridor: "바람꽃 수분 주기가 60초×(1 - 10%×계수)로 짧아집니다.",
   golden_fields: "최대 생산 횟수가 기본 수명×(1 + 50%×계수)로 늘어납니다.",
@@ -643,14 +668,23 @@ const PRODUCTION_ZONE_NOTES = {
 const zoneCoeff = (opt) => opt.familiar * 0.1 + (opt.fog ? 1 : 0) + (opt.raid ? 0.5 : 0);
 const plentyMultiplier = (opt) => 1 + 0.05 * opt.plenty * (opt.zone === "dried_spring" ? 1 + zoneCoeff(opt) : 1);
 const zoneNoteHtml = (opt) => {
+  const zc = zoneCoeff(opt);
   const sunsetStatus = opt.zone !== "sunset_cliff"
     ? ""
     : !opt.sunsetRipen
       ? `<br><strong>현재 즉시 수확 기준: +1 숙성을 기다리지 않아 지역 없음과 생산량이 같습니다.</strong>`
-      : zoneCoeff(opt) <= 0
+      : zc <= 0
         ? `<br><strong>현재 지역효과 계수가 0이라 +1 숙성이 발동하지 않습니다.</strong>`
         : `<br><strong>현재 숙성 수확 기준: +1 산물을 얻는 대신 대기 중 생산 정지가 반영됩니다.</strong>`;
-  return `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}${sunsetStatus}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 추가 버프 0.5 (습격 방어 성공·수호의 향로)</span>`;
+  const echoThreshold = plannerEchoHarvestThreshold(zc);
+  const echoStatus = opt.zone !== "mid_cave"
+    ? ""
+    : !Number.isFinite(echoThreshold)
+      ? `<br><strong>현재 지역효과 계수가 0이라 연속 수확 보너스가 발동하지 않습니다.</strong>`
+      : opt.echoResonance
+        ? `<br><strong>현재 같은 산물 ${echoThreshold}회마다 ${echoThreshold}번째 수확이 2배입니다.</strong><br><span>공명포션으로 같은 종의 생산 진행도를 맞추고 종별 수확 시점을 분리한 최적 운용을 가정합니다. 실제로 수확이 겹치면 생산량이 낮아질 수 있습니다.</span>`
+        : `<br><strong>현재 같은 산물 ${echoThreshold}회마다 ${echoThreshold}번째 수확이 2배입니다.</strong><br><span>생산 요약은 산물별 시간당 수확 빈도로 연속 수확 확률을 추정합니다. 공명포션 없이 실제 수확 순서에 따라 달라질 수 있습니다.</span>`;
+  return `<b>${PRODUCTION_ZONES[opt.zone] || PRODUCTION_ZONES[""]}</b>: ${PRODUCTION_ZONE_NOTES[opt.zone] || PRODUCTION_ZONE_NOTES[""]}${sunsetStatus}${echoStatus}<br><span>계수 = 낯익은 터×0.1 + 안개 해방 1 + 추가 버프 0.5 (습격 방어 성공·수호의 향로)</span>`;
 };
 
 function multiplier(pid, cond, plantCond, sameCount, diversity, opt, oneShot, crystalLineBonus) {
@@ -821,7 +855,7 @@ export async function renderPlanner(view) {
   const selectedSkins = new Map();
   const selectedVariants = new Map();
   let badgesVisible = loadBadgeVisibility();
-  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, sunsetRipen: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, inheritance: 0, revival: 0, uptime: 100, gust: false };
+  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, sunsetRipen: false, echoResonance: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, inheritance: 0, revival: 0, uptime: 100, gust: false };
   let condMap = null;
 
   view.innerHTML = `<h2>🌿 텃밭 배치 테스트</h2>
@@ -866,6 +900,7 @@ export async function renderPlanner(view) {
           <label class="chk"><input type="checkbox" id="pl-fog"> 안개 해방</label>
           <label class="chk" title="습격 방어 성공 또는 수호의 향로 사용"><input type="checkbox" id="pl-raid"> 지역효과 +50% 버프</label>
           <label class="chk" id="pl-sunset-ripen-wrap" style="display:none" title="즉시 자동수확을 멈추고 숙성이 끝난 산물을 수확하는 경우"><input type="checkbox" id="pl-sunset-ripen"> 숙성 완료 후 수확 (일반 산물 +1)</label>
+          <label class="chk" id="pl-echo-resonance-wrap" style="display:none" title="공명포션으로 같은 종의 생산 진행도를 맞춘 뒤 종별 수확 시점을 최대한 분리하는 경우"><input type="checkbox" id="pl-echo-resonance"> 공명포션으로 종별 수확 타이밍 분리</label>
           <div class="muted">지역효과 계수 <b id="pl-zone-coeff">0.00</b></div>
           <div class="pl-zone-note" id="pl-zone-note">${zoneNoteHtml(opt)}</div>
           <label class="lvlabel">뿌리 지배 <input id="pl-root" type="range" min="0" max="2" value="0"><b id="pl-rootv">0</b></label>
@@ -1375,13 +1410,16 @@ export async function renderPlanner(view) {
         })
       : growEff + harvests * intervalEff;
     const yieldMul = m * plentyMultiplier(opt) * (opt.uptime / 100); // 풍요의손길 · 가동률
-    const perHour = prod && !gated && !paused && cycle > 0 ? (harvests / cycle) * 3600000 * yieldMul : 0;
+    const harvestEventsPerHour = prod && !gated && !paused && cycle > 0
+      ? (harvests / cycle) * 3600000 * (opt.uptime / 100)
+      : 0;
+    const perHour = harvestEventsPerHour * m * plentyMultiplier(opt);
     return {
       ...z, P, cond, plantCond, same, diversity, crystalBonus, m, prod, gated, paused,
       zoneCoeff: zc,
       dryBlocked: aridBlocked, aridBlocked, toxicBlocked,
       waterKilled, fireProtected: waterKills(z.p, P) && cond.has("arid"),
-      perHour, harvests, growEff, intervalEff, cycle,
+      perHour, harvestEventsPerHour, harvests, growEff, intervalEff, cycle,
       sunsetRipenMode, ripened, nativeRipen: Boolean(nativeRipen), ripenTime,
       outputCode, outputEnh, inheritanceChance,
     };
@@ -1399,6 +1437,23 @@ export async function renderPlanner(view) {
     const inherited = Math.max(0, Math.min(1, st?.inheritanceChance || 0));
     addProduction(totals, st?.outputCode, st?.outputEnh, amount * (1 - inherited));
     addProduction(totals, st?.outputCode, (st?.outputEnh || 0) + 1, amount * inherited);
+  };
+  const addHarvestEvents = (events, code, amount) => {
+    if (!code || !(amount > 0)) return;
+    events.set(code, (events.get(code) || 0) + amount);
+  };
+  const applyEchoProduction = (totals, events) => {
+    if (opt.zone !== "mid_cave") return;
+    const totalEvents = [...events.values()].reduce((sum, amount) => sum + amount, 0);
+    if (!(totalEvents > 0)) return;
+    for (const entry of totals.values()) {
+      const eventShare = (events.get(entry.code) || 0) / totalEvents;
+      entry.amount *= plannerEchoProductionMultiplier(zoneCoeff(opt), eventShare, opt.echoResonance);
+    }
+  };
+  const mergeHarvestEvents = (target, source) => {
+    for (const [code, amount] of source) addHarvestEvents(target, code, amount);
+    return target;
   };
   const propagatedEnh = (src, wind) => opt.vein ? Math.min(src.e || 0, wind.e || 0) : 0;
   const pollTargets = () => {
@@ -1446,6 +1501,7 @@ export async function renderPlanner(view) {
     if (changed) buildWindow(want);
     const poll = pollSet();
     const totals = new Map();
+    const harvestEvents = new Map();
     let planted = 0, tilled = 0;
     let blockedProduction = 0;
     const showSlots = mode === "till" && hasField();
@@ -1568,16 +1624,29 @@ export async function renderPlanner(view) {
         `<span class="pl-mult ${st.m > 1 ? "up" : "down"}">×${st.m.toFixed(st.m < 10 ? 1 : 0)}</span>`);
       if (st.perHour > 0 && (z.p || !st.P.oneShot)) {
         if (autoHarvestBlocked(st)) blockedProduction++;
-        else addStatProduction(totals, st, st.perHour);
+        else {
+          addStatProduction(totals, st, st.perHour);
+          addHarvestEvents(harvestEvents, st.outputCode, st.harvestEventsPerHour);
+        }
       }
     }
+    const pollResult = pollProduction();
+    const allHarvestEvents = mergeHarvestEvents(new Map(harvestEvents), pollResult.harvestEvents);
+    applyEchoProduction(totals, allHarvestEvents);
+    applyEchoProduction(pollResult.totals, allHarvestEvents);
     renderSummary(totals, planted, tilled, blockedProduction);
-    renderPollSum();
+    renderPollSum(pollResult.totals);
   };
 
   const renderSummary = (totals, planted, tilled, blockedProduction = 0) => {
     const ent = [...totals.values()].sort((a, b) => b.amount - a.amount);
-    const harvestMode = opt.zone === "sunset_cliff" && opt.sunsetRipen ? "숙성 수확 기준" : "자동수확 기준";
+    const harvestMode = opt.zone === "sunset_cliff" && opt.sunsetRipen
+      ? "숙성 수확 기준"
+      : opt.zone === "mid_cave"
+        ? opt.echoResonance
+          ? "자동수확·공명 최적화"
+          : "자동수확·메아리 추정"
+        : "자동수확 기준";
     let html = `<h3>생산 요약 <small>(개간 ${tilled} · 작물 ${planted} · ${harvestMode} · 시간당)</small></h3>`;
     if (!ent.length) html += `<p class="muted">생산물 없음</p>`;
     else html += `<div class="pl-sum-list">${ent.map(({ code, enhancement, amount }) =>
@@ -1592,8 +1661,9 @@ export async function renderPlanner(view) {
 
   // 바람꽃 수분 기반 일회성 작물 자동화 생산 (항마 보호 원천 + 너머 빈칸 필요)
   const pollProduction = () => {
-    const out = new Map();
-    if (!grid.flat().some((z) => z && z.p === "wind_blossom")) return out;
+    const totals = new Map();
+    const harvestEvents = new Map();
+    if (!grid.flat().some((z) => z && z.p === "wind_blossom")) return { totals, harvestEvents };
     const windZoneMult = opt.zone === "wind_corridor" ? Math.max(0.01, 1 - 0.1 * zoneCoeff(opt)) : 1;
     const pollIntervalMs = 60000 * (opt.gust ? 0.5 : 1) * windZoneMult; // 질풍포션 → 2배속
     for (const { src, sr, sc, clone, tr, tc } of pollTargets().values()) {
@@ -1614,12 +1684,21 @@ export async function renderPlanner(view) {
         cycleMs: cloneStat.cycle,
         revivalChance: plannerRevivalChance(opt.revival),
       });
-      addStatProduction(out, cloneStat, perHour);
+      addStatProduction(totals, cloneStat, perHour);
+      const eventRate = plannerPollProductionPerHour({
+        pollIntervalMs,
+        growTimeMs: cloneStat.growEff,
+        produceIntervalMs: cloneStat.intervalEff,
+        harvests: cloneStat.harvests,
+        cycleMs: cloneStat.cycle,
+        revivalChance: plannerRevivalChance(opt.revival),
+        yieldMultiplier: opt.uptime / 100,
+      });
+      addHarvestEvents(harvestEvents, cloneStat.outputCode, eventRate);
     }
-    return out;
+    return { totals, harvestEvents };
   };
-  const renderPollSum = () => {
-    const autoOut = pollProduction();
+  const renderPollSum = (autoOut) => {
     const autoEnt = [...autoOut.values()].sort((a, b) => b.amount - a.amount);
     if (!autoEnt.length) { pollsum.innerHTML = ""; return; }
     const revival = plannerRevivalChance(opt.revival);
@@ -1898,6 +1977,7 @@ export async function renderPlanner(view) {
     view.querySelector("#pl-zone-coeff").textContent = zoneCoeff(opt).toFixed(2);
     view.querySelector("#pl-zone-note").innerHTML = zoneNoteHtml(opt);
     view.querySelector("#pl-sunset-ripen-wrap").style.display = opt.zone === "sunset_cliff" ? "" : "none";
+    view.querySelector("#pl-echo-resonance-wrap").style.display = opt.zone === "mid_cave" ? "" : "none";
     recompute();
   };
   view.querySelector("#pl-zone").onchange = (e) => {
@@ -1914,6 +1994,10 @@ export async function renderPlanner(view) {
   view.querySelector("#pl-raid").onchange = (e) => { opt.raid = e.target.checked; updateZoneCoeff(); };
   view.querySelector("#pl-sunset-ripen").onchange = (e) => {
     opt.sunsetRipen = e.target.checked;
+    updateZoneCoeff();
+  };
+  view.querySelector("#pl-echo-resonance").onchange = (e) => {
+    opt.echoResonance = e.target.checked;
     updateZoneCoeff();
   };
   view.querySelector("#pl-root").oninput = (e) => { opt.rootDom = +e.target.value; view.querySelector("#pl-rootv").textContent = opt.rootDom; recompute(); };
@@ -1940,7 +2024,13 @@ export async function renderPlanner(view) {
     }
     return t;
   };
-  const STAGES = [[0, "기본 5×5"], [4, "1단계"], [5, "2단계"], [6, "3단계"], [7, "4단계"], [8, "5단계"], [9, "6단계"], [10, "7단계"], [11, "8단계"], [12, "9단계"], [13, "10단계"]];
+  const STAGES = [
+    [0, "기본 5×5"],
+    ...Array.from({ length: PLANNER_PRESET_MAX_STAGE }, (_, index) => {
+      const stage = index + 1;
+      return [plannerPresetRadius(stage), `${stage}단계`];
+    }),
+  ];
   const presetSel = view.querySelector("#pl-preset");
   const costBox = view.querySelector("#pl-cost");
   presetSel.innerHTML = `<option value="">— 직접 배치 —</option>` +

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
 const {
+  PLANNER_PRESET_MAX_STAGE,
   farmersBatonCovers,
   farmersBatonRange,
   plannerEmitterRange,
@@ -10,6 +11,9 @@ const {
   plannerDecompressShareCode,
   plannerDiscordShareText,
   plannerDeduplicateSharedFences,
+  plannerEchoHarvestMultiplier,
+  plannerEchoHarvestThreshold,
+  plannerEchoProductionMultiplier,
   plannerFitGrid,
   plannerGridFromGardenProfile,
   plannerItemVariantId,
@@ -20,6 +24,7 @@ const {
   plannerPlantSkinId,
   plannerPlantSkinIds,
   plannerPollProductionPerHour,
+  plannerPresetRadius,
   plannerRevivalChance,
   plannerRipenedCycleMs,
   plannerShareCodeFromLocation,
@@ -28,6 +33,12 @@ const {
   plannerSunsetRipenDurationMs,
   plannerToggleSharedFence,
 } = await import("../js/planner.js");
+
+assert.equal(PLANNER_PRESET_MAX_STAGE, 20);
+assert.equal(plannerPresetRadius(0), 0);
+assert.equal(plannerPresetRadius(1), 4);
+assert.equal(plannerPresetRadius(10), 13);
+assert.equal(plannerPresetRadius(20), 23);
 
 assert.equal(plannerShareHash("abc_123-xyz"), "#p/abc_123-xyz");
 assert.equal(
@@ -116,6 +127,19 @@ assert.ok(Math.abs(plannerInheritanceChance(5, 5) - (1 - Math.pow(0.85, 5))) < 1
 assert.equal(plannerRevivalChance(0), 0);
 assert.equal(plannerRevivalChance(1), 0.05);
 assert.ok(Math.abs(plannerRevivalChance(3) - 0.15) < 1e-12);
+
+assert.equal(plannerEchoHarvestThreshold(0), Number.POSITIVE_INFINITY);
+assert.equal(plannerEchoHarvestThreshold(0.5), 10);
+assert.equal(plannerEchoHarvestThreshold(1), 5);
+assert.equal(plannerEchoHarvestThreshold(1.5), 4);
+assert.equal(plannerEchoHarvestThreshold(2), 3);
+assert.equal(plannerEchoHarvestThreshold(2.5), 2);
+assert.equal(plannerEchoHarvestMultiplier(0, 1), 1);
+assert.equal(plannerEchoHarvestMultiplier(1, 1), 1.2);
+assert.equal(plannerEchoHarvestMultiplier(2.5, 1), 1.5);
+assert.ok(Math.abs(plannerEchoHarvestMultiplier(1, 0.5) - (1 + 1 / 31)) < 1e-12);
+assert.ok(Math.abs(plannerEchoProductionMultiplier(1, 0.5, false) - (1 + 1 / 31)) < 1e-12);
+assert.equal(plannerEchoProductionMultiplier(1, 0.5, true), 1.2);
 
 assert.equal(plannerPollProductionPerHour({
   pollIntervalMs: 60000,
@@ -432,5 +456,10 @@ const migratedPlannerGrid = plannerFitGrid(oldPlannerGrid, 33);
 assert.deepEqual(migratedPlannerGrid[16][16], { p: "herb", e: 5 });
 assert.equal(migratedPlannerGrid.length, 33);
 assert.equal(migratedPlannerGrid.every((row) => row.length === 33), true);
+
+const expandedPlannerGrid = plannerFitGrid(oldPlannerGrid);
+assert.deepEqual(expandedPlannerGrid[23][23], { p: "herb", e: 5 });
+assert.equal(expandedPlannerGrid.length, 47);
+assert.equal(expandedPlannerGrid.every((row) => row.length === 47), true);
 
 console.log("planner tests passed");
