@@ -30,7 +30,7 @@ for (const [code, expected] of Object.entries(expectedShopBuyPrices)) {
     assert.equal(expected, gameData.sell_price[code] * 2, `${code} buy/sell ratio`);
   }
 }
-assert.equal(defaultEnhancementMaterialPrice(gameData, "dia_box_30"), gameData.item_values.dia_box_30);
+assert.equal(defaultEnhancementMaterialPrice(gameData, "dia_box_30"), gameData.sell_price.dia_box_30);
 assert.equal(defaultEnhancementMaterialPrice(gameData, "copper_scrap"), gameData.item_values.copper_scrap);
 
 // 목표에서 시작점으로 거꾸로 계산한 장기 산출률. 순방향 재고 배열을 사용하지 않는다.

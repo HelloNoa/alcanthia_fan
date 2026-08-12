@@ -3,6 +3,7 @@
 names.json + gamedata 가치표/업적 재생성 스크립트 (게임 번들만으로, 이미지 다운로드 불필요)
 
 게임 업데이트 시:  python3 regen_names.py
+가치표만 갱신:      python3 regen_names.py --values-only
   - game.alcanthia.com 에서 최신 index-*.js 자동 탐색·다운로드
   - 작물/아이템 이름, 스킨, 모험가, 스킬, 존, 업적, itemFolders(폴더 색인) 추출
   - data/names.json 갱신
@@ -84,7 +85,10 @@ def match_delim(s, i):
 
 
 def extract_assignment(s, name):
-    m = re.search(r"(?:const\s+)?" + re.escape(name) + r"=", s)
+    m = re.search(
+        r"(?<![A-Za-z0-9_$])(?:const\s+)?" + re.escape(name) + r"=",
+        s,
+    )
     if not m:
         return None
     i = m.end()
@@ -113,34 +117,84 @@ def js_number(v):
     return int(n) if n.is_integer() else n
 
 
-def parse_value_object(obj):
+def js_numeric_expr(v, constants=None):
+    """Evaluate the bundle's small numeric constant expressions."""
+    constants = constants or {}
+    expr = v.strip()
+    for name in sorted(constants, key=len, reverse=True):
+        expr = re.sub(r"\b" + re.escape(name) + r"\b", str(constants[name]), expr)
+    if not re.fullmatch(r"[0-9eE+*/().\s-]+", expr):
+        return None
+    try:
+        n = float(eval(expr, {"__builtins__": {}}, {}))
+    except (SyntaxError, TypeError, ValueError, ZeroDivisionError):
+        return None
+    return int(n) if n.is_integer() else n
+
+
+def parse_numeric_constants(s):
     out = {}
-    for k, v in re.findall(r"([a-z0-9_]+):([^,}]+)", obj):
-        out[k] = js_number(v)
+    number = r"-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?"
+    for name, value in re.findall(r"\b([A-Za-z_$][A-Za-z0-9_$]*)=(" + number + r")", s):
+        parsed = js_number(value)
+        if parsed is not None:
+            out[name] = parsed
     return out
 
 
-def parse_shop_prices(s):
+def parse_value_object(obj, constants=None):
+    out = {}
+    for k, raw in split_top(obj):
+        if not re.fullmatch(r"[a-z0-9_]+", k or ""):
+            continue
+        if raw.startswith("[") and raw.endswith("]"):
+            out[k] = [js_numeric_expr(v, constants) for v in split_array_items(raw)]
+        else:
+            out[k] = js_numeric_expr(raw, constants)
+    return out
+
+
+def parse_shop_tables(s):
     base_var = None
     m = re.search(r"([A-Za-z0-9_$]+)=\[\{itemCode:\"herb_seed\",price:10\}", s)
     if m:
         base_var = m.group(1)
     if not base_var:
-        return {}
+        return {}, {}
     base = extract_delimited_from(s, m.start(), "[") or ""
-    sell = {}
+    base_buy = {}
     for code, price in re.findall(r"\{itemCode:\"([a-z0-9_]+)\",price:([^,}]+)", base):
         n = js_number(price)
         if n is not None:
-            sell[code] = n / 2
+            base_buy[code] = n
 
-    m = re.search(r"([A-Za-z0-9_$]+)=\{buy:\[\.\.\." + re.escape(base_var), s)
+    m = re.search(
+        r"([A-Za-z0-9_$]+)=\{buy:\[(?:\{[^{}]*\},)?\.\.\." + re.escape(base_var),
+        s,
+    )
     shop = extract_delimited_from(s, m.start(), "{") if m else ""
-    for code, price in re.findall(r"\{itemCode:\"([a-z0-9_]+)\",price:([^,}]+)", shop or ""):
+    if not shop:
+        return base_buy, {code: price / 2 for code, price in base_buy.items()}
+
+    buy = dict(base_buy)
+    sell = {code: price / 2 for code, price in base_buy.items()}
+    buy_src = js_field_value(shop, "buy") or ""
+    sell_src = js_field_value(shop, "sell") or ""
+    for code, price in re.findall(r"\{itemCode:\"([a-z0-9_]+)\",price:([^,}]+)", buy_src):
+        n = js_number(price)
+        if n is not None:
+            buy[code] = n
+    for code, price in re.findall(r"\{itemCode:\"([a-z0-9_]+)\",price:([^,}]+)", sell_src):
         n = js_number(price)
         if n is not None:
             sell[code] = n
-    return sell
+    return buy, sell
+
+
+def parse_shop_prices(s):
+    buy, sell = parse_shop_tables(s)
+    # Purchase-only items such as the copper diamond box still need a calculator price.
+    return {**buy, **sell}
 
 
 def parse_recipes_for_values(s):
@@ -172,15 +226,20 @@ def parse_recipes_for_values(s):
         })
 
     recipe_src = extract_assignment(s, recipe_var) or ""
-    for inputs_s, level, outputs_s, irreversible in re.findall(
-        r"\{inputs:\[(.*?)\],requiredLevel:(\d+),outputs:\[(.*?)\](,irreversible:!0)?\}",
-        recipe_src,
-    ):
+    recipe_items = split_array_items(recipe_src) if recipe_src.startswith("[") else []
+    for item in recipe_items:
+        if not item.startswith("{inputs:"):
+            continue
+        inputs_s = js_field_value(item, "inputs") or ""
+        outputs_s = js_field_value(item, "outputs") or ""
+        level = js_number(js_field_value(item, "requiredLevel") or "")
+        if level is None:
+            continue
         recipes.append({
             "inputs": re.findall(r'"([a-z0-9_]+)"', inputs_s),
             "requiredLevel": int(level),
             "outputs": re.findall(r'"([a-z0-9_]+)"', outputs_s),
-            "irreversible": bool(irreversible),
+            "irreversible": js_field_value(item, "irreversible") in ("!0", "true"),
         })
     return recipes
 
@@ -188,73 +247,102 @@ def parse_recipes_for_values(s):
 def computed_value_tables(s, item_codes):
     base_obj = extract_assignment(s, "dC")
     if not base_obj or "opaque_sediment" not in base_obj:
-        m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:null,earth_breath:null,herb:", s)
+        m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:null,earth_breath:null,", s)
         base_obj = extract_delimited_from(s, m.start(), "{") if m else None
     if not base_obj:
         return {}, {}, {}
-    base_values = parse_value_object(base_obj)
-    sell_price = parse_shop_prices(s)
+    constants = parse_numeric_constants(s)
+    base_values = parse_value_object(base_obj, constants)
+    reference_obj = extract_assignment(s, "$Q")
+    reference_values = parse_value_object(reference_obj, constants) if reference_obj else {}
+    shop_buy, shop_sell = parse_shop_tables(s)
+    sell_price = {**shop_buy, **shop_sell}
     recipes = parse_recipes_for_values(s)
     memo = {}
 
-    def raw_value(code):
-        if code in base_values:
-            return base_values[code]
-        return sell_price.get(code)
+    def direct_value(code, mode):
+        raw = base_values.get(code)
+        side = 0 if mode == "input" else 1
+        if isinstance(raw, list):
+            base = raw[side] if side < len(raw) else None
+        else:
+            base = raw
+        shop = shop_sell.get(code) if mode == "input" else shop_buy.get(code)
+        values = [v for v in (base, shop) if v is not None]
+        if not values:
+            return None
+        return min(values) if mode == "input" else max(values)
 
-    def shop_floor(code):
-        return sell_price.get(code)
-
-    def value_of(code, output_mode, seen=None):
+    def value_of(code, mode, seen=None):
         if seen is None:
             seen = set()
-        key = ("output" if output_mode else "input", code)
+        key = (mode, code)
         if key in memo:
             return memo[key]
-        base = raw_value(code)
-        if base is None:
+
+        raw = base_values.get(code)
+        side = 0 if mode == "input" else 1
+        if mode != "reference" and (
+            (code in base_values and raw is None)
+            or (isinstance(raw, list) and (side >= len(raw) or raw[side] is None))
+        ):
             memo[key] = None
             return None
+
+        if mode == "reference":
+            if code in reference_values and reference_values[code] is not None:
+                return reference_values[code]
+            candidates = [
+                value_of(code, candidate_mode, seen)
+                for candidate_mode in ("input", "output")
+            ]
+            candidates = [v for v in candidates if v is not None]
+            direct = sum(candidates) / len(candidates) if candidates else None
+        else:
+            direct = direct_value(code, mode)
+
         if key in seen:
-            return base
+            return direct
         seen.add(key)
         try:
             costs = []
             for rec in recipes:
                 if rec.get("irreversible") or code not in rec.get("outputs", []):
                     continue
-                cost = recipe_cost(rec.get("inputs", []), rec.get("requiredLevel", 0), output_mode, seen)
+                cost = recipe_cost(rec.get("inputs", []), rec.get("requiredLevel", 0), mode, seen)
+                if cost is None and mode != "reference":
+                    cost = recipe_cost(rec.get("inputs", []), rec.get("requiredLevel", 0), "reference", seen)
                 if cost is not None:
                     costs.append(cost)
             if not costs:
-                v = base
-            elif output_mode:
-                v = max([base] + costs)
+                value = direct
+            elif direct is None:
+                value = max(costs)
+            elif mode == "input":
+                value = min([direct] + costs)
             else:
-                v = min([base] + costs)
-            floor = shop_floor(code)
-            if floor is not None:
-                v = max(v, floor)
-            memo[key] = v
-            return v
+                value = max([direct] + costs)
+            memo[key] = value
+            return value
         finally:
             seen.remove(key)
 
-    def enhanced_value(code, enh, output_mode, seen):
-        base = value_of(code, output_mode, seen)
+    def enhanced_value(code, enh, mode, seen):
+        base = value_of(code, mode, seen)
         if base is None:
             return None
-        return base * (3 ** enh if output_mode else 2 ** enh)
+        factor = 2 if mode == "input" else 2.5 if mode == "reference" else 3
+        return base * (factor ** enh)
 
-    def recipe_cost(inputs, req_level, output_mode, seen):
+    def recipe_cost(inputs, req_level, mode, seen):
         if len(inputs) != 2:
             return None
         a, b = inputs
         best = None
         for ea in range(req_level + 1):
             eb = req_level - ea
-            av = enhanced_value(a, ea, output_mode, seen)
-            bv = enhanced_value(b, eb, output_mode, seen)
+            av = enhanced_value(a, ea, mode, seen)
+            bv = enhanced_value(b, eb, mode, seen)
             if av is None or bv is None:
                 continue
             cost = av + bv
@@ -264,8 +352,8 @@ def computed_value_tables(s, item_codes):
     item_values = {}
     item_output_values = {}
     for code in item_codes:
-        iv = value_of(code, False)
-        ov = value_of(code, True)
+        iv = value_of(code, "input")
+        ov = value_of(code, "output")
         if iv is not None and iv > 0:
             item_values[code] = int(iv) if float(iv).is_integer() else iv
         if ov is not None and ov > 0:
@@ -719,6 +807,36 @@ def write_progression(s):
     print(f"  oneTimeQuests: {len(one_time_quests)}")
 
 
+def apply_value_tables(s, gd):
+    item_codes = list((gd.get("items") or {}).keys())
+    item_values, item_output_values, sell_price = computed_value_tables(s, item_codes)
+    if not item_values or not item_output_values:
+        return None
+    gd["item_values"] = item_values
+    set_after(gd, "item_output_values", item_output_values, "item_values")
+    gd["sell_price"] = sell_price
+    return item_values, item_output_values, sell_price
+
+
+def update_gamedata_values(s):
+    if not os.path.exists(GAMEDATA_OUT):
+        print("skip gamedata: data/gamedata.json 없음")
+        return
+    with open(GAMEDATA_OUT, "r", encoding="utf-8") as f:
+        gd = json.load(f)
+    tables = apply_value_tables(s, gd)
+    if not tables:
+        print("skip gamedata values: 번들에서 가치표를 추출하지 못함")
+        return
+    with open(GAMEDATA_OUT, "w", encoding="utf-8") as f:
+        json.dump(gd, f, ensure_ascii=False, separators=(",", ":"))
+    item_values, item_output_values, sell_price = tables
+    print(f"updated {GAMEDATA_OUT}")
+    print(f"  item_values: {len(item_values)}")
+    print(f"  item_output_values: {len(item_output_values)}")
+    print(f"  sell_price: {len(sell_price)}")
+
+
 def update_gamedata(s):
     if not os.path.exists(GAMEDATA_OUT):
         print("skip gamedata: data/gamedata.json 없음")
@@ -767,14 +885,11 @@ def update_gamedata(s):
         set_after(gd, "quests", quests, "npcs")
     else:
         print("skip gamedata quests: 번들에서 반복 의뢰를 추출하지 못함")
-    item_codes = list((gd.get("items") or {}).keys())
-    item_values, item_output_values, sell_price = computed_value_tables(s, item_codes)
-    if not item_values or not item_output_values:
+    tables = apply_value_tables(s, gd)
+    if not tables:
         print("skip gamedata values: 번들에서 가치표를 추출하지 못함")
         return
-    gd["item_values"] = item_values
-    set_after(gd, "item_output_values", item_output_values, "item_values")
-    gd["sell_price"] = sell_price
+    item_values, item_output_values, sell_price = tables
 
     random_messages = {
         "dream_potion": "다음 1회 수확 시 랜덤 작물 (강화 시 고가치 작물 확률 증가)",
@@ -917,6 +1032,9 @@ def array_strings(s, var_anchor):
 
 def main():
     s = fetch_bundle()
+    if "--values-only" in sys.argv[1:]:
+        update_gamedata_values(s)
+        return
 
     # 식물: id -> {name, sprite}
     plants = {}

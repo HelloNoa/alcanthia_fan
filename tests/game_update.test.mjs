@@ -166,11 +166,25 @@ for (const code of [
 ]) {
   assert.equal(code in gameData.sell_price, false, `${code} is no longer shop-sellable`);
 }
-assert.equal(gameData.item_values.aquifer_potion, 510);
-assert.equal(gameData.item_output_values.aquifer_potion, 750);
-assert.equal(gameData.item_values.reversion_potion, 1000);
-assert.equal(gameData.item_output_values.mana_sprayer, 3730050);
-assert.equal(gameData.item_output_values.cauldron_controller, 3936600);
+assert.equal(gameData.item_values.aquifer_potion, 60);
+assert.equal(gameData.item_output_values.aquifer_potion, 200);
+assert.equal(gameData.item_values.reversion_potion, 550);
+assert.equal(gameData.item_output_values.reversion_potion, 1050);
+assert.equal(gameData.item_values.copper_scrap, 1200);
+assert.equal(gameData.item_output_values.copper_scrap, 1200);
+assert.equal(gameData.item_values.nightshade_root, 500);
+assert.equal(gameData.item_output_values.nightshade_root, 1000);
+assert.equal("black_sap" in gameData.item_values, false);
+assert.equal(gameData.item_output_values.black_sap, 2000);
+assert.equal(gameData.item_output_values.mana_sprayer, 12325500);
+assert.equal(gameData.item_output_values.cauldron_controller, 3653100);
+
+const copperReversionInput = gameData.item_values.copper_scrap * (2 ** 2)
+  + gameData.item_values.reversion_potion * (2 ** 2);
+const copperReversionOutput = 2 * gameData.item_output_values.copper_scrap * (3 ** 1);
+assert.equal(copperReversionInput, 7000);
+assert.equal(copperReversionOutput, 7200);
+assert.equal(copperReversionInput < copperReversionOutput, true);
 for (const code of ["vine_tendril", "aquifer_potion", "reversion_potion"]) {
   assert.equal(code in gameData.sell_price, false);
 }
