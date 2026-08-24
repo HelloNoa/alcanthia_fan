@@ -42,7 +42,8 @@ const expectedItems = {
     perk: "텃밭에 설치 가능 · 초당 아이템 1개를 소모해 인접 식물 강화도 +1 · 보관 슬롯 6×(강화도+1)",
     folder: "items/ornament",
   },
-  binding_token: { name: "결속의 증표", folder: "items/materials" },
+  binding_token: { name: "낡은 결속의 증표", folder: "items/materials" },
+  restored_binding_token: { name: "결속의 증표", folder: "items/materials" },
   black_thorn_sapling: { name: "검은 가시 묘목", folder: "plants/seeds" },
   black_sap: { name: "검은 수액", folder: "plants/produce" },
   depletion_potion: { name: "고갈포션", folder: "potions" },
@@ -58,6 +59,33 @@ const expectedItems = {
     perk: "텃밭에 설치 가능",
     folder: "items/ornament",
   },
+  overheated_catalyst: { name: "과열 촉매", folder: "items/materials" },
+  extraction_catalyst: { name: "추출 촉매", folder: "items/materials" },
+  overheated_onyx: { name: "과열 오닉스", folder: "items/materials" },
+  onyx_ore: { name: "오닉스 원석", folder: "items/materials" },
+  refined_onyx: { name: "가공된 오닉스", folder: "items/materials" },
+  recovery_catalyst: { name: "회복 촉매", folder: "items/materials" },
+  earths_grace: { name: "대지의 은총", folder: "items/materials" },
+  guild_foundation_stone: {
+    name: "결사의 주춧돌",
+    perk: "텃밭에 설치 가능 · 결사 진입 · 여러 개 설치 시 최고 강화도만 적용",
+    folder: "items/ornament",
+  },
+  deep_lens: {
+    name: "심층 렌즈",
+    perk: "텃밭에 설치 가능",
+    folder: "items/ornament",
+  },
+  leyline_well: {
+    name: "회복샘",
+    perk: "텃밭에 설치 가능 · 포션을 소모해 맥 회복에 기여 · 강화 시 소모량·저장 슬롯 증가",
+    folder: "items/ornament",
+  },
+  unnamed_key: {
+    name: "무명의 열쇠",
+    perk: "귀속 해제 · 열쇠 강화도가 대상보다 낮으면 단계마다 성공률 1/4",
+    folder: "items/materials",
+  },
 };
 
 for (const [code, expected] of Object.entries(expectedItems)) {
@@ -68,7 +96,7 @@ for (const [code, expected] of Object.entries(expectedItems)) {
 }
 
 const recipes = [...(gameData.brew_recipes || []), ...(gameData.recipes_full || [])];
-for (const code of ["guardian_censer", "leyline_stitching_needle", "witch_paint_pot"]) {
+for (const code of ["witch_paint_pot"]) {
   assert.equal(recipes.some((recipe) => recipe.output === code), false, `${code} must not show a recipe`);
 }
 
@@ -101,6 +129,18 @@ for (const [output, inputs, requiredLevel] of [
 for (const [output, inputs, requiredLevel] of [
   ["gilded_copper_ingot", "binding_token,purification_potion", 2],
   ["whispering_tea_table", "working_shelf,binding_token", 5],
+  ["restored_binding_token", "binding_token,polishing_powder", 5],
+  ["guild_foundation_stone", "warding_stone,restored_binding_token", 2],
+  ["deep_lens", "town_teleporter,telescope", 3],
+  ["leyline_well", "recovery_catalyst,deep_lens", 1],
+  ["extraction_catalyst", "overheated_catalyst,freeze_potion", 2],
+  ["onyx_ore", "overheated_onyx,freeze_potion", 2],
+  ["refined_onyx", "onyx_ore,mana_crystal", 4],
+  ["recovery_catalyst", "extraction_catalyst,backflow_potion", 2],
+  ["leyline_stitching_needle", "earths_grace,recovery_catalyst", 3],
+  ["earth_breath", "earths_grace,replay_tome", 0],
+  ["guardian_censer", "earths_grace,beast_horn", 6],
+  ["unnamed_key", "time_wheel,binding_token", 4],
 ]) {
   assert.equal(
     gameData.recipes_full.some((recipe) =>
@@ -315,5 +355,35 @@ assert.equal(
     && achievement.hidden === true),
   true,
 );
+
+assert.equal(gameData.zones.extraction_abyss?.name, "추출의 심연");
+assert.deepEqual(gameData.zones.extraction_abyss?.monsters, [
+  "rusted_worker", "mana_leech", "mana_glutton", "abyss_gatekeeper",
+]);
+assert.deepEqual(gameData.zones.extraction_abyss?.drops, {
+  mana_crystal: 5,
+  overheated_catalyst: 4,
+  overheated_onyx: 2,
+});
+assert.deepEqual(gameData.zone_cultivation.extraction_abyss, {
+  cultivationItemCode: null,
+  cultivationItem_kr: null,
+  effects: [],
+});
+for (const [id, name] of Object.entries({
+  rusted_worker: "녹슨 일꾼",
+  mana_leech: "마나 거머리",
+  mana_glutton: "마나 폭식자",
+  abyss_gatekeeper: "심연의 문지기",
+})) {
+  assert.equal(gameData.monsters[id]?.name, name);
+}
+assert.equal(gameData.monsters.mana_leech.skills[1].effects[0].flat, -40);
+assert.deepEqual(gameData.gem_effects.refined_onyx, {
+  name: "칠흑의 방벽",
+  desc: "습격 전투에서 받는 모든 피해 감소율 = 1 - 0.95^(강화도+1)",
+});
+assert.equal(gameData.unobtainable.includes("earth_breath"), false);
+assert.equal(gameData.special_source.earths_grace, "🌿 지맥 회복 주간 기여 보상");
 
 console.log("latest game update data tests passed");

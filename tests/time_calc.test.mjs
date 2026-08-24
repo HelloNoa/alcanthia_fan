@@ -14,7 +14,7 @@ assert.equal(byCode.get("herbal_tonic")?.typeLabel, "포션");
 
 assert.equal(byCode.has("aging_red_flower_seed"), false);
 assert.equal(byCode.has("growth_elixir"), false);
-assert.equal(byCode.has("earth_breath"), false);
+assert.equal(byCode.get("earth_breath")?.typeLabel, "도구");
 assert.equal(byCode.has("record_fragment_1"), false);
 
 assert.equal(enhancementAttemptBaseMs(gameData, "mud", 0), 30_000);

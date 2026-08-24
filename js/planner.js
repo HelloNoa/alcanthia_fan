@@ -650,6 +650,7 @@ const PRODUCTION_ZONES = {
   dried_spring: "메마른 샘",
   sunset_cliff: "석양 절벽",
   guild_corridor: "결사의 회랑",
+  extraction_abyss: "추출의 심연",
 };
 const PRODUCTION_ZONE_NOTES = {
   "": "텃밭 생산량에 영향을 주는 지역 효과를 적용하지 않습니다.",
@@ -664,6 +665,7 @@ const PRODUCTION_ZONE_NOTES = {
   dried_spring: "풍요의 손길 추가 수확 확률 효과가 (1 + 계수)배 커집니다.",
   sunset_cliff: "숙성되지 않던 산물도 +1로 숙성됩니다. 지속형은 기본 생산주기, 소모형은 기본 성장시간에 ×(3 - 2×계수/3)의 숙성시간이 필요합니다.",
   guild_corridor: "지역 효과가 아직 밝혀지지 않아 생산량 보정은 적용하지 않습니다.",
+  extraction_abyss: "지역 효과가 없어 생산량 보정은 적용하지 않습니다.",
 };
 const zoneCoeff = (opt) => opt.familiar * 0.1 + (opt.fog ? 1 : 0) + (opt.raid ? 0.5 : 0);
 const plentyMultiplier = (opt) => 1 + 0.05 * opt.plenty * (opt.zone === "dried_spring" ? 1 + zoneCoeff(opt) : 1);

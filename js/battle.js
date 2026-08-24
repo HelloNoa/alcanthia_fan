@@ -7,7 +7,7 @@ const ml=e=>e?.filter(t=>!!t)??[];
 let it={};
 function EB(e){const t=e.charCodeAt(0);return t<44032||t>55203?!1:(t-44032)%28!==0}
 function Fy(e){return e.hp<=0&&!e.statusEffects.some(t=>t.type==="undying")};
-function jB(e,t,i,s){const a=Vi(e),g=[];for(const r of t){let u=0,n;const o=HI(r.effects,i),p=r.action.kind==="skill"&&r.action.skill.type==="attack_aoe_mp_burn"?VI(r.action.skill,e.mp):null;for(const l of r.effects)if(l.op==="atk_damage"){const h=a*(p??l.coefficient);if(l.target==="enemy_one"){const d=o??vb(e,i,h,s);d&&(u+=ao(h,d)*s,n=d)}else u+=os(i,d=>ao(h,d)*s)}else if(l.op==="hp"&&(l.flat??0)<0){const h=Math.abs(l.flat??0);if(l.target==="enemy_one"){const d=o??vb(e,i,h,s);d&&(u+=h*s,n=d)}else u+=h*s*i.length}u>0&&g.push({damage:u,action:{...r.action,enemyTarget:n}})}return g.length===0?null:(g.sort((r,u)=>u.damage-r.damage),g[0].action)};
+function jB(e,t,i,s){const a=Vi(e),g=[];for(const r of t){let u=0,n;const o=HI(r.effects,i),p=r.action.kind==="skill"&&r.action.skill.type==="attack_aoe_mp_burn"?VI(r.action.skill,e.mp):null;for(const l of r.effects)if(l.op==="atk_damage"){const h=a*(p??l.coefficient);if(l.target==="enemy_one"){const d=o??vb(e,i,h,s);d&&(u+=applyDamageMultiplier(ao(h,d)*s,d),n=d)}else u+=os(i,d=>applyDamageMultiplier(ao(h,d)*s,d))}else if(l.op==="hp"&&(l.flat??0)<0){const h=Math.abs(l.flat??0);if(l.target==="enemy_one"){const d=o??vb(e,i,h,s);d&&(u+=applyDamageMultiplier(h*s,d),n=d)}else u+=os(i,d=>applyDamageMultiplier(h*s,d))}u>0&&g.push({damage:u,action:{...r.action,enemyTarget:n}})}return g.length===0?null:(g.sort((r,u)=>u.damage-r.damage),g[0].action)};
 function MI(e){const t={s:e.seed|1},i=[],s=pb(e.ally),a=pb(e.enemy),g=[...s.units,...a.units];i.push({type:"battle_start",turn:0,allies:e.ally.units,enemies:e.enemy.units,snapshots:_e(g)});const r=e.rule==="ally_first_interleaved"||e.rule==="enemy_first_interleaved",n=e.rule==="ally_first"||e.rule==="ally_first_interleaved"?[s,a]:[a,s];let o=!1,p=0;for(let d=1;d<=RB;d++){p=d;const c=[];for(const v of g)v.statusEffects.some(m=>m.type==="frozen")||v.skills.forEach(m=>{const y=v.cooldowns[m.id];y&&(v.cooldowns[m.id]=y-1,c.push({unitId:v.id,skillId:m.id,newCd:y-1}))});c.length>0&&i.push({type:"turn_start",turn:d,cdChanges:c,snapshots:_e(g)});const f=r?DB(n):MB(n);for(const{actor:v,actorSide:m,opponentSide:y}of f){if(o||Fy(v))continue;if(ql(y)){o=!0;break}const S=v.statusEffects.some(P=>P.type==="frozen");if(v.statusEffects=ml(v.statusEffects.map(P=>P.turnsLeft<=0?null:S&&P.type!=="frozen"?P:{...P,turnsLeft:P.turnsLeft-1})),v.hp>0&&!S){for(const P of v.statusEffects){if(P.type==="burn"||P.type==="poison"){const E=YI(P,v);v.hp=Math.max(0,v.hp-E);const I=P.type==="burn"?"화상":"중독";i.push({type:"status_effect",turn:d,text:`${ky(v.name)} ${I}으로 ${Math.round(E)} 대미지!`,hpChanges:[{unitId:v.id,delta:-E,newHp:v.hp}],snapshots:_e(g)})}if(P.type==="regen"){const E=m9(P,v);E>0&&i.push({type:"status_effect",turn:d,text:`${v.name} 재생으로 HP ${Math.round(E)} 회복`,hpChanges:[{unitId:v.id,delta:E,newHp:v.hp}],snapshots:_e(g)})}if(P.type==="mp_regen"){const E=y9(P,v);E>0&&i.push({type:"status_effect",turn:d,text:`${v.name} 수맥으로 MP ${Math.round(E)} 회복`,hpChanges:[],mpChanges:[{unitId:v.id,delta:E,newMp:v.mp}],snapshots:_e(g)})}}if(v.hp<=0){if(gm(m,i,t,d,g),ql(m)){o=!0;break}continue}}if(v.statusEffects.find(P=>P.type==="frozen")){i.push({type:"status_effect",turn:d,text:`${v.name} 결빙 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="stun")){i.push({type:"status_effect",turn:d,text:`${v.name} 스턴 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="sleep")){i.push({type:"status_effect",turn:d,text:`${v.name} 수면 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="confusion")&&Ze(t)<.5){i.push({type:"status_effect",turn:d,text:`${v.name} 혼란 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(KB(v,m,y,1,t,i,d,m===a,g),gm(m,i,t,d,g),gm(y,i,t,d,g),ql(m)){o=!0;break}if(ql(y)){o=!0;break}}if(o)break}const l=ql(a);return i.push({type:"battle_end",turn:p,victory:l}),{victory:l,events:i,totalTurns:p,rngAfter:t.s}};
 function gm(e,t,i,s,a){for(const g of e.units)g.hp<=0&&!kB(g.id,t)&&(!g.hasCrystalDivinationRevived&&Ze(i)<e.skills.crystalDivination*.05&&zy(g,.3)?(g.hasCrystalDivinationRevived=!0,t.push({type:"crystal_divination",turn:s,actorId:g.id,text:`${ky(g.name)} 부활!`,hpChanges:[{unitId:g.id,delta:g.hp,newHp:g.hp}]})):LB(g,t,s,a)||Fy(g)&&t.push({type:"defeat",turn:s,unitId:g.id,unitName:g.name}))};
 function m9(e,t){if(t.hp<=0||t.hp>=t.maxHp||t.statusEffects.some(a=>a.type==="heal_block"))return 0;const i=t.maxHp*e.percent/100+e.flat,s=t.hp;return t.hp=Math.min(t.maxHp,t.hp+i),t.hp-s};
@@ -23,7 +23,7 @@ function NI(e,t,i,s,a){const g=VB(e,t,i,s);if(g)return g;const r=YB(e,t);if(r)re
 function GI(e){return e.some(t=>t.op==="dispel"||t.op==="dispel_all")};
 function MB(e){const t=[];for(const i of e){const s=e.find(a=>a!==i);for(const a of i.units)t.push({actor:a,actorSide:i,opponentSide:s})}return t};
 function LB(e,t,i,s){const a=e.statusEffects.findIndex(r=>r.type==="afterimage");if(a<0)return!1;const g=e.statusEffects[a];return e.statusEffects=e.statusEffects.filter((r,u)=>u!==a),Uc(e,By({effectId:g.effectId+"_undying",type:"undying",casterId:g.casterId,turnsLeft:1})),t.push({type:"status_effect",turn:i,text:`${ky(e.name)} 잔상 발동! 불사 1턴`,hpChanges:[],snapshots:_e(s)}),!0};
-function vb(e,t,i,s){const a=t.filter(o=>o.hp>0);if(a.length===0)return null;const g=Gy(e);if(g){const o=a.find(p=>p.id===g);if(o)return o}const r=a.filter(o=>!o.statusEffects.some(p=>p.type==="stealth")),u=r.length>0?r:a,n=u.filter(o=>ao(i,o)*s>=o.hp);return n.length>0?n.reduce((o,p)=>Sv(p)>Sv(o)?p:o):u.reduce((o,p)=>p.hp/p.maxHp<o.hp/o.maxHp?p:o)};
+function vb(e,t,i,s){const a=t.filter(o=>o.hp>0);if(a.length===0)return null;const g=Gy(e);if(g){const o=a.find(p=>p.id===g);if(o)return o}const r=a.filter(o=>!o.statusEffects.some(p=>p.type==="stealth")),u=r.length>0?r:a,n=u.filter(o=>applyDamageMultiplier(ao(i,o)*s,o)>=o.hp);return n.length>0?n.reduce((o,p)=>Sv(p)>Sv(o)?p:o):u.reduce((o,p)=>p.hp/p.maxHp<o.hp/o.maxHp?p:o)};
 function kI(e,t,i,s,a,g,r,u,n,o=!1,q=!1){
   const p=[],l=[],h=[],d=[];
   for(const c of e){
@@ -43,7 +43,7 @@ function kI(e,t,i,s,a,g,r,u,n,o=!1,q=!1){
             p.push({unitId:b.id,delta:P,newHp:b.hp});
             S.push(y?`+${Math.round(P)}`:`${b.name}(+${Math.round(P)})`);
           }else{
-            const w=Math.abs(x)*a;
+            const w=applyDamageMultiplier(Math.abs(x)*a,b);
             if(q&&consumePotionGuard(b)){S.push(y?"장막":`${b.name}(장막)`);continue}
             if(o&&gb(b)){S.push(y?"항마":`${b.name}(항마)`);continue}
             b.hp=Math.max(0,b.hp-w);
@@ -63,20 +63,21 @@ function kI(e,t,i,s,a,g,r,u,n,o=!1,q=!1){
           if(b.statusEffects.some(C=>C.type==="evasion")&&Ze(g)<.5){S.push(y?"회피":`${b.name}(회피)`);continue}
           let w=ao(v*c.coefficient,b,t)*a;
           w=g9(w,b);
+          w=applyDamageMultiplier(w,b);
           if(q&&consumePotionGuard(b)){S.push(y?"장막":`${b.name}(장막)`);continue}
           if(o&&gb(b)){S.push(y?"항마":`${b.name}(항마)`);continue}
           b.hp=Math.max(0,b.hp-w);
           Xh(b,"sleep");
           p.push({unitId:b.id,delta:-w,newHp:b.hp});
           if(t.hp>0){
-            const C=b.statusEffects.find(E=>E.type==="damage_reflect"&&E.turnsLeft>0),P=C&&w>0?w*C.flat/100:0;
-            if(P>0){t.hp=Math.max(0,t.hp-P);p.push({unitId:t.id,delta:-P,newHp:t.hp});S.push(`반사 ${Math.round(P)}`)}
+            const C=b.statusEffects.find(E=>E.type==="damage_reflect"&&E.turnsLeft>0),P=C&&w>0?w*C.flat/100:0,E=applyDamageMultiplier(P,t);
+            if(E>0){t.hp=Math.max(0,t.hp-E);p.push({unitId:t.id,delta:-E,newHp:t.hp});S.push(`반사 ${Math.round(E)}`)}
           }
           S.push(y?`${Math.round(w)}`:`${b.name}(${Math.round(w)})`);
         }
         if(c.target==="enemy_one"&&f.length===1){
           const b=t.statusEffects.find(C=>C.type==="splash"),x=p.find(C=>C.unitId===f[0]?.id),w=b&&x&&x.delta<0?Math.abs(x.delta)*b.flat/100:0;
-          if(w>0){const C=n?i:s;for(const P of C.units)P.hp<=0||f.includes(P)||(P.hp=Math.max(0,P.hp-w),p.push({unitId:P.id,delta:-w,newHp:P.hp}))}
+          if(w>0){const C=n?i:s;for(const P of C.units)if(P.hp>0&&!f.includes(P)){const E=applyDamageMultiplier(w,P);P.hp=Math.max(0,P.hp-E);p.push({unitId:P.id,delta:-E,newHp:P.hp})}}
         }
         y&&S.length>0?d.push(`${y}(${S.join(", ")})`):d.push(...S);
         break;
@@ -137,7 +138,7 @@ function dp(e){let t=e.s;return t^=t<<13,t^=t>>>17,t^=t<<5,e.s=t>>>0,e.s};
 function zy(e,t){return OI(e,e.maxHp*t)};
 function gb(e){return e.statusEffects.some(t=>t.type==="anti_magic")};
 function consumePotionGuard(e){const t=e.statusEffects.find(i=>i.type==="potion_guard"&&(i.flat??0)>0);if(!t)return!1;return t.flat<=1?e.statusEffects=e.statusEffects.filter(i=>i!==t):e.statusEffects=e.statusEffects.map(i=>i===t?{...i,flat:i.flat-1}:i),!0};
-function applyBackflow(e,t){if(t<=0)return null;const i=e.statusEffects.find(s=>s.type==="backflow");if(!i)return null;const s=t*(i.percent??0)/100;return e.hp=Math.max(0,e.hp-s),Xh(e,"backflow"),{hpChange:{unitId:e.id,delta:-s,newHp:e.hp},text:`${e.name}(역류 ${Math.round(s)})`}};
+function applyBackflow(e,t){if(t<=0)return null;const i=e.statusEffects.find(s=>s.type==="backflow");if(!i)return null;const s=applyDamageMultiplier(t*(i.percent??0)/100,e);return e.hp=Math.max(0,e.hp-s),Xh(e,"backflow"),{hpChange:{unitId:e.id,delta:-s,newHp:e.hp},text:`${e.name}(역류 ${Math.round(s)})`}};
 function qB(e,t,i,s){const a=UI(e),g=t.potions.filter(u=>!u.used),r=[];for(const u of a)u.type!=="resurrect_aoe"&&u.type!=="resurrect_one"&&r.push({kind:"skill",skill:u});for(const u of g)XI(u,i.units)&&(GI(u.effects)&&!$I(u.effects,t.units,i.units)||r.push({kind:"potion",potion:u}));return r.length===0?null:r[Math.floor(Ze(s)*r.length)]};
 function UB(e,t,i,s){const a=t.units.filter(u=>u.hp>0),g=i.units.filter(u=>u.hp>0);if(g.length===0)return null;const r=[];for(const u of t.potions.filter(n=>!n.used)){if(u.itemCode==="rejuvenation_potion"){if(t.units.some(n=>n.hp<=0))return{kind:"potion",potion:u};continue}if(u.itemCode==="sunset_glow_potion"){if(t.units.some(n=>n.hp<=0))return{kind:"potion",potion:u};continue}if(u.itemCode==="sunset_potion"){if(t.potions.some(n=>n.used&&n.itemCode!=="sunset_potion"&&n.enhancement<=u.enhancement&&XI(n,i.units)))return{kind:"potion",potion:u};continue}if(u.itemCode==="encroachment_potion"){const n=$y(i.units);if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}if(u.itemCode==="nightmare_potion"){const n=Hy(i.units,"sleep");if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}if(u.itemCode==="contagion_potion"){const n=Ky(i.units,u.enhancement+1);if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}r.push({effects:u.effects,action:{kind:"potion",potion:u}})}return r.length===0?null:NI(e,r,a,g,s)};
 function _h(e){return e.flat??0};
@@ -171,7 +172,7 @@ function vm(e,t,i,s,a,g,r,u,n,o){
     }
   }
 };
-function LI(e,t,i,s,a,g){if(!t.units.some(u=>(u.engravedGems?.length??0)>0)&&!i.units.some(u=>(u.engravedGems?.length??0)>0))return;const r=new Set(e.filter(u=>u.delta<0).map(u=>u.unitId));if(r.size!==0)for(const u of r){const{unit:n,fromSide:o}=FI(u,t,i);if(!n||n.hp<=0)continue;const p=(n.engravedGems??[]).filter(l=>l.itemCode==="refined_fluorite");if(p.length!==0&&(n.fluorescence+=1,n.fluorescence>=mL)){n.fluorescence=0;const l=os(p,y=>GP(y.enhancement)),d=Vi(n)*l,f=(o===t?i:t).units.filter(y=>y.hp>0),v=[],m=[];for(const y of f){const S=ao(d,y);y.hp=Math.max(0,y.hp-S),v.push({unitId:y.id,delta:-S,newHp:y.hp}),m.push(`${y.name}(${Math.round(S)})`)}m.length>0&&a.push({type:"skill",turn:s,actorId:n.id,skillId:"fluorescence_burst",text:`${n.name} 마력 폭발! ${m.join(", ")}`,hpChanges:v,mpChanges:[],cdChanges:[],snapshots:_e(g)})}}};
+function LI(e,t,i,s,a,g){if(!t.units.some(u=>(u.engravedGems?.length??0)>0)&&!i.units.some(u=>(u.engravedGems?.length??0)>0))return;const r=new Set(e.filter(u=>u.delta<0).map(u=>u.unitId));if(r.size!==0)for(const u of r){const{unit:n,fromSide:o}=FI(u,t,i);if(!n||n.hp<=0)continue;const p=(n.engravedGems??[]).filter(l=>l.itemCode==="refined_fluorite");if(p.length!==0&&(n.fluorescence+=1,n.fluorescence>=mL)){n.fluorescence=0;const l=os(p,y=>GP(y.enhancement)),d=Vi(n)*l,f=(o===t?i:t).units.filter(y=>y.hp>0),v=[],m=[];for(const y of f){const S=applyDamageMultiplier(ao(d,y),y);y.hp=Math.max(0,y.hp-S),v.push({unitId:y.id,delta:-S,newHp:y.hp}),m.push(`${y.name}(${Math.round(S)})`)}m.length>0&&a.push({type:"skill",turn:s,actorId:n.id,skillId:"fluorescence_burst",text:`${n.name} 마력 폭발! ${m.join(", ")}`,hpChanges:v,mpChanges:[],cdChanges:[],snapshots:_e(g)})}}};
 function KB(e,t,i,s,a,g,r,u,n){if(e.smart){const o=e.skills.find(d=>d.type==="resurrect_aoe");if(o){const d=t.units.filter(f=>f!==e&&f.hp<=0),c=t.units.filter(f=>f!==e&&f.hp>0);if(d.length>0&&c.length===0&&$B(e,t,o,g,r,n))return}const p=e.skills.find(d=>d.type==="resurrect_one");if(p){const d=e.cooldowns[p.id]??0,c=t.units.filter(f=>f!==e&&f.hp<=0);if(d<=0&&c.length>0){const f=wp(e,p.mpCost);if(e.mp>=f&&HB(e,t,p,f,g,r,n))return}}const l=UB(e,t,i,s);l&&vm(l,e,t,i,s,a,g,r,u,n);const h=WB(e,t,i,s);h&&vm(h,e,t,i,s,a,g,r,u,n)}else{const o=qB(e,t,i,a);o&&vm(o,e,t,i,s,a,g,r,u,n)}};
 function DI(e){const t=e.baseDef;let i=0,s=0;return e.statusEffects.forEach(a=>{a.type==="def_buff"&&(i+=a.percent??0,s+=a.flat??0)}),t*(1+i/100)+s};
 function wp(e,t){if(t<=0)return 0;let i=0;for(const s of e.statusEffects)s.type==="mp_cost_reduce"&&(i+=s.percent);return Math.max(0,Math.round(t*(1-i/100)))};
@@ -180,14 +181,15 @@ function XI(e,t){switch(e.itemCode){case"encroachment_potion":return $y(t)!=null
 function os(e,t){return(e||[]).reduce((i,s)=>i+(t?t(s):s),0)};
 function FI(e,t,i){const s=t.units.find(g=>g.id===e);return s?{unit:s,fromSide:t}:{unit:i.units.find(g=>g.id===e),fromSide:i}};
 function Hy(e,t,i){const s=e.filter(a=>a.hp>0&&a.statusEffects.some(g=>g.type===t));if(s.length!==0)return s.reduce((a,g)=>g.hp>a.hp?g:a)};
-function xv(e,t){return Math.max(0,e.turnsLeft)*YI(e,t)};
+function xv(e,t){return Math.max(0,e.turnsLeft)*rawStatusDamage(e,t)};
 function HB(e,t,i,s,a,g,r){const u=t.units.filter(p=>p!==e&&p.hp<=0),n=W8(u,p=>p.baseAtk);if(!n||!OI(n,Vi(e)*i.coefficient))return!1;const o=e.mp;e.mp=Math.max(0,e.mp-s),n.statusEffects=[],e.cooldowns[i.id]=i.cooldown;const p=[{unitId:n.id,delta:n.hp,newHp:n.hp}],l=[`${n.name} 부활(HP ${Math.round(n.hp/n.maxHp*100)}%)`],h=applyBackflow(e,s);return h&&(p.push(h.hpChange),l.push(h.text)),a.push({type:"skill",turn:g,actorId:e.id,skillId:i.id,text:`${e.name}의 ${i.name}! ${l.join(", ")}`,hpChanges:p,mpChanges:s>0?[{unitId:e.id,delta:e.mp-o,newMp:e.mp}]:[],cdChanges:[{unitId:e.id,skillId:i.id,newCd:i.cooldown}],snapshots:_e(r)}),!0};
 function YB(e,t){for(const i of t){const s=i.effects.filter(u=>u.op==="mp"&&(_h(u)>0||lf(u)>0));if(s.length===0)continue;const a=os(s,u=>e.maxMp*lf(u)/100+_h(u));if(e.maxMp-e.mp<a)continue;const g=e.mp+a;if(e.skills.some(u=>{const n=wp(e,u.mpCost);return n<=e.mp||n>g?!1:!e.cooldowns[u.id]}))return i.action}return null};
 function pb(e){return{...e,units:e.units.map(t=>({...t,hp:t.maxHp,mp:t.maxMp,hasCrystalDivinationRevived:!1,cooldowns:{},statusEffects:[],fluorescence:0})),potions:ml(e.potions.map(t=>t?{itemCode:t.itemCode,enhancement:t.enhancement,effects:t.effects||[],used:!1}:null))}};
 function Ky(e,t,i){const s=e.filter(g=>g.hp>0);if(s.length<2)return;const a=s.filter(g=>Ou(g).length>=t);if(a.length!==0)return a.reduce((g,r)=>Ou(r).length>Ou(g).length?r:g)};
 function OI(e,t){return e.hp>0?!1:(e.hp=Math.min(e.maxHp,Math.max(1,Math.round(t))),!0)};
 function Uc(e,t){const i=e.statusEffects.findIndex(s=>s.effectId===t.effectId);i>=0?e.statusEffects[i]=t:e.statusEffects.push(t)};
-function YI(e,t){const i=e.coefficient>0?e.casterAtk*e.coefficient:t.maxHp*e.percent/100+e.flat;return e.type==="burn"?ao(i,t):i};
+function rawStatusDamage(e,t){const i=e.coefficient>0?e.casterAtk*e.coefficient:t.maxHp*e.percent/100+e.flat;return e.type==="burn"?ao(i,t):i};
+function YI(e,t){return applyDamageMultiplier(rawStatusDamage(e,t),t)};
 function $I(e,t,i){return e.some(s=>s.op!=="dispel"&&s.op!=="dispel_all"?!1:(bv(s.target)?t:i).some(g=>g.hp>0&&Ny(s,g)))};
 function HI(e,t){for(const i of e){if(i.op!=="dispel"&&i.op!=="dispel_all"||i.target!=="enemy_one")continue;const s=t.find(a=>a.hp>0&&Ny(i,a));if(s)return s}};
 function WB(e,t,i,s){const a=t.units.filter(n=>n.hp>0),g=i.units.filter(n=>n.hp>0);if(g.length===0)return null;const r=Vi(e),u=[];for(const n of UI(e))n.type!=="resurrect_aoe"&&n.type!=="resurrect_one"&&u.push({effects:WI(n,r),action:{kind:"skill",skill:n}});return u.length===0?null:NI(e,u,a,g,s)};
@@ -207,7 +209,7 @@ function XB(e,t,i,s){const a=[];for(const u of t){if(!u.effects.some(d=>d.op==="
 function Xh(e,t){e.statusEffects=e.statusEffects.filter(i=>i.type!==t)};
 function ym(e,t){return os(e,i=>t.maxHp*lf(i)/100+_h(i))};
 function o9(e,t,i,s){for(const a of e){if(a.op==="dispel"||a.op==="dispel_all"){if((a.target==="enemy_all"?s.filter(u=>u.hp>0):a.target==="enemy_one"?s.filter(u=>u.hp>0).slice(0,1):[]).some(u=>u.statusEffects.length>0))return!1;continue}if(Lb(a)){if(Av(a.target,i,s).some(u=>u.mp>0))return!1;continue}if(a.op!=="status")continue;if((()=>{switch(a.target){case"self":return[t];case"ally_one":case"ally_all":return i.filter(r=>r.hp>0);case"enemy_one":case"enemy_all":return s.filter(r=>r.hp>0)}})().some(r=>!r.statusEffects.some(u=>u.effectId===a.effectId)))return!1}return!0};
-function l9(e,t,i){if(!i)return!1;const s=t.filter(a=>a.hp>0);if(s.length===0)return!1;for(const a of e){if(a.op!=="status"||a.status!=="burn"&&a.status!=="poison")continue;const g=a.coefficient??0,r=Math.abs(a.flat??0),u=Math.abs(a.percent??0);if(s.some(n=>{const o=g>0?Vi(i)*g:n.maxHp*u/100+r,p=a.status==="burn"?ao(o,n):o;return n.hp<=p}))return!0}return!1};
+function l9(e,t,i){if(!i)return!1;const s=t.filter(a=>a.hp>0);if(s.length===0)return!1;for(const a of e){if(a.op!=="status"||a.status!=="burn"&&a.status!=="poison")continue;const g=a.coefficient??0,r=Math.abs(a.flat??0),u=Math.abs(a.percent??0);if(s.some(n=>{const o=g>0?Vi(i)*g:n.maxHp*u/100+r,p=a.status==="burn"?ao(o,n):o;return n.hp<=applyDamageMultiplier(p,n)}))return!0}return!1};
 function W8(e,t){const i=t??(s=>s);return U8(e,(s,a)=>i(s)>i(a)?s:a)};
 function BI(e,t,i,s,a,g){if(!t.units.some(o=>(o.engravedGems?.length??0)>0)&&!i.units.some(o=>(o.engravedGems?.length??0)>0))return;const r=new Map;for(const o of e)o.delta<0&&r.set(o.unitId,(r.get(o.unitId)??0)+-o.delta);if(r.size===0)return;const u=[],n=[];for(const[o,p]of r){const{unit:l}=FI(o,t,i);if(!l||l.hp<=0)continue;const h=(l.engravedGems??[]).filter(m=>m.itemCode==="refined_crystal");if(h.length===0)continue;const d=os(h,m=>HP(m.enhancement)),c=p*d/100;if(c<=0)continue;const f=l.mp;l.mp=Math.min(l.maxMp,l.mp+c);const v=l.mp-f;v>0&&(u.push({unitId:l.id,delta:v,newMp:l.mp}),n.push(`${l.name}(+${Math.round(v)})`))}u.length!==0&&a.push({type:"skill",turn:s,actorId:u[0].unitId,skillId:"crystal_absorb",text:`마력 흡수: ${n.join(", ")}`,hpChanges:[],mpChanges:u,cdChanges:[],snapshots:_e(g)})};
 function ao(e,t,i){const s=OB(t,i);return Math.max(1,e*mb/(mb+s))};
@@ -221,7 +223,7 @@ function zB(e,t,i,s,a,g){
   const r=it[e.itemCode].name,u=$y(i.units),n=[];
   let o=`${t.name}: ${r} — 잠식할 DoT 없음`;
   if(u){
-    const p=u.statusEffects.filter(Dh),h=os(p,d=>xv(d,u))/2*(e.enhancement+1);
+    const p=u.statusEffects.filter(Dh),h=applyDamageMultiplier(os(p,d=>xv(d,u))/2*(e.enhancement+1),u);
     u.statusEffects=u.statusEffects.filter(d=>!Dh(d));
     if(h>0){
       if(consumePotionGuard(u))o=`${t.name}: ${r} 사용! ${u.name}(장막)`;
@@ -241,7 +243,7 @@ function NB(e,t,i,s,a,g){
   const r=it[e.itemCode].name,u=Hy(i.units,"sleep"),n=[];
   let o=`${t.name}: ${r} — 악몽을 꿀 대상 없음`;
   if(u){
-    const p=250*(e.enhancement+1);
+    const p=applyDamageMultiplier(250*(e.enhancement+1),u);
     if(consumePotionGuard(u))o=`${t.name}: ${r} 사용! ${u.name}(장막)`;
     else{u.hp=Math.max(0,u.hp-p);Xh(u,"sleep");n.push({unitId:u.id,delta:-p,newHp:u.hp});o=`${t.name}: ${r} 사용! ${u.name} 악몽 ${Math.round(p)}`}
   }
@@ -256,6 +258,8 @@ function Av(e,t,i){const s=(bv(e)?t:i).filter(a=>a.hp>0&&a.mp>0);if(e==="enemy_o
 const U8=(e,t)=>!e||(e.length??0)===0?null:e.reduce(t);
 function HP(e){return(e+1)*10};
 function $P(e){return(e+1)*5};
+function onyxDamageMultiplier(e){const t=(e??[]).filter(i=>i.itemCode==="refined_onyx");if(t.length!==0)return Math.pow(.95,Math.max(...t.map(i=>i.enhancement))+1)};
+function applyDamageMultiplier(e,t){return e*(t.damageTakenMultiplier??1)};
 function a9(e,t,i,s){let a=0;for(const g of e){if(g.op==="dispel"||g.op==="dispel_all"){const l=bv(g.target)?t.filter(h=>h.hp>0):i.filter(h=>h.hp>0);a+=os(l,h=>h.statusEffects.length)*100;continue}if(g.op!=="status")continue;const r=Math.abs(g.flat??0),u=Math.abs(g.percent??0),n=g.coefficient??0;let o=g.status==="taunt"?1/0:r;if(n>0&&s)o+=Vi(s)*n;else if(u>0){const l=bv(g.target)?t.filter(h=>h.hp>0):i.filter(h=>h.hp>0);if(l.length>0){const h=Math.max(...l.map(d=>c9(g.status,d)));o+=h*u/100}}const p=h9(g.target,t,i);a+=o*g.duration*p}return a+Mv(e,t,i)};
 function Mv(e,t,i){let s=0;for(const a of e){if(!Lb(a))continue;const g=Av(a.target,t,i);s+=os(g,r=>{const u=Math.abs(_h(a))+r.maxMp*Math.abs(lf(a))/100;return Math.min(r.mp,u)})}return s};
 function e9(e,t,i){const s=i.filter(g=>g.hp>0);let a=0;for(const g of s){const r=Sv(g),u=d9(g);a+=u;const n=Gy(g);n?e.id===n&&(a+=r):a+=r}return a};
@@ -273,7 +277,7 @@ function r9(e,t,i){if(i){const s=e.coefficient??0,a=Math.abs(e.flat??0),g=Math.a
 // ── 어댑터 ──
 function scaleEquip(b, e){ if(!b) return null; const s=(e||0)+1; return {atk:(b.atk||0)*s,def:(b.def||0)*s,hp:(b.hp||0)*s,mp:(b.mp||0)*s}; }
 function nightmareFactor(e){ return 2 ** Math.max(0, Math.floor(+e || 0)); }
-export function buildAlly(advList, gd){
+export function buildAlly(advList, gd, raid=false){
   const seen = new Set();
   return advList.filter(a=>a&&a.id).map((a,idx)=>{ const adv=gd.adventurers[a.id]; if(!adv) throw new Error("모험가 없음: "+a.id);
     if(seen.has(a.id)) throw new Error("같은 모험가는 한 번만 편성할 수 있습니다: "+adv.name);
@@ -281,7 +285,8 @@ export function buildAlly(advList, gd){
     const eq=a.equip?scaleEquip(gd.equipment_stats[a.equip], a.equipEnh||0):null;
     return { id:`${a.id}_${idx}`, name:adv.name, spriteKey:adv.spriteKey, rawAtk:adv.atk, rawDef:adv.def,
       baseAtk:adv.atk+(eq?.atk||0), baseDef:adv.def+(eq?.def||0), equipmentItemCode:a.equip,
-      maxHp:Math.max(1,adv.hp+(eq?.hp||0)), maxMp:Math.max(0,adv.mp+(eq?.mp||0)), smart:true, skills:adv.skills, engravedGems:a.engraved||[] }; });
+      maxHp:Math.max(1,adv.hp+(eq?.hp||0)), maxMp:Math.max(0,adv.mp+(eq?.mp||0)), smart:true, skills:adv.skills, engravedGems:a.engraved||[],
+      ...(raid?{damageTakenMultiplier:onyxDamageMultiplier(a.engraved)}:{}) }; });
 }
 export function buildEnemy(monIds, gd, difficulty=0){
   const mult=nightmareFactor(difficulty);
@@ -314,7 +319,7 @@ export function winRate(party, zoneId, gd, trials=200, seedBase=1){
 const RAID_SKILLS = Object.freeze({ crystalDivination:5, extraLoot:0, potionPreserve:0 });
 
 function buildRaidSide(party, gd, prefix){
-  const units=buildAlly(party?.adventurers||[], gd).map(unit=>({...unit,id:`${prefix}${unit.id}`}));
+  const units=buildAlly(party?.adventurers||[], gd, true).map(unit=>({...unit,id:`${prefix}${unit.id}`}));
   return {
     units,
     potions:buildPotions(party?.potions||[], gd),

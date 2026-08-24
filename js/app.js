@@ -259,7 +259,7 @@ async function tabMarket() {
 const ZONES = ["beginner_forest", "misty_swamp", "poison_jungle", "mid_cave",
   "starlight_plateau", "advanced_volcano", "wind_corridor", "golden_fields",
   "twilight_valley", "sunset_cliff", "forgotten_fortress", "crystal_mine",
-  "sleeping_roots", "dried_spring", "guild_corridor"];
+  "sleeping_roots", "dried_spring", "guild_corridor", "extraction_abyss"];
 const RELOCATION_MATERIALS = {
   mist_town: "mana_crystal",
   beginner_forest: "growth_potion",

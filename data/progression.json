@@ -760,7 +760,7 @@
     {
       "order": 51,
       "id": "claim_hourglass_sand",
-      "title": "오늘의 모래 채우기",
+      "title": "모래시계 출석 보상 받기",
       "description": "모래시계를 선택해 오늘의 모래를 채우세요. 무료 모래를 먼저 담아두면 이후 오프라인 시간이 저장됩니다.",
       "action": "garden",
       "required": false,

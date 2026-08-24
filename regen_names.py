@@ -247,13 +247,16 @@ def parse_recipes_for_values(s):
 def computed_value_tables(s, item_codes):
     base_obj = extract_assignment(s, "dC")
     if not base_obj or "opaque_sediment" not in base_obj:
-        m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:null,earth_breath:null,", s)
+        m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:null,", s)
         base_obj = extract_delimited_from(s, m.start(), "{") if m else None
     if not base_obj:
         return {}, {}, {}
     constants = parse_numeric_constants(s)
     base_values = parse_value_object(base_obj, constants)
     reference_obj = extract_assignment(s, "$Q")
+    if not reference_obj or "opaque_sediment" not in reference_obj:
+        m = re.search(r"([A-Za-z0-9_$]+)=\{opaque_sediment:500,garden_contest_ticket:", s)
+        reference_obj = extract_delimited_from(s, m.start(), "{") if m else None
     reference_values = parse_value_object(reference_obj, constants) if reference_obj else {}
     shop_buy, shop_sell = parse_shop_tables(s)
     sell_price = {**shop_buy, **shop_sell}
@@ -484,6 +487,11 @@ ITEM_PERK_OVERRIDES = {
     "campfire": "텃밭에 설치 가능 · 가마솥을 올려 마나 대신 연료로 연성 · 일반 연성은 장작, 묶음 연성은 잉걸 사용 · 장식물 강화도 이하 연료 사용 · 연성시간 ×0.9^연료 강화도",
     "levitation_chest": "텃밭에 설치 가능 · 가까운 가마솥의 재료 상자 · 보관 슬롯 6×(강화도+1)",
     "compost_bin": "텃밭에 설치 가능 · 초당 아이템 1개를 소모해 인접 식물 강화도 +1 · 보관 슬롯 6×(강화도+1)",
+    "guild_foundation_stone": "텃밭에 설치 가능 · 결사 진입 · 여러 개 설치 시 최고 강화도만 적용",
+    "deep_lens": "텃밭에 설치 가능",
+    "leyline_well": "텃밭에 설치 가능 · 포션을 소모해 맥 회복에 기여 · 강화 시 소모량·저장 슬롯 증가",
+    "earth_breath": "선택 식물 부활 및 수명 회복 · 강화 시 주변 범위 증가",
+    "unnamed_key": "귀속 해제 · 열쇠 강화도가 대상보다 낮으면 단계마다 성공률 1/4",
 }
 
 # 게임 번들에서 test 플래그를 유지하지만 실제 플레이에 공개된 예외가 있다.
@@ -495,6 +503,85 @@ INDEXED_TEST_ITEM_CODES = {
     "poison_fang",
     *PUBLIC_TEST_ITEM_CODES,
 }
+
+
+def combat_skill(skill_id, sprite_key, name, description, skill_type, coefficient, mp_cost, cooldown, effects=None):
+    row = {
+        "id": skill_id,
+        "spriteKey": sprite_key,
+        "name": name,
+        "description": description,
+        "type": skill_type,
+        "coefficient": coefficient,
+        "mpCost": mp_cost,
+        "cooldown": cooldown,
+        "coef": coefficient,
+        "mp": mp_cost,
+        "cd": cooldown,
+        "desc": description,
+    }
+    if effects:
+        row["effects"] = effects
+    return row
+
+
+CURRENT_ZONES = {
+    "extraction_abyss": {
+        "name": "추출의 심연",
+        "iconKey": "icon_zone_extraction_abyss",
+        "rule": "ally_first",
+        "monsters": ["rusted_worker", "mana_leech", "mana_glutton", "abyss_gatekeeper"],
+        "drops": {"mana_crystal": 5, "overheated_catalyst": 4, "overheated_onyx": 2},
+    },
+}
+
+
+CURRENT_MONSTERS = {
+    "rusted_worker": {
+        "id": "rusted_worker", "name": "녹슨 일꾼", "spriteKey": "monster_rusted_worker",
+        "hp": 520, "atk": 112, "def": 30, "mp": 60, "smart": False,
+        "skills": [
+            combat_skill("rusted_worker_atk", "monskill_golem_atk", "녹슨 주먹", "낡은 금속 팔을 그대로 휘두른다", "attack", 1, 0, 0),
+            combat_skill("rusted_worker_overwork", "monskill_throne_converter_discharge", "과부하 타격", "남은 동력을 한계까지 끌어올려 내리친다", "attack", 1.5, 20, 3),
+        ],
+    },
+    "mana_leech": {
+        "id": "mana_leech", "name": "마나 거머리", "spriteKey": "monster_mana_leech",
+        "hp": 560, "atk": 108, "def": 20, "mp": 120, "smart": True,
+        "skills": [
+            combat_skill("mana_leech_atk", "monskill_mana_leech_atk", "달라붙기", "몸을 붙여 문다", "attack", 1, 0, 0),
+            combat_skill(
+                "mana_leech_siphon", "monskill_mana_leech_siphon", "마나 흡착",
+                "상처에 달라붙어 마나를 빨아낸다", "attack", .5, 15, 3,
+                [{"op": "mp", "target": "enemy_one", "flat": -40}],
+            ),
+        ],
+    },
+    "mana_glutton": {
+        "id": "mana_glutton", "name": "마나 폭식자", "spriteKey": "monster_mana_glutton",
+        "hp": 1700, "atk": 118, "def": 25, "mp": 400, "smart": True,
+        "skills": [
+            combat_skill("mana_glutton_atk", "monskill_mana_glutton_atk", "마력 씹기", "허공의 마력째 물어뜯는다", "attack", 1, 0, 0),
+            combat_skill("mana_glutton_burst", "monskill_mana_glutton_burst", "마나 분출", "삼킨 마력을 한 번에 터뜨린다", "attack", 3.2, 80, 3),
+        ],
+    },
+    "abyss_gatekeeper": {
+        "id": "abyss_gatekeeper", "name": "심연의 문지기", "spriteKey": "monster_abyss_gatekeeper",
+        "hp": 1250, "atk": 122, "def": 45, "mp": 140, "smart": True,
+        "skills": [
+            combat_skill("abyss_gatekeeper_atk", "monskill_abyss_gatekeeper_atk", "빗장 내리치기", "돌 빗장을 내리친다", "attack", 1, 0, 0),
+            combat_skill("abyss_gatekeeper_slam", "monskill_obsidian_giant_smash", "심연의 강타", "심연의 무게를 실어 내려찍는다", "attack", 1.5, 30, 4),
+        ],
+    },
+}
+
+
+SYNCED_SPECIAL_RECIPE_OUTPUTS = (
+    "farmers_baton", "levitation_chest", "compost_bin",
+    "restored_binding_token", "guild_foundation_stone", "deep_lens", "leyline_well",
+    "extraction_catalyst", "onyx_ore", "refined_onyx", "recovery_catalyst",
+    "leyline_stitching_needle", "earth_breath", "guardian_censer", "unnamed_key",
+)
 
 
 def parse_item_catalog(s):
@@ -582,7 +669,10 @@ def parse_dia_shop(s):
 def parse_achievements(s):
     arr = extract_assignment(s, "Il")
     if not arr:
-        m = re.search(r"([A-Za-z0-9_$]+)=\[\{id:\"first_adventure\"", s)
+        m = re.search(
+            r"([A-Za-z0-9_$]+)=\[\{id:\"(?:starlight_gardener|first_adventure)\"",
+            s,
+        )
         if m:
             i = s.find("[", m.start())
             j = match_delim(s, i) if i >= 0 else -1
@@ -858,18 +948,37 @@ def update_gamedata(s):
     test_items.update(code for code, item in catalog.items() if item.get("test"))
     test_items.difference_update(PUBLIC_TEST_ITEM_CODES)
     gd["test_items"] = sorted(test_items)
+
+    gd.setdefault("zones", {}).update(CURRENT_ZONES)
+    gd.setdefault("monsters", {}).update(CURRENT_MONSTERS)
+    gd.setdefault("zone_effects", {})["extraction_abyss"] = []
+    gd.setdefault("zone_cultivation", {})["extraction_abyss"] = {
+        "cultivationItemCode": None,
+        "cultivationItem_kr": None,
+        "effects": [],
+    }
+    gd.setdefault("gem_effects", {})["refined_onyx"] = {
+        "name": "칠흑의 방벽",
+        "desc": "습격 전투에서 받는 모든 피해 감소율 = 1 - 0.95^(강화도+1)",
+    }
+
     dia_shop = parse_dia_shop(s)
     if dia_shop:
         gd["dia_shop"] = dia_shop
     else:
         dia_shop = gd.setdefault("dia_shop", {})
         print("skip gamedata dia_shop: 번들에서 다이아 상점을 추출하지 못함")
-    for output in ("farmers_baton", "levitation_chest", "compost_bin"):
-        if not sync_recipe(gd, s, output, "special"):
-            print(f"skip gamedata {output} recipe: 번들에서 제작법을 추출하지 못함")
     special_source = gd.setdefault("special_source", {})
-    for code in ("guardian_censer", "leyline_stitching_needle"):
-        special_source[code] = "📌 현재 게임 데이터에 제작법·고정 상점 판매 없음"
+    for output in SYNCED_SPECIAL_RECIPE_OUTPUTS:
+        if sync_recipe(gd, s, output, "special"):
+            special_source.pop(output, None)
+        else:
+            print(f"skip gamedata {output} recipe: 번들에서 제작법을 추출하지 못함")
+    special_source["earths_grace"] = "🌿 지맥 회복 주간 기여 보상"
+    gd["unobtainable"] = [
+        code for code in (gd.get("unobtainable") or [])
+        if code not in SYNCED_SPECIAL_RECIPE_OUTPUTS
+    ]
     achievements = parse_achievements(s)
     if achievements:
         gd["achievements"] = achievements

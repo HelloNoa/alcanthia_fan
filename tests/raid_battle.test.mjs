@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { MI, raidWinRate, simulateRaid } from "../js/battle.js";
+import { buildAlly, MI, raidWinRate, simulateRaid } from "../js/battle.js";
 import { parseItemKey } from "../js/item_key.js";
 import {
   combineRaidRates,
@@ -96,6 +96,38 @@ test("backflow deals fixed damage from the next actual skill MP spend", () => {
       .statusEffects.some((status) => status.type === "backflow"),
     false,
   );
+});
+
+test("onyx uses the highest engraving and reduces raid damage only", () => {
+  const member = {
+    id: "sorin",
+    engraved: [
+      { itemCode: "refined_onyx", enhancement: 4 },
+      { itemCode: "refined_onyx", enhancement: 12 },
+    ],
+  };
+  const raidUnit = buildAlly([member], gameData, true)[0];
+  const adventureUnit = buildAlly([member], gameData)[0];
+
+  assert.ok(Math.abs(raidUnit.damageTakenMultiplier - (0.95 ** 13)) < 1e-12);
+  assert.equal(adventureUnit.damageTakenMultiplier, undefined);
+
+  const hit = {
+    id: "hit",
+    name: "타격",
+    spriteKey: "",
+    type: "attack",
+    coefficient: 1,
+    mpCost: 0,
+    cooldown: 0,
+  };
+  const attacker = bareUnit("attacker", { skills: [hit] });
+  const defender = { ...bareUnit("defender"), damageTakenMultiplier: 0.95 ** 13 };
+  const result = runLowLevelBattle(lowLevelSide([defender]), lowLevelSide([attacker]));
+  const attack = result.events.find((event) => event.skillId === "hit");
+  const damage = -attack.hpChanges.find((change) => change.unitId === "defender").delta;
+
+  assert.ok(Math.abs(damage - 10 * (0.95 ** 13)) < 1e-12);
 });
 
 test("depletion targets the living enemy with the most MP", () => {
