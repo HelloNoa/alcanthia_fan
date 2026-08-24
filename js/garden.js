@@ -138,6 +138,16 @@ export function gardenProfileIntro(profile) {
   return typeof intro === "string" ? intro.trim() : "";
 }
 
+export function gardenGuildMetadata(profile) {
+  const guild = profile?.guild && typeof profile.guild === "object" ? profile.guild : {};
+  const rawId = guild.id ?? profile?.guildId ?? profile?.guild_id ?? "";
+  const rawName = guild.name ?? profile?.guildName ?? profile?.guild_name ?? "";
+  return {
+    id: rawId == null ? "" : String(rawId),
+    name: typeof rawName === "string" ? rawName.trim() : "",
+  };
+}
+
 export function gardenCumulativeGold(profile) {
   const value = profile?.leaderboardGoldEarned ?? profile?.totalGoldEarned;
   if (value == null || value === "") return null;
@@ -185,6 +195,10 @@ export async function renderGarden(container, profile, label) {
   // 헤더 요약
   const head = document.createElement("div");
   head.className = "garden-head";
+  const guild = gardenGuildMetadata(profile);
+  head.dataset.guildId = guild.id;
+  head.dataset.guildName = guild.name;
+  head.classList.toggle("has-guild", Boolean(guild.id || guild.name));
   const cells = grid.flat().filter(Boolean);
   const plants = cells.filter((c) => c.plant);
   const title = document.createElement("h2");

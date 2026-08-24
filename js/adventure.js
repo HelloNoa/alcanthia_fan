@@ -1,5 +1,6 @@
 // ⚔️ 모험 전투 시뮬레이터 (계산기 서브탭)
 import { gamedata } from "./api.js";
+import { adventureGemChoices } from "./adventure_gems.js";
 import { itemIcon, monsterIcon, CDN } from "./sprites.js";
 import { simulate, winRate } from "./battle.js";
 import { escapeHtml as esc, hydrateCombatIcons, renderCombatFlow } from "./combat_log.js";
@@ -37,12 +38,8 @@ export async function advSim(body) {
     const label = e === 0 ? "일반" : `악몽 ${e}단계 · HP/MP ×${nightmareMult(e)} · 전리품 +${e}회`;
     return `<option value="${e}"${e === nightmare ? " selected" : ""}>${label}</option>`;
   }).join("");
-  // 전투 세공 3종 (배틀엔진이 코드로 직접 처리)
-  const GEMS = [
-    { code: "refined_amber", label: "호박석 (공격시 스턴)" },
-    { code: "refined_fluorite", label: "형석 (피격누적 반격)" },
-    { code: "refined_crystal", label: "수정 (피격시 MP환원)" },
-  ];
+  // 공식 세공 효과 목록에서 선택지를 생성한다. 습격 전용 효과도 표시하되 모험 계산에는 적용하지 않는다.
+  const GEMS = adventureGemChoices(g);
   const statSummary = (code) => {
     const stats = g.equipment_stats[code] || {};
     return ["atk", "def", "hp", "mp"].filter((key) => stats[key])

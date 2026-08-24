@@ -6,6 +6,7 @@ const {
   gardenCumulativeGold,
   gardenEdgeItems,
   gardenGridLayout,
+  gardenGuildMetadata,
   gardenPopularity,
   gardenProfileIntro,
   gardenSnapshotLimitedProduce,
@@ -21,6 +22,16 @@ assert.equal(gardenProfileIntro({ profileIntro: "  안녕하세요\n반갑습니
 assert.equal(gardenProfileIntro({ profileIntro: "   " }), "");
 assert.equal(gardenProfileIntro({ profileIntro: null }), "");
 assert.equal(gardenProfileIntro(null), "");
+
+assert.deepEqual(
+  gardenGuildMetadata({ guild: { id: 2, name: "  에덴  " } }),
+  { id: "2", name: "에덴" },
+);
+assert.deepEqual(
+  gardenGuildMetadata({ guildName: "별빛 결사" }),
+  { id: "", name: "별빛 결사" },
+);
+assert.deepEqual(gardenGuildMetadata({ guild: null }), { id: "", name: "" });
 
 assert.equal(gardenCumulativeGold({ leaderboardGoldEarned: 1_028_325_955 }), 1_028_325_955);
 assert.equal(
