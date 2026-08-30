@@ -3,7 +3,12 @@ import { itemIcon, plantIcon, fmtDuration } from "./sprites.js";
 import { advSim } from "./adventure.js";
 import { raidSim } from "./raid.js";
 import { defaultEnhancementMaterialPrice } from "./calc_prices.js";
-import { enhancementGoalForTarget, enhancementMaterialFlow, formatExpectedQuantity } from "./enhancement_ev.js";
+import {
+  enhancementGoalForTarget,
+  enhancementMaterialFlow,
+  enhancementResultBonusRate,
+  formatExpectedQuantity,
+} from "./enhancement_ev.js";
 import { createSearchPicker } from "./search_picker.js";
 import { ENHANCEMENT_EV_STORE, loadEnhancementEvState } from "./calc_state.js";
 import { enhancementAttemptBaseMs, enhancementTimeCatalog } from "./time_calc.js";
@@ -540,6 +545,7 @@ async function evCalc(body) {
           <label class="lvlabel">작업 지역
             <select id="ev-zone" class="num-in">
               <option value="">기타 (효과 없음)</option>
+              <option value="mid_cave">메아리 동굴 (소재 강화 성공 시 +2)</option>
               <option value="golden_fields">금빛들판 (제작 성공률)</option>
               <option value="sunset_cliff">석양절벽 (성공 결과 +1)</option>
               <option value="forgotten_fortress">잊힌 성터 (실패 재료 반환)</option>
@@ -561,7 +567,7 @@ async function evCalc(body) {
         <div class="calc-note">💡 강화 = <b>같은 강화도 아이템 2개 합성 → +1</b> (성공률 p). <b>실패 시 1개만 회수</b>(1개 손실).<br>
           성공률 <code>p = min(75%, 50%×(2−(1−0.005×심지)^(솥강화+1)))</code> · 지역효과가 없으면 단계별 필요량은 <code>1+1/p</code>배.<br>
           <b>2차 전개</b>: 기본 제작 산출은 +0, <b>입력 강화도 합 ≥ requiredLevel</b>이면 100% 성공(미만은 0.25^부족분). 아래에서 <b>각 제작 입력 강화도를 직접 지정</b>(기본=자동 최소비용). 수확물은 강화 불가.<br>
-          금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적합니다. <b>최종 목표 +0은 +0 이상 결과를 모두 집계</b>하고, +1 이상 목표는 정확히 해당 강화도인 결과만 집계합니다.<br>
+          메아리 동굴은 <b>소재 강화 성공 시 4%×지역효과 계수</b> 확률로 강화도가 +2가 됩니다. 금빛들판은 제작 성공률 ×(1 + 50%×계수), 최대 ×2.25로 반영합니다. 석양절벽은 강화도별 기대 공급량을 따로 추적합니다. <b>최종 목표 +0은 +0 이상 결과를 모두 집계</b>하고, +1 이상 목표는 정확히 해당 강화도인 결과만 집계합니다.<br>
           잊힌 성터는 강화 실패 시 <b>10%×지역효과 계수</b> 확률로 재료 2개를 모두 반환합니다.</div>
       </div>
     </div>`;
@@ -577,7 +583,7 @@ async function evCalc(body) {
   restoreNumber("#ev-start", "start", 0, 99);
   restoreNumber("#ev-brew", "brew", 0, 2);
   restoreNumber("#ev-target", "target", 0, 99);
-  if (["", "golden_fields", "sunset_cliff", "forgotten_fortress"].includes(savedEvState.zone)) q("#ev-zone").value = savedEvState.zone;
+  if (["", "mid_cave", "golden_fields", "sunset_cliff", "forgotten_fortress"].includes(savedEvState.zone)) q("#ev-zone").value = savedEvState.zone;
   if (typeof savedEvState.fog === "boolean") q("#ev-fog").checked = savedEvState.fog;
   if (typeof savedEvState.zoneBuff === "boolean") q("#ev-zoneBuff").checked = savedEvState.zoneBuff;
   if (typeof savedEvState.self === "boolean") q("#ev-self").checked = savedEvState.self;
@@ -588,7 +594,15 @@ async function evCalc(body) {
     + (q("#ev-fog")?.checked ? 1 : 0)
     + (q("#ev-zoneBuff")?.checked ? 0.5 : 0);
   const craftBuff = () => q("#ev-zone")?.value === "golden_fields" ? Math.min(2.25, 1 + 0.5 * zoneCoeff()) : 1;
-  const sunsetBonusRate = () => q("#ev-zone")?.value === "sunset_cliff" ? Math.min(1, 0.05 * zoneCoeff()) : 0;
+  const resultBonusRate = (code) => enhancementResultBonusRate({
+    zone: q("#ev-zone")?.value,
+    itemType: g.items?.[code]?.type,
+    zoneEffectCoeff: zoneCoeff(),
+  });
+  const sunsetBonusRate = () => enhancementResultBonusRate({
+    zone: q("#ev-zone")?.value,
+    zoneEffectCoeff: zoneCoeff(),
+  });
   const fortressRestoreRate = () => q("#ev-zone")?.value === "forgotten_fortress" ? Math.min(1, 0.1 * zoneCoeff()) : 0;
   // reqLevel R을 강화가능 입력들에 분배 (입력별 강화비용 최소화)
   const bestSplit = (R, costFns) => {
@@ -766,20 +780,24 @@ async function evCalc(body) {
     const craftRateBuff = craftBuff();
     const sunsetRate = sunsetBonusRate();
     const restoreRate = fortressRestoreRate();
+    const targetBonusRate = resultBonusRate(item);
+    const targetBonusLabel = targetBonusRate > 0
+      ? (q("#ev-zone").value === "mid_cave" ? "메아리" : "석양")
+      : "";
     q("#ev-brew-row").style.display = potion ? "" : "none";
     q("#ev-start-row").style.display = potion ? "none" : "";   // 포션은 양조 작물 강화도가 시작점 → 시작 강화도 숨김
     // 단계 k(→k+1) 성공률. 자가강화면 도구 솥 강화도 = max(솥강화도, k)
     const pAt = (k) => { const tool = self ? Math.max(c, k) : c; return Math.min(0.75, 0.5 * (2 - Math.pow(1 - 0.005 * w, tool + 1))); };
     const flowMemo = new Map();
-    const materialFlow = (start, target, sourceBonusRate = 0, goal = "exact") => {
+    const materialFlow = (start, target, successBonusRate = 0, sourceBonusRate = 0, goal = "exact") => {
       start = Math.max(0, Math.floor(start || 0));
       target = Math.max(start, Math.floor(target || 0));
-      const key = `${start}:${target}:${sourceBonusRate}:${restoreRate}:${goal}`;
+      const key = `${start}:${target}:${successBonusRate}:${sourceBonusRate}:${restoreRate}:${goal}`;
       if (!flowMemo.has(key)) flowMemo.set(key, enhancementMaterialFlow({
         start,
         target,
         successRate: pAt,
-        bonusRate: sunsetRate,
+        bonusRate: successBonusRate,
         sourceBonusRate,
         failureRestoreRate: restoreRate,
         goal,
@@ -787,10 +805,10 @@ async function evCalc(body) {
       return flowMemo.get(key);
     };
     const fmtFlow = formatExpectedQuantity;
-    const renderFlowProgress = (flow, start, target, sourceBonusRate, source) => {
+    const renderFlowProgress = (flow, start, target, sourceBonusRate, source, successBonusLabel = "") => {
       if (target - start < 2 || !Number.isFinite(flow.expectedInputs)) return "";
       const scale = flow.expectedInputs;
-      const withSunset = sunsetRate > 0;
+      const withBonus = Boolean(successBonusLabel);
       const sourceBase = scale * (1 - sourceBonusRate);
       const sourceBonus = scale * sourceBonusRate;
       const sourceTotal = `${source.label} ${fmtFlow(scale)}${source.suffix}`;
@@ -809,21 +827,21 @@ async function evCalc(body) {
           <td><b>${fmtFlow(available)}개</b></td>
           <td>${fmtFlow(attempts)}회</td>
           <td><b>${fmtFlow(normal)}개</b><small>→ +${step.level + 1}</small></td>
-          ${withSunset ? `<td class="${excluded > 0 ? "excluded" : ""}"><b>${fmtFlow(bonus)}개</b><small>→ +${bonusTarget}</small></td>
+          ${withBonus ? `<td class="${excluded > 0 ? "excluded" : ""}"><b>${fmtFlow(bonus)}개</b><small>→ +${bonusTarget}</small></td>
           <td class="ev-flow-discard">${excluded > 0 ? `<b>${fmtFlow(excluded)}개</b>` : "-"}</td>` : ""}
         </tr>`;
       });
       rows.push(`<tr class="final">
         <th scope="row"><span>+${target}</span><small>최종</small></th>
         <td><b>${fmtFlow(flow.targetYield * scale)}개</b></td><td>완료</td><td>-</td>
-        ${withSunset ? "<td>-</td><td>-</td>" : ""}
+        ${withBonus ? "<td>-</td><td>-</td>" : ""}
       </tr>`);
       return `<div class="ev-flow">
         <div class="ev-flow-h"><b>강화 재고 흐름</b><span>최종 +${target} 1개 · 실패 회수와 재투입 반영</span></div>
         <div class="ev-flow-source">${sourceFlow}</div>
-        <div class="ev-flow-scroll"><table class="${withSunset ? "sunset" : ""}">
+        <div class="ev-flow-scroll"><table class="${withBonus ? "bonus" : ""}">
           <thead><tr><th scope="col">단계</th><th scope="col">유입 재고</th><th scope="col">예상 시도</th><th scope="col">일반 +1 산출</th>
-            ${withSunset ? "<th scope=\"col\">석양 +2 산출</th><th scope=\"col\">목표 초과 제외</th>" : ""}</tr></thead>
+            ${withBonus ? `<th scope="col">${successBonusLabel} +2 산출</th><th scope="col">목표 초과 제외</th>` : ""}</tr></thead>
           <tbody>${rows.join("")}</tbody>
         </table></div>
       </div>`;
@@ -831,7 +849,7 @@ async function evCalc(body) {
     const multFor = (code, e, stack) => {
       e = Math.max(0, Math.floor(e || 0));
       const sourceBonus = sunsetRate > 0 && !leaf(code, stack) ? sunsetRate : 0;
-      return materialFlow(0, e, sourceBonus, "atLeast").expectedInputs;
+      return materialFlow(0, e, resultBonusRate(code), sourceBonus, "atLeast").expectedInputs;
     };
     const rawEl = q("#ev-raw"), fEl = q("#ev-fields");
     if (potion) {   // 포션: 강화 작물 양조 계승(dz) — +baseE 작물 양조 → 목표까지 합성
@@ -840,7 +858,7 @@ async function evCalc(body) {
       const baseE = Math.min(t, k);
       const targetGoal = enhancementGoalForTarget(t);
       const targetRequirement = targetGoal === "atLeast" ? `+${t} 이상` : `정확히 +${t}`;
-      const brewFlow = materialFlow(baseE, t, sunsetRate, targetGoal);
+      const brewFlow = materialFlow(baseE, t, targetBonusRate, sunsetRate, targetGoal);
       const brews = brewFlow.expectedInputs;
       if (item !== lastItem || baseE !== lastBrew) { renderBrewPrices(item, baseE); lastItem = item; lastBrew = baseE; }
       fEl.innerHTML = "";
@@ -855,7 +873,7 @@ async function evCalc(body) {
         <div class="ev-res"><span>석양 양조 산출 +${baseE + 1}</span><b>${pct(sunsetRate)}</b></div>
         ${t > baseE ? `<div class="ev-res"><span>일반 합성 (+${baseE}→+${baseE + 1})</span><b>${pct(brewP * (1 - sunsetRate))}</b></div>
         <div class="ev-res"><span>석양 대성공 (+${baseE}→+${baseE + 2})</span><b>${pct(brewP * sunsetRate)}</b></div>` : ""}` : ""}
-        ${renderFlowProgress(brewFlow, baseE, t, sunsetRate, { label: "양조", suffix: "회", generated: true })}
+        ${renderFlowProgress(brewFlow, baseE, t, sunsetRate, { label: "양조", suffix: "회", generated: true }, targetBonusLabel)}
         <div class="ev-res big"><span>${targetRequirement} ${nameOf(item)} <span class="muted">· 장기 기댓값</span></span><b>양조 ${fmt(brews)}번</b></div>`;
       let totalCost = 0;
       const rows = Object.entries(dict).sort((a, b) => b[1] - a[1]).map(([code, n]) => {
@@ -875,7 +893,7 @@ async function evCalc(body) {
     const sourceBonus = hasCraft && s === 0 ? sunsetRate : 0;
     const targetGoal = enhancementGoalForTarget(t);
     const targetRequirement = targetGoal === "atLeast" ? `+${t} 이상` : `정확히 +${t}`;
-    const targetFlow = materialFlow(s, t, sourceBonus, targetGoal);
+    const targetFlow = materialFlow(s, t, targetBonusRate, sourceBonus, targetGoal);
     const items = targetFlow.expectedInputs;
     const pS = pAt(s), pT1 = pAt(Math.max(s, t - 1));
     const rateTxt = self && levels > 1 ? `${(pS * 100).toFixed(1)}% → ${(pT1 * 100).toFixed(1)}%` : `${(pS * 100).toFixed(2)}%`;
@@ -885,14 +903,14 @@ async function evCalc(body) {
       ${levels > 0 ? `<div class="ev-res"><span>강화 성공률 (1회)</span><b>${rateTxt}</b></div>` : ""}
       ${hasCraft && craftRateBuff > 1 ? `<div class="ev-res"><span>금빛들판 제작 성공률</span><b>×${craftRateBuff.toFixed(2)}</b></div>` : ""}
       ${restoreRate > 0 ? `<div class="ev-res"><span>잊힌 성터 실패 재료 반환률</span><b>${pct(restoreRate)}</b></div>` : ""}
-      ${sunsetRate > 0 ? `<div class="ev-res"><span>석양 발동률 (성공 결과)</span><b>${pct(sunsetRate)}</b></div>
-      ${hasCraft && s === 0 ? `<div class="ev-res"><span>제작 산출 +0 / +1</span><b>${pct(1 - sunsetRate)} / ${pct(sunsetRate)}</b></div>` : ""}
+      ${targetBonusRate > 0 ? `<div class="ev-res"><span>${targetBonusLabel} 발동률 (${targetBonusLabel === "메아리" ? "소재 강화 성공" : "성공 결과"})</span><b>${pct(targetBonusRate)}</b></div>
+      ${sunsetRate > 0 && hasCraft && s === 0 ? `<div class="ev-res"><span>제작 산출 +0 / +1</span><b>${pct(1 - sunsetRate)} / ${pct(sunsetRate)}</b></div>` : ""}
       ${levels > 0 ? `<div class="ev-res"><span>시작 단계 실패 (+${s} 회수)</span><b>${pct(1 - pS)}</b></div>
-      <div class="ev-res"><span>일반 성공 (+${s}→+${s + 1})</span><b>${pct(pS * (1 - sunsetRate))}</b></div>
-      <div class="ev-res"><span>석양 대성공 (+${s}→+${s + 2})</span><b>${pct(pS * sunsetRate)}</b></div>` : ""}` : ""}
+      <div class="ev-res"><span>일반 성공 (+${s}→+${s + 1})</span><b>${pct(pS * (1 - targetBonusRate))}</b></div>
+      <div class="ev-res"><span>${targetBonusLabel} 대성공 (+${s}→+${s + 2})</span><b>${pct(pS * targetBonusRate)}</b></div>` : ""}` : ""}
       ${renderFlowProgress(targetFlow, s, t, sourceBonus, hasCraft && s === 0
         ? { label: "제작 결과", suffix: "개", generated: true }
-        : { label: `+${s} 재료`, suffix: "개", generated: false })}
+        : { label: `+${s} 재료`, suffix: "개", generated: false }, targetBonusLabel)}
       <div class="ev-res big"><span>${targetRequirement} ${label} 1개 <span class="muted">· 장기 기댓값</span></span><b>${sourceNeedTxt}</b></div>`;
     if (item) {  // 레시피 없는 원재료(각인석 등)도 자기 자신을 원재료로 전개
       const auto = q("#ev-auto").checked;

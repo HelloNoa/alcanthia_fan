@@ -10,6 +10,13 @@ export function formatExpectedQuantity(value) {
   return value.toLocaleString("ko-KR", { minimumFractionDigits: 0, maximumFractionDigits: digits });
 }
 
+export function enhancementResultBonusRate({ zone = "", itemType = "", zoneEffectCoeff = 0 } = {}) {
+  const coeff = Math.max(0, Number(zoneEffectCoeff) || 0);
+  if (zone === "sunset_cliff") return clamp01(0.05 * coeff);
+  if (zone === "mid_cave" && itemType === "general") return clamp01(0.04 * coeff);
+  return 0;
+}
+
 // 장기 반복 시 강화도별 기대 공급량을 흘려 정확한 목표 강화도 산출률을 구한다.
 export function enhancementMaterialFlow({
   start = 0,

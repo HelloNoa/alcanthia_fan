@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultEnhancementMaterialPrice } from "../js/calc_prices.js";
-import { enhancementGoalForTarget, enhancementMaterialFlow, formatExpectedQuantity } from "../js/enhancement_ev.js";
+import {
+  enhancementGoalForTarget,
+  enhancementMaterialFlow,
+  enhancementResultBonusRate,
+  formatExpectedQuantity,
+} from "../js/enhancement_ev.js";
 
 const closeTo = (actual, expected, epsilon = 1e-10) => {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
@@ -50,6 +55,27 @@ const step = 1 + 1 / p;
 const rate = () => p;
 
 closeTo(enhancementMaterialFlow({ start: 0, target: 3, successRate: rate }).expectedInputs, step ** 3);
+
+// 메아리 동굴: 소재 강화 성공에만 계수×4% 확률로 +2 결과가 붙는다.
+closeTo(enhancementResultBonusRate({
+  zone: "mid_cave", itemType: "general", zoneEffectCoeff: 2.5,
+}), 0.1);
+assert.equal(enhancementResultBonusRate({
+  zone: "mid_cave", itemType: "tool", zoneEffectCoeff: 2.5,
+}), 0);
+assert.equal(enhancementResultBonusRate({
+  zone: "golden_fields", itemType: "general", zoneEffectCoeff: 2.5,
+}), 0);
+assert.equal(enhancementResultBonusRate({
+  zone: "mid_cave", itemType: "general", zoneEffectCoeff: 100,
+}), 1);
+closeTo(enhancementResultBonusRate({ zone: "sunset_cliff", zoneEffectCoeff: 2.5 }), 0.125);
+const echoRate = enhancementResultBonusRate({
+  zone: "mid_cave", itemType: "general", zoneEffectCoeff: 2.5,
+});
+closeTo(enhancementMaterialFlow({
+  start: 0, target: 1, successRate: rate, bonusRate: echoRate, goal: "exact",
+}).expectedInputs, (1 + p) / (p * 0.9));
 
 // 잊힌 성터: 실패 중 restore 비율은 재료 2개를 모두 반환해 순소모가 없다.
 const restore = 0.25;

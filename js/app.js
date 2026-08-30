@@ -463,7 +463,7 @@ async function tabQuests(sub) {
   const questsById = new Map([...oneTime, ...recurring].map((q) => [q.id, q]));
   const quests = [...questsById.values()];
   const npcs = g.npcs || {};
-  const titleById = Object.fromEntries(quests.map((q) => [q.id, q.title]));
+  const titleById = Object.fromEntries([...goals, ...quests].map((q) => [q.id, q.title]));
   const count = (repeat) => quests.filter((q) => q.repeat === repeat).length;
   const requiredCount = goals.filter((goal) => goal.required).length;
   const cats = [

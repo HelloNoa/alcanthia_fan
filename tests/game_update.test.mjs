@@ -294,6 +294,18 @@ assert.equal(gameData.special_source.record_fragment_6, "📜 필수 목표 (수
 assert.equal(gameData.special_source.record_fragment_7, "📜 필수 목표 (결사의 회랑 클리어 후)");
 assert.equal(gameData.special_source.record_fragment_8, "📜 필수 목표 (마지막 기록 확인 후)");
 assert.equal(gameData.unobtainable.includes("record_fragment_6"), false);
+const questEntries = [
+  ...(progression.oneTimeQuests || []),
+  ...(gameData.quests || []),
+];
+const questTitleById = new Map([
+  ...(progression.tutorialGoals || []),
+  ...questEntries,
+].map((entry) => [entry.id, entry.title]));
+const unresolvedPreviousQuestIds = questEntries.flatMap((quest) =>
+  (quest.previous || []).filter((id) => !questTitleById.has(id)));
+assert.deepEqual(unresolvedPreviousQuestIds, []);
+assert.equal(questTitleById.get("ruins_found"), "별빛 고원 클리어");
 const trustedHelper = progression.oneTimeQuests.find((quest) => quest.id === "hestia_trusted_helper");
 assert.deepEqual(trustedHelper?.unlock, ["헤스티아 의뢰 누적 50회 완료"]);
 assert.equal(trustedHelper?.requestItems.length, 6);

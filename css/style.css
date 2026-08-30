@@ -1011,7 +1011,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .ev-flow-source b { color: var(--ink); }
 .ev-flow-scroll { width: 100%; min-width: 0; max-width: 100%; max-height: 420px; overflow: auto; overscroll-behavior: contain; }
 .ev-flow table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.ev-flow table.sunset { min-width: 780px; }
+.ev-flow table.sunset, .ev-flow table.bonus { min-width: 780px; }
 .ev-flow th, .ev-flow td { padding: 7px 9px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
 .ev-flow th:first-child, .ev-flow td:first-child { text-align: left; }
 .ev-flow thead th { position: sticky; top: 0; z-index: 1; color: var(--muted); background: var(--panel); font-size: 11.5px; font-weight: 600; }
