@@ -699,6 +699,18 @@ async function evCalc(body) {
     const ns = new Set(stack); ns.add(item);
     for (const c of rec.in) collectCrafts(c, ns, acc, seen);
   };
+  // 완성품이 도구여도 제작 조건을 맞추기 위해 강화하는 general 재료에는 메아리가 적용된다.
+  const inputBonusUsage = (item) => {
+    const crafts = [];
+    collectCrafts(item, new Set(), crafts, new Set());
+    const usage = new Map();
+    for (const cr of crafts) for (const code of cr.inputs) {
+      const enhancement = Math.max(0, Math.floor(enhState[cr.item + "|" + code] || 0));
+      const rate = resultBonusRate(code);
+      if (enhancement > 0 && rate > 0) usage.set(`${code}:${enhancement}`, { code, enhancement, rate });
+    }
+    return [...usage.values()];
+  };
   // 트리의 원재료(잎) 수집 (가격 입력용)
   const collectLeaves = (item, stack, set) => {
     if (leaf(item, stack)) { set.add(item); return; }
@@ -733,6 +745,7 @@ async function evCalc(body) {
     if (key.includes("|") && Number.isFinite(+value)) restoredEnhState[key] = Math.max(0, Math.min(40, Math.floor(+value)));
   }
   let enhState = restoredEnhState, lastItem = null, lastStart = -1, lastBrew = -1;
+  let flowExpanded = true;
   const saveState = () => {
     const numberOf = (id) => Math.max(0, Math.floor(+q(id).value || 0));
     try {
@@ -754,21 +767,24 @@ async function evCalc(body) {
       }));
     } catch {}
   };
-  const renderFields = (item, multFor) => {
+  const renderFields = (item, multFor, { readOnly = false } = {}) => {
     if (leaf(item, new Set())) { q("#ev-fields").innerHTML = ""; enhState = {}; return; }   // 완제품 leaf면 제작 입력 없음
     const aa = autoAssign(multFor); aa.f(item, new Set());
-    enhState = { ...aa.assign, ...enhState };   // 자동 기본값 위에 저장된 수동값 복원
+    enhState = readOnly ? aa.assign : { ...aa.assign, ...enhState };   // 자동 모드는 최적값 표시, 수동은 저장값 복원
     const crafts = []; collectCrafts(item, new Set(), crafts, new Set());
-    q("#ev-fields").innerHTML = `<div class="ev-fields-h">🔧 제작 입력 강화도 <span class="muted">(직접 조정 · 합 ≥ reqLv면 100%)</span></div>` +
+    const fieldGuide = readOnly ? "자동 선택값 · 끄면 수정 가능" : "직접 조정 · 합 ≥ reqLv면 100%";
+    q("#ev-fields").innerHTML = `<div class="ev-fields-h">🔧 제작 입력 강화도 <span class="muted">(${fieldGuide})</span></div>` +
       crafts.map((cr) => `<div class="ev-craft"><div class="ev-craft-h"><b>${nameOf(cr.item)}</b> <span class="muted">reqLv ${cr.req}</span> <span class="ev-q" data-c="${cr.item}"></span></div>
         <div class="ev-craft-in">${cr.inputs.map((c) => {
           const mx = isProduce(c) ? 2 : 40;   // 작물(산물)은 최대 +2 (유전/석양 — 합성 불가)
-          return `<label class="ev-finput">${nameOf(c)} +<input type="number" min="0" max="${mx}" value="${enhState[cr.item + "|" + c] ?? 0}" data-key="${cr.item + "|" + c}" class="ev-enh-in"></label>`;
+          return `<label class="ev-finput">${nameOf(c)} +<input type="number" min="0" max="${mx}" value="${enhState[cr.item + "|" + c] ?? 0}" data-key="${cr.item + "|" + c}" class="ev-enh-in"${readOnly ? " readonly" : ""}></label>`;
         }).join("")}</div></div>`).join("");
-    q("#ev-fields").querySelectorAll(".ev-enh-in").forEach((inp) =>
+    if (!readOnly) q("#ev-fields").querySelectorAll(".ev-enh-in").forEach((inp) =>
       inp.oninput = () => { enhState[inp.dataset.key] = Math.max(0, Math.floor(+inp.value || 0)); calc(); });
   };
   const calc = () => {
+    const previousFlow = q("#ev-out .ev-flow");
+    if (previousFlow) flowExpanded = previousFlow.open;
     const c = Math.max(0, Math.floor(+q("#ev-cauldron").value || 0));
     const w = Math.max(0, Math.min(10, Math.floor(+q("#ev-wick").value || 0)));
     q("#ev-wickv").textContent = w;
@@ -836,15 +852,17 @@ async function evCalc(body) {
         <td><b>${fmtFlow(flow.targetYield * scale)}개</b></td><td>완료</td><td>-</td>
         ${withBonus ? "<td>-</td><td>-</td>" : ""}
       </tr>`);
-      return `<div class="ev-flow">
-        <div class="ev-flow-h"><b>강화 재고 흐름</b><span>최종 +${target} 1개 · 실패 회수와 재투입 반영</span></div>
-        <div class="ev-flow-source">${sourceFlow}</div>
-        <div class="ev-flow-scroll"><table class="${withBonus ? "bonus" : ""}">
-          <thead><tr><th scope="col">단계</th><th scope="col">유입 재고</th><th scope="col">예상 시도</th><th scope="col">일반 +1 산출</th>
-            ${withBonus ? `<th scope="col">${successBonusLabel} +2 산출</th><th scope="col">목표 초과 제외</th>` : ""}</tr></thead>
-          <tbody>${rows.join("")}</tbody>
-        </table></div>
-      </div>`;
+      return `<details class="ev-flow"${flowExpanded ? " open" : ""}>
+        <summary class="ev-flow-h"><span class="ev-flow-title"><span class="ev-flow-chevron" aria-hidden="true">▾</span><b>강화 재고 흐름</b></span><span>최종 +${target} 1개 · 실패 회수와 재투입 반영</span></summary>
+        <div class="ev-flow-body">
+          <div class="ev-flow-source">${sourceFlow}</div>
+          <div class="ev-flow-scroll"><table class="${withBonus ? "bonus" : ""}">
+            <thead><tr><th scope="col">단계</th><th scope="col">유입 재고</th><th scope="col">예상 시도</th><th scope="col">일반 +1 산출</th>
+              ${withBonus ? `<th scope="col">${successBonusLabel} +2 산출</th><th scope="col">목표 초과 제외</th>` : ""}</tr></thead>
+            <tbody>${rows.join("")}</tbody>
+          </table></div>
+        </div>
+      </details>`;
     };
     const multFor = (code, e, stack) => {
       e = Math.max(0, Math.floor(e || 0));
@@ -916,10 +934,13 @@ async function evCalc(body) {
       const auto = q("#ev-auto").checked;
       if (item !== lastItem) { renderPrices(item); if (!auto) renderFields(item, multFor); lastItem = item; lastStart = s; }
       else if (s !== lastStart) { renderPrices(item); if (!auto) renderFields(item, multFor); lastStart = s; }   // 시작 강화도 바뀌면 +s 라벨·완제품 leaf 갱신
-      if (auto) { const aa = autoAssign(multFor); aa.f(item, new Set()); enhState = aa.assign; fEl.innerHTML = ""; }  // 가격 기준 최소비용 자동
+      if (auto) renderFields(item, multFor, { readOnly: true });   // 가격 기준 최소비용 자동값도 읽기 전용으로 표시
       const qmap = {};
       const base = manualRaw(multFor, enhState, qmap)(item, new Set());
       const mult = items;   // 정확한 목표 강화도 1개에 필요한 성공 제작물 수
+      const bonusUsage = inputBonusUsage(item);
+      if (bonusUsage.length) q("#ev-out .ev-res.big")?.insertAdjacentHTML("beforebegin", bonusUsage.map(({ code, enhancement, rate }) =>
+        `<div class="ev-res"><span>메아리 적용 재료 · ${nameOf(code)} +${enhancement} 이상 준비</span><b>${pct(rate)} · +2도 제작 조건 충족</b></div>`).join(""));
       // 제작 성공률 표시
       fEl.querySelectorAll(".ev-q[data-c]").forEach((el) => {
         const qv = qmap[el.dataset.c]; if (qv == null) return;

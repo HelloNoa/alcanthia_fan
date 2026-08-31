@@ -76,6 +76,12 @@ const echoRate = enhancementResultBonusRate({
 closeTo(enhancementMaterialFlow({
   start: 0, target: 1, successRate: rate, bonusRate: echoRate, goal: "exact",
 }).expectedInputs, (1 + p) / (p * 0.9));
+const copperForCauldron = enhancementMaterialFlow({
+  start: 0, target: 1, successRate: rate, bonusRate: echoRate, goal: "atLeast",
+});
+closeTo(copperForCauldron.expectedInputs, step);
+assert.ok(copperForCauldron.levels[0].bonusOutput > 0);
+assert.equal(copperForCauldron.overshootYield, 0);
 
 // 잊힌 성터: 실패 중 restore 비율은 재료 2개를 모두 반환해 순소모가 없다.
 const restore = 0.25;
