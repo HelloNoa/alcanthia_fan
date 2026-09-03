@@ -23,6 +23,7 @@ test("homepage exposes crawlable Alcanthia content", () => {
   assert.match(html, /<link\s+rel="canonical"\s+href="https:\/\/hellonoa\.github\.io\/alcanthia_fan\/"\s*\/?>/);
   assert.match(html, /알칸시아 — 마녀의 텃밭 유저를 위한 비공식 팬페이지입니다\./);
   for (const slug of slugs) assert.match(html, new RegExp(`href=["']\\./${slug}/["']`));
+  assert.ok(html.indexOf('<main id="view"></main>') < html.indexOf('class="home-seo-intro"'));
 });
 
 test("homepage publishes accurate social and WebSite metadata", () => {

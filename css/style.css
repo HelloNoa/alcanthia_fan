@@ -59,7 +59,8 @@ nav#tabs :is(button, a) {
 nav#tabs :is(button, a).active { background: var(--accent); border-color: var(--accent); }
 
 .home-seo-intro {
-  max-width: 1000px; margin: 0 auto; padding: 22px 20px 10px;
+  max-width: 1000px; margin: 0 auto; padding: 22px 20px 28px;
+  border-top: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
 .home-seo-intro h2 { margin: 0 0 8px; font-size: 18px; }
@@ -664,7 +665,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   .proxy-settings { font-size: 11px; }
   nav#tabs { padding: 10px 12px; gap: 5px; }
   nav#tabs :is(button, a) { padding: 7px 11px; font-size: 13px; }
-  .home-seo-intro { padding: 18px 12px 8px; }
+  .home-seo-intro { padding: 18px 12px 24px; }
   main#view { padding: 8px 12px 50px; }
   h2 { font-size: 19px; }
 
