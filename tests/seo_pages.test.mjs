@@ -19,6 +19,7 @@ test("homepage exposes crawlable Alcanthia content", () => {
   const html = readRepoFile("index.html");
   assert.match(html, /<title>알칸시아 공략·도감·계산기 \| 이끼제리 팬페이지<\/title>/);
   assert.match(html, /<meta\s+name="description"\s+content="알칸시아 작물·포션·스킬·몬스터·모험가 도감과 텃밭 배치, 스킬트리, 계산기를 제공하는 비공식 팬페이지입니다\."\s*\/?>/);
+  assert.match(html, /<meta\s+name="google-site-verification"\s+content="uCMjr2jFEn_XK5bCE-LDJAZExcH_6pJ8dDQF4C04oqQ"\s*\/?>/);
   assert.match(html, /<link\s+rel="canonical"\s+href="https:\/\/hellonoa\.github\.io\/alcanthia_fan\/"\s*\/?>/);
   assert.match(html, /알칸시아 — 마녀의 텃밭 유저를 위한 비공식 팬페이지입니다\./);
   for (const slug of slugs) assert.match(html, new RegExp(`href=["']\\./${slug}/["']`));
