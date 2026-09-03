@@ -681,9 +681,8 @@ export async function renderCodex(view, sub) {
     }
   };
 
-  view.querySelectorAll("#cxcats [data-k]").forEach((control) => {
-    control.onclick = (event) => {
-      if (control.matches("a")) event.preventDefault();
+  view.querySelectorAll("#cxcats button[data-k]").forEach((control) => {
+    control.onclick = () => {
       view.querySelectorAll("#cxcats [data-k]").forEach((item) => item.classList.toggle("active", item === control));
       cur = control.dataset.k;
       location.hash = `codex/${cur}`;

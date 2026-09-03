@@ -609,14 +609,14 @@ const TABS = {
   skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
   calc: { label: "🧮 계산기", run: (sub) => renderCalc(view, sub) },
 };
+const STATIC_CODEX_CATEGORIES = new Set(["plants", "potions", "skills", "monsters", "adventurers", "items"]);
 function mountTabs() {
   const nav = $("#tabs");
   nav.innerHTML = Object.entries(TABS).map(([k, t]) => t.href
     ? `<a href="${t.href}" data-tab="${k}">${t.label}</a>`
     : `<button type="button" data-tab="${k}">${t.label}</button>`).join("");
-  nav.querySelectorAll("[data-tab]").forEach((control) => {
-    control.onclick = (event) => {
-      if (control.matches("a")) event.preventDefault();
+  nav.querySelectorAll("button[data-tab]").forEach((control) => {
+    control.onclick = () => {
       selectTab(control.dataset.tab);
     };
   });
@@ -624,6 +624,11 @@ function mountTabs() {
 function selectTab(key) {
   const [routeMain, sub] = key.split("/");   // "calc/adv" → 메인 탭 + 서브탭(새로고침 유지)
   const main = routeMain === "p" ? "planner" : routeMain;
+  if (main === "codex" && !["achievements", "transmute"].includes(sub)) {
+    const category = STATIC_CODEX_CATEGORIES.has(sub) ? sub : "plants";
+    location.replace(`./${category}/`);
+    return;
+  }
   location.hash = key;
   $("#tabs").querySelectorAll("[data-tab]").forEach((control) =>
     control.classList.toggle("active", control.dataset.tab === main));

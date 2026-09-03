@@ -349,22 +349,27 @@ table.rank .sub { color: var(--muted); font-size: 12px; }
 .seo-page-intro .seo-eyebrow { margin: 0 0 3px; color: var(--accent); font-size: 13px; font-weight: 700; }
 .seo-page-intro h1 { margin: 0 0 8px; font-size: clamp(26px, 5vw, 38px); }
 .seo-page-intro > p:not(.seo-eyebrow) { max-width: 720px; margin: 0; color: var(--muted); }
-.seo-interactive-link {
-  display: inline-flex; min-height: 40px; align-items: center; margin-top: 14px; padding: 8px 14px;
-  border-radius: 8px; background: var(--accent); color: #fff; font-weight: 700; text-decoration: none;
-}
 .seo-category-links { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0; }
 .seo-category-links a {
   display: inline-flex; min-height: 36px; align-items: center; padding: 6px 11px;
   border: 1px solid var(--line); border-radius: 999px; color: var(--ink); text-decoration: none;
 }
 .seo-category-links a[aria-current="page"] { background: var(--accent); border-color: var(--accent); }
+.seo-filter { display: grid; grid-template-columns: auto minmax(180px, 360px) auto; align-items: center; gap: 10px; margin: 0 0 16px; }
+.seo-filter > span { font-weight: 700; }
+.seo-filter input {
+  width: 100%; min-width: 0; padding: 10px 12px; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; font: inherit;
+}
+.seo-filter small { color: var(--muted); white-space: nowrap; }
 .seo-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
 .seo-card {
   min-width: 0; overflow: hidden; padding: 14px; border: 1px solid var(--line);
   border-radius: 10px; background: var(--panel);
 }
-.seo-card h2 { margin: 0 0 10px; font-size: 17px; overflow-wrap: anywhere; }
+.seo-card-title { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.seo-card-title img { flex: 0 0 auto; width: 48px; height: 48px; object-fit: contain; }
+.seo-card h2 { margin: 0; font-size: 17px; overflow-wrap: anywhere; }
 .seo-card dl { display: grid; gap: 6px; margin: 0; }
 .seo-card dl > div { display: grid; grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: 10px; }
 .seo-card dt { color: var(--muted); }
@@ -372,6 +377,7 @@ table.rank .sub { color: var(--muted); font-size: 12px; }
 .seo-card-notes { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); }
 .seo-card-notes p { margin: 0; overflow-wrap: anywhere; }
 .seo-card-notes p + p { margin-top: 6px; }
+.seo-empty { color: var(--muted); }
 .seo-footer { padding: 22px 20px 30px; }
 .seo-footer p { margin: 3px 0; }
 
@@ -732,6 +738,8 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   .seo-main { padding: 14px 12px 48px; }
   .seo-footer { padding: 20px 12px 26px; }
   .seo-card { padding: 12px; }
+  .seo-filter { grid-template-columns: 1fr auto; }
+  .seo-filter > span { grid-column: 1 / -1; }
 }
 
 /* ───────── 텃밭 배치 플래너 ───────── */

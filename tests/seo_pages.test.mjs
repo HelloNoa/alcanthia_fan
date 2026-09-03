@@ -80,9 +80,13 @@ test("rendered pages expose complete non-JavaScript content", () => {
     assert.match(html, /href="https:\/\/www\.alcanthia\.com\/"/);
     assert.match(html, /비공식 팬/);
     assert.match(html, /데이터: 저장소의 gamedata\.json 기반 정적 생성 · 제작자 노아/);
-    assert.match(html, /대화형 도감에서 열기/);
+    assert.doesNotMatch(html, /대화형 도감에서 열기/);
     for (const slug of slugs) assert.match(html, new RegExp(`href="\\.\\./${slug}/"`));
     assert.equal((html.match(/class="seo-card"/g) || []).length > 0, true, `${definition.slug} must contain data cards`);
+    assert.equal((html.match(/class="seo-card-title"/g) || []).length > 0, true, `${definition.slug} must contain card images`);
+    assert.match(html, /<img\s+src="https:\/\/game\.alcanthia\.com\/assets\//);
+    assert.match(html, /data-seo-filter/);
+    assert.match(html, /src="\.\.\/js\/seo-filter\.js"/);
 
     assertSocialMetadata(html, {
       title: definition.title,
@@ -155,13 +159,18 @@ test("renderer escapes text and excludes private or test-only data", () => {
   assert.equal(extractJsonLd(unsafePage).name, unsafeTitle);
 });
 
-test("SPA navigation provides real static URLs", () => {
+test("codex navigation uses canonical static URLs instead of duplicate SPA pages", () => {
   const app = readRepoFile("js/app.js");
   const codex = readRepoFile("js/codex.js");
   assert.match(app, /codex:\s*\{[^}]*href:\s*"\.\/plants\/"/s);
+  assert.match(app, /querySelectorAll\("button\[data-tab\]"\)/);
+  assert.doesNotMatch(app, /control\.matches\("a"\)/);
+  assert.match(app, /STATIC_CODEX_CATEGORIES/);
+  assert.match(app, /location\.replace\(`\.\/\$\{category\}\/`\)/);
   for (const slug of slugs) {
     assert.match(codex, new RegExp(`key:\\s*"${slug}"[^}]*href:\\s*"\\.\\/${slug}\\/"`));
   }
+  assert.match(codex, /querySelectorAll\("#cxcats button\[data-k\]"\)/);
 });
 
 test("sitemap contains only the seven canonical non-fragment URLs", () => {

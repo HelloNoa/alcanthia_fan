@@ -1,5 +1,6 @@
 const SITE_ROOT = "https://hellonoa.github.io/alcanthia_fan/";
 const OFFICIAL_SITE = "https://www.alcanthia.com/";
+const ASSET_CDN = "https://game.alcanthia.com/assets";
 
 export const SEO_PAGE_DEFINITIONS = Object.freeze([
   {
@@ -116,7 +117,10 @@ export function renderSeoPage(definition, gameData, names) {
   const cards = renderCategory(definition.category, context);
   const navigation = SEO_PAGE_DEFINITIONS.map((page) =>
     `<a${page.slug === definition.slug ? ' aria-current="page"' : ""} href="../${escapeAttribute(page.slug)}/">${escapeHtml(CATEGORY_LABELS[page.category])} 도감</a>`
-  ).join("\n        ");
+  ).concat([
+    '<a href="../#codex/achievements">업적</a>',
+    '<a href="../#codex/transmute">변성</a>',
+  ]).join("\n        ");
   const structuredData = serializeJsonLd({
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -167,20 +171,26 @@ export function renderSeoPage(definition, gameData, names) {
       <p class="seo-eyebrow">알칸시아 공략 자료</p>
       <h1>${escapeHtml(definition.heading)}</h1>
       <p>${escapeHtml(definition.intro)}</p>
-      <a class="seo-interactive-link" href="../#codex/${escapeAttribute(definition.category)}">대화형 도감에서 열기</a>
     </section>
     <nav class="seo-category-links" aria-label="알칸시아 도감">
         ${navigation}
     </nav>
+    <label class="seo-filter">
+      <span>${escapeHtml(CATEGORY_LABELS[definition.category])} 검색</span>
+      <input type="search" placeholder="이름 또는 내용 검색…" autocomplete="off" data-seo-filter>
+      <small aria-live="polite" data-seo-result-count></small>
+    </label>
     <section class="seo-card-grid" aria-label="${escapeAttribute(CATEGORY_LABELS[definition.category])} 목록">
 ${indent(cards, 6)}
     </section>
+    <p class="seo-empty" data-seo-empty hidden>검색 결과가 없습니다.</p>
   </main>
   <footer class="seo-footer">
     <p>이 페이지는 알칸시아 유저를 위한 비공식 팬 제작 자료이며 공식 서비스가 아닙니다.</p>
     <p>데이터: 저장소의 gamedata.json 기반 정적 생성 · 제작자 노아</p>
     <p><a href="${OFFICIAL_SITE}" target="_blank" rel="noopener noreferrer">알칸시아 공식 사이트</a> · <a href="../">이끼제리 팬페이지 홈</a></p>
   </footer>
+  <script type="module" src="../js/seo-filter.js"></script>
 </body>
 </html>
 `;
@@ -278,7 +288,12 @@ function renderPlants({ gameData, names }) {
       if (produce.ripen?.itemCode) outputs.push(`숙성 → ${itemName(produce.ripen.itemCode, gameData, names)}`);
       rows.push(["생산물", outputs.join(" · ")]);
     }
-    return renderCard(plant.name || id, rows, plant.perk ? [`특수 효과: ${plant.perk}`] : []);
+    return renderCard(
+      plant.name || id,
+      rows,
+      plant.perk ? [`특수 효과: ${plant.perk}`] : [],
+      [`${ASSET_CDN}/plants/sprites/${plant.spriteKey || id}.png`],
+    );
   }).join("\n");
 }
 
@@ -304,7 +319,7 @@ function renderPotions(context) {
       const notes = [];
       if (gameData.use_duration?.includes(code)) notes.push("지속형 사용 효과: 기본 10분, 강화 시 지속 시간 증가");
       if (gameData.transmute_effects?.[code]) notes.push(`변성: ${gameData.transmute_effects[code]}`);
-      return renderCard(item.name || code, rows, notes);
+      return renderCard(item.name || code, rows, notes, itemIconUrls(code, context.names));
     }).join("\n");
 }
 
@@ -319,7 +334,7 @@ function renderSkills({ gameData }) {
       ["효과", formatFormula(skill.formula || skill.description)],
     ];
     if (prereqs.length) rows.push(["선행 조건", prereqs.join(", ")]);
-    return renderCard(skill.name || id, rows, skill.flavor ? [skill.flavor] : []);
+    return renderCard(skill.name || id, rows, skill.flavor ? [skill.flavor] : [], [`${ASSET_CDN}/skills/${id}.png`]);
   }).join("\n");
 }
 
@@ -339,7 +354,12 @@ function renderMonsters({ gameData, zonesByMonster }) {
         if (skill.mp) meta.push(`MP ${skill.mp}`);
         return `${skill.name}: ${skill.desc || skill.description || "—"}${meta.length ? ` (${meta.join(" · ")})` : ""}`;
       });
-      return renderCard(`${monster.name || id}${monster.boss ? " (보스)" : ""}`, rows, notes);
+      return renderCard(
+        `${monster.name || id}${monster.boss ? " (보스)" : ""}`,
+        rows,
+        notes,
+        [`${ASSET_CDN}/monsters/${monster.spriteKey || id}.png`],
+      );
     }).join("\n");
 }
 
@@ -365,7 +385,12 @@ function renderAdventurers({ gameData }) {
         return `${skill.name}: ${skill.description || "—"}${meta.length ? ` (${meta.join(" · ")})` : ""}`;
       });
       if (adventurer.introduction) notes.push(adventurer.introduction);
-      return renderCard(`${adventurer.name || id}${adventurer.title ? ` · ${adventurer.title}` : ""}`, rows, notes);
+      return renderCard(
+        `${adventurer.name || id}${adventurer.title ? ` · ${adventurer.title}` : ""}`,
+        rows,
+        notes,
+        [`${ASSET_CDN}/npc/${adventurer.spriteKey || id}.png`],
+      );
     }).join("\n");
 }
 
@@ -391,7 +416,7 @@ function renderItems(context) {
       const stat = gameData.equipment_stats?.[code];
       if (stat) rows.push(["기본 스탯", formatStats(stat)]);
       const notes = [item.perk, gameData.gem_effects?.[code]?.desc, item.description].filter(Boolean);
-      return renderCard(item.name || code, rows, notes);
+      return renderCard(item.name || code, rows, notes, itemIconUrls(code, names));
     }).join("\n");
 }
 
@@ -399,16 +424,28 @@ function publicEntries(collection = {}, gameData = {}) {
   return Object.entries(collection || {}).filter(([code, entry]) => !isExcludedEntry(code, entry, gameData));
 }
 
-function renderCard(title, rows, notes = []) {
+function renderCard(title, rows, notes = [], iconUrls = []) {
   const detailRows = rows.map(([label, value]) =>
     `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value ?? "—")}</dd></div>`
   ).join("");
   const noteRows = notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("");
+  const [iconUrl, fallbackUrl] = iconUrls.filter(Boolean);
+  const icon = iconUrl
+    ? `<img src="${escapeAttribute(iconUrl)}"${fallbackUrl ? ` data-fallback-src="${escapeAttribute(fallbackUrl)}"` : ""} alt="" loading="lazy" decoding="async" width="48" height="48">`
+    : "";
   return `<article class="seo-card">
-  <h2>${escapeHtml(title)}</h2>
+  <div class="seo-card-title">${icon}<h2>${escapeHtml(title)}</h2></div>
   <dl>${detailRows}</dl>${noteRows ? `
   <div class="seo-card-notes">${noteRows}</div>` : ""}
 </article>`;
+}
+
+function itemIconUrls(code, names) {
+  const spriteKey = names.itemSprites?.[code] || code;
+  const folder = names.itemFolders?.[spriteKey] || names.itemFolders?.[code];
+  if (!folder) return [`${ASSET_CDN}/${spriteKey}.png`];
+  const base = `${ASSET_CDN}/${folder}/${spriteKey}`;
+  return [`${base}.png`, `${base}_anim.png`];
 }
 
 function itemName(code, gameData, names) {
