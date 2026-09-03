@@ -635,17 +635,29 @@ window.addEventListener("alcanthia:navigate", (event) => {
   if (typeof route === "string" && TABS[route.split("/")[0]]) selectTab(route);
 });
 
-// 프록시 주소 표시/변경
-function mountProxyBadge() {
-  const el = $("#proxy");
-  el.textContent = PROXY_BASE;
-  el.onclick = () => {
-    const v = prompt("프록시 주소", PROXY_BASE);
-    if (v) setProxy(v);
+// 프록시 주소 확인/변경
+function mountProxySettings() {
+  const trigger = $("#proxy");
+  const dialog = $("#proxy-dialog");
+  const form = $("#proxy-form");
+  const input = $("#proxy-url");
+  const cancel = $("#proxy-cancel");
+  trigger.title = `현재 프록시: ${PROXY_BASE} · 클릭해서 변경`;
+  trigger.onclick = () => {
+    input.value = PROXY_BASE;
+    dialog.showModal();
+    input.focus();
+    input.select();
+  };
+  cancel.onclick = () => dialog.close();
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    const value = input.value.trim();
+    if (value) setProxy(value);
   };
 }
 
 mountTabs();
 mountThemeToggle();
-mountProxyBadge();
+mountProxySettings();
 selectTab((location.hash || "#garden").slice(1));

@@ -24,6 +24,36 @@ test("homepage exposes crawlable Alcanthia content", () => {
   for (const slug of slugs) assert.match(html, new RegExp(`href=["']\\./${slug}/["']`));
 });
 
+test("homepage publishes accurate social and WebSite metadata", () => {
+  const html = readRepoFile("index.html");
+  assertSocialMetadata(html, {
+    title: "알칸시아 공략·도감·계산기 | 이끼제리 팬페이지",
+    description: "알칸시아 작물·포션·스킬·몬스터·모험가 도감과 텃밭 배치, 스킬트리, 계산기를 제공하는 비공식 팬페이지입니다.",
+    type: "website",
+    url: siteRoot,
+  });
+  const metadata = extractJsonLd(html);
+  assert.equal(metadata["@type"], "WebSite");
+  assert.equal(metadata["@id"], `${siteRoot}#website`);
+  assert.equal(metadata.url, siteRoot);
+  assert.equal(metadata.inLanguage, "ko-KR");
+  assert.match(metadata.description, /비공식/);
+  assert.equal("publisher" in metadata, false);
+});
+
+test("public header hides the proxy URL and the homepage explains its source", () => {
+  const html = readRepoFile("index.html");
+  assert.doesNotMatch(html, /proxy:\s*<code/i);
+  assert.match(html, /<button[^>]+id="proxy"[^>]*>연결 설정<\/button>/);
+  assert.match(html, /데이터:\s*저장소의 gamedata\.json 기반 정적 생성/);
+  assert.match(html, /제작자\s*노아/);
+  assert.match(html, /비공식 팬 제작/);
+
+  const app = readRepoFile("js/app.js");
+  assert.doesNotMatch(app, /\.textContent\s*=\s*PROXY_BASE/);
+  assert.match(app, /현재 프록시/);
+});
+
 test("SEO page definitions have unique metadata and canonical URLs", () => {
   assert.deepEqual(SEO_PAGE_DEFINITIONS.map(({ slug }) => slug), slugs);
   for (const key of ["slug", "title", "heading", "description", "canonical"]) {
@@ -47,9 +77,29 @@ test("rendered pages expose complete non-JavaScript content", () => {
     assert.match(html, new RegExp(`<h1(?:\\s[^>]*)?>${escapeRegExp(definition.heading)}<\\/h1>`));
     assert.match(html, /href="https:\/\/www\.alcanthia\.com\/"/);
     assert.match(html, /비공식 팬/);
+    assert.match(html, /데이터: 저장소의 gamedata\.json 기반 정적 생성 · 제작자 노아/);
     assert.match(html, /대화형 도감에서 열기/);
     for (const slug of slugs) assert.match(html, new RegExp(`href="\\.\\./${slug}/"`));
     assert.equal((html.match(/class="seo-card"/g) || []).length > 0, true, `${definition.slug} must contain data cards`);
+
+    assertSocialMetadata(html, {
+      title: definition.title,
+      description: definition.description,
+      type: "website",
+      url: definition.canonical,
+    });
+    const metadata = extractJsonLd(html);
+    assert.equal(metadata["@type"], "WebPage");
+    assert.equal(metadata["@id"], `${definition.canonical}#webpage`);
+    assert.equal(metadata.name, definition.title);
+    assert.equal(metadata.url, definition.canonical);
+    assert.equal(metadata.description, definition.description);
+    assert.equal(metadata.inLanguage, "ko-KR");
+    assert.deepEqual(metadata.isPartOf, { "@id": `${siteRoot}#website` });
+    assert.equal(metadata.about?.name, "알칸시아");
+    assert.equal(metadata.about?.url, "https://www.alcanthia.com/");
+    assert.equal("publisher" in metadata, false);
+    assert.equal("creator" in metadata, false);
   }
 });
 
@@ -91,6 +141,16 @@ test("renderer escapes text and excludes private or test-only data", () => {
 
   const items = renderSeoPage(SEO_PAGE_DEFINITIONS[5], sampleGameData, sampleNames);
   assert.doesNotMatch(items, /목록 테스트|명시 테스트|노화 테스트|독니|정상 포션/);
+
+  const unsafeTitle = `제목 </script><script>alert("x")</script> & 끝`;
+  const unsafeDefinition = {
+    ...SEO_PAGE_DEFINITIONS[0],
+    title: unsafeTitle,
+    description: `설명 <태그> & "인용"`,
+  };
+  const unsafePage = renderSeoPage(unsafeDefinition, sampleGameData, sampleNames);
+  assert.doesNotMatch(unsafePage, /<script>alert\("x"\)<\/script>/);
+  assert.equal(extractJsonLd(unsafePage).name, unsafeTitle);
 });
 
 test("SPA navigation provides real static URLs", () => {
@@ -114,12 +174,50 @@ test("sitemap contains only the seven canonical non-fragment URLs", () => {
 });
 
 test("committed SEO artifacts match the current local data", () => {
+  const generatedPages = [];
   for (const definition of SEO_PAGE_DEFINITIONS) {
-    assert.equal(readRepoFile(`${definition.slug}/index.html`), renderSeoPage(definition, gameData, names));
+    const generated = renderSeoPage(definition, gameData, names);
+    generatedPages.push(generated);
+    assert.equal(readRepoFile(`${definition.slug}/index.html`), generated);
   }
   assert.equal(readRepoFile("sitemap.xml"), renderSitemap(SEO_PAGE_DEFINITIONS));
+
+  const combined = generatedPages.join("\n");
+  for (const code of gameData.test_items || []) {
+    const hiddenName = gameData.items?.[code]?.name || gameData.plants?.[code]?.name;
+    if (hiddenName) assert.equal(combined.includes(hiddenName), false, `${code} must stay private`);
+  }
+  for (const privateMarker of ["proxy:", "userId", "nickname"]) {
+    assert.equal(combined.includes(privateMarker), false, `${privateMarker} must not be generated`);
+  }
 });
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractJsonLd(html) {
+  const scripts = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  assert.equal(scripts.length, 1, "exactly one JSON-LD block is required");
+  return JSON.parse(scripts[0][1]);
+}
+
+function assertSocialMetadata(html, expected) {
+  for (const [property, value] of Object.entries({
+    "og:title": expected.title,
+    "og:description": expected.description,
+    "og:type": expected.type,
+    "og:url": expected.url,
+    "og:locale": "ko_KR",
+  })) {
+    assert.match(html, new RegExp(`<meta property="${escapeRegExp(property)}" content="${escapeRegExp(value)}">`));
+  }
+  for (const [name, value] of Object.entries({
+    "twitter:card": "summary",
+    "twitter:title": expected.title,
+    "twitter:description": expected.description,
+  })) {
+    assert.match(html, new RegExp(`<meta name="${escapeRegExp(name)}" content="${escapeRegExp(value)}">`));
+  }
+  assert.doesNotMatch(html, /(?:og|twitter):image/);
 }

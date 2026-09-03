@@ -24,8 +24,31 @@ header h1 span { color: var(--muted); font-weight: 400; font-size: 14px; }
   white-space: nowrap;
 }
 .theme-toggle:hover { border-color: var(--accent); }
-.proxy { font-size: 12px; color: var(--muted); }
-.proxy code { color: var(--accent); cursor: pointer; }
+.proxy-settings {
+  background: transparent; color: var(--accent); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 10px; cursor: pointer; font-size: 12px;
+  white-space: nowrap;
+}
+.proxy-settings:hover { border-color: var(--accent); }
+.proxy-dialog {
+  width: min(calc(100% - 24px), 480px); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 12px; padding: 0; background: var(--panel); box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+.proxy-dialog::backdrop { background: rgba(9, 8, 17, .72); }
+.proxy-dialog form { display: grid; gap: 10px; padding: 20px; }
+.proxy-dialog h2 { margin: 0; font-size: 19px; }
+.proxy-dialog p { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
+.proxy-dialog label { font-size: 13px; font-weight: 700; }
+.proxy-dialog input {
+  width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; background: var(--panel2); color: var(--ink); font: inherit;
+}
+.proxy-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.proxy-dialog-actions button {
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px;
+  background: transparent; color: var(--ink); cursor: pointer; font: inherit;
+}
+.proxy-dialog-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 nav#tabs { display: flex; gap: 6px; padding: 12px 20px; flex-wrap: wrap; }
 nav#tabs :is(button, a) {
@@ -50,6 +73,11 @@ nav#tabs :is(button, a).active { background: var(--accent); border-color: var(--
 }
 .home-codex-links a:hover, .official-link:hover { border-color: var(--accent); }
 .official-link { color: var(--accent); background: transparent; }
+.home-info {
+  display: flex; flex-wrap: wrap; gap: 5px 9px; max-width: 780px; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px;
+}
+.home-info strong { color: var(--ink); }
 
 main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .loading, .muted { color: var(--muted); padding: 16px 0; }
@@ -633,7 +661,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   header { flex-wrap: wrap; gap: 4px; padding: 10px 14px; }
   header h1 { font-size: 17px; }
   .header-actions { width: 100%; justify-content: space-between; gap: 8px; }
-  .proxy { font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proxy-settings { font-size: 11px; }
   nav#tabs { padding: 10px 12px; gap: 5px; }
   nav#tabs :is(button, a) { padding: 7px 11px; font-size: 13px; }
   .home-seo-intro { padding: 18px 12px 8px; }

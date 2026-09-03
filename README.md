@@ -33,7 +33,7 @@ cd alcanthia_fan
 python3 -m http.server 5500
 # 브라우저: http://localhost:5500
 ```
-- 우상단 `proxy:` 를 클릭하면 프록시 주소를 바꿀 수 있음(배포 주소로).
+- 우상단 `연결 설정`을 클릭하면 현재 프록시 주소를 확인하고 바꿀 수 있음(배포 주소로).
 - 기본값은 `http://localhost:8000` (js/config.js / localStorage).
 
 ## 배포 (GitHub Pages)

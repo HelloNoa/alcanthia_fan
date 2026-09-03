@@ -117,6 +117,21 @@ export function renderSeoPage(definition, gameData, names) {
   const navigation = SEO_PAGE_DEFINITIONS.map((page) =>
     `<a${page.slug === definition.slug ? ' aria-current="page"' : ""} href="../${escapeAttribute(page.slug)}/">${escapeHtml(CATEGORY_LABELS[page.category])} 도감</a>`
   ).join("\n        ");
+  const structuredData = serializeJsonLd({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${definition.canonical}#webpage`,
+    name: definition.title,
+    url: definition.canonical,
+    inLanguage: "ko-KR",
+    description: definition.description,
+    isPartOf: { "@id": `${SITE_ROOT}#website` },
+    about: {
+      "@type": "VideoGame",
+      name: "알칸시아",
+      url: OFFICIAL_SITE,
+    },
+  });
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -126,6 +141,15 @@ export function renderSeoPage(definition, gameData, names) {
   <title>${escapeHtml(definition.title)}</title>
   <meta name="description" content="${escapeAttribute(definition.description)}">
   <link rel="canonical" href="${escapeAttribute(definition.canonical)}">
+  <meta property="og:title" content="${escapeAttribute(definition.title)}">
+  <meta property="og:description" content="${escapeAttribute(definition.description)}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${escapeAttribute(definition.canonical)}">
+  <meta property="og:locale" content="ko_KR">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${escapeAttribute(definition.title)}">
+  <meta name="twitter:description" content="${escapeAttribute(definition.description)}">
+  <script type="application/ld+json">${structuredData}</script>
   <link rel="icon" type="image/png" href="../favicon.png">
   <link rel="apple-touch-icon" href="../favicon.png">
   <link rel="stylesheet" href="../css/style.css">
@@ -154,6 +178,7 @@ ${indent(cards, 6)}
   </main>
   <footer class="seo-footer">
     <p>이 페이지는 알칸시아 유저를 위한 비공식 팬 제작 자료이며 공식 서비스가 아닙니다.</p>
+    <p>데이터: 저장소의 gamedata.json 기반 정적 생성 · 제작자 노아</p>
     <p><a href="${OFFICIAL_SITE}" target="_blank" rel="noopener noreferrer">알칸시아 공식 사이트</a> · <a href="../">이끼제리 팬페이지 홈</a></p>
   </footer>
 </body>
@@ -488,6 +513,16 @@ function escapeAttribute(value) {
 
 function escapeXml(value) {
   return escapeHtml(value);
+}
+
+function serializeJsonLd(value) {
+  return JSON.stringify(value, null, 2).replace(/[<>&\u2028\u2029]/g, (character) => ({
+    "<": "\\u003c",
+    ">": "\\u003e",
+    "&": "\\u0026",
+    "\u2028": "\\u2028",
+    "\u2029": "\\u2029",
+  })[character]);
 }
 
 function indent(value, spaces) {
