@@ -12,27 +12,26 @@ import {
 import { createSearchPicker } from "./search_picker.js";
 import { ENHANCEMENT_EV_STORE, loadEnhancementEvState } from "./calc_state.js";
 import { enhancementAttemptBaseMs, enhancementTimeCatalog } from "./time_calc.js";
+import { CALC_ROUTE_KEYS, routeHref } from "./routes.js?v=20260904-clean-routes";
 
 export async function renderCalc(view, sub) {
+  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix, ev: evCalc, adv: advSim, raid: raidSim };
+  const labels = {
+    brew: "⚗️ 양조 조합표",
+    time: "⏱️ 시간 계산",
+    level: "🌱 레벨 계산",
+    ev: "🎲 강화 기댓값",
+    adv: "⚔️ 모험 시뮬",
+    raid: "🛡️ 습격 시뮬",
+  };
+  const current = VIEWS[sub] ? sub : "brew";
   view.innerHTML = `<h2>🧮 계산기</h2>
     <nav class="subtabs" id="calccats">
-      <button data-k="brew" class="active">⚗️ 양조 조합표</button>
-      <button data-k="time">⏱️ 시간 계산</button>
-      <button data-k="level">🌱 레벨 계산</button>
-      <button data-k="ev">🎲 강화 기댓값</button>
-      <button data-k="adv">⚔️ 모험 시뮬</button>
-      <button data-k="raid">🛡️ 습격 시뮬</button>
+      ${CALC_ROUTE_KEYS.map((key) => `<a href="${routeHref(`calc/${key}`)}" data-k="${key}" class="${key === current ? "active" : ""}">${labels[key]}</a>`).join("")}
     </nav>
     <div id="calcbody"></div>`;
   const body = view.querySelector("#calcbody");
-  const VIEWS = { time: timeCalc, level: levelCalc, brew: brewMatrix, ev: evCalc, adv: advSim, raid: raidSim };
-  const sel = (k) => {
-    location.hash = "calc/" + k;   // 새로고침 시 서브탭 유지
-    view.querySelectorAll("#calccats button").forEach((b) => b.classList.toggle("active", b.dataset.k === k));
-    (VIEWS[k] || brewMatrix)(body);
-  };
-  view.querySelectorAll("#calccats button").forEach((b) => b.onclick = () => sel(b.dataset.k));
-  sel(VIEWS[sub] ? sub : "brew");   // 해시의 서브탭 복원 (없으면 양조 조합표)
+  await VIEWS[current](body);
 }
 
 // ---------- 양조 조합표 (매트릭스) ----------

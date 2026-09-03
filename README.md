@@ -5,7 +5,7 @@ Alcanthia 비공식 팬페이지 프론트엔드 (빌드 없는 정적 사이트
 
 ## 구성
 ```
-index.html          진입점
+index.html          홈페이지 진입점
 css/style.css       스타일
 js/config.js        프록시 주소 설정 (PROXY_BASE)
 js/api.js           프록시 호출 래퍼
@@ -15,7 +15,8 @@ js/app.js           탭/라우팅
 data/names.json     한글 이름 맵 (작물/아이템/스킬/존) — gamedata에서 생성됨
 scripts/             검색 가능한 정적 도감 페이지 생성기
 plants/ 등           생성된 정적 도감 HTML
-sitemap.xml          홈페이지와 6개 정적 도감 URL 사이트맵
+garden/, calc/ 등    실제 경로로 접근하는 생성된 앱 진입 HTML
+sitemap.xml          홈페이지·정적 도감·공개 공략 도구의 색인 URL 사이트맵
 ```
 
 ## 기능
@@ -49,7 +50,7 @@ python3 -m http.server 5500
 
 ### 정적 도감 생성 및 검증
 
-`data/gamedata.json` 또는 `data/names.json`을 갱신한 뒤에는 검색 가능한 정적 도감과 사이트맵도 반드시 다시 생성한다.
+`data/gamedata.json`, `data/names.json` 또는 홈페이지 셸을 갱신한 뒤에는 검색 가능한 정적 도감, 실제 경로 앱 진입 페이지와 사이트맵도 반드시 다시 생성한다.
 
 ```bash
 node scripts/generate-seo-pages.mjs
@@ -63,7 +64,7 @@ node --test tests/*.test.mjs
 python3 -m http.server 5500
 ```
 
-브라우저에서 `http://localhost:5500/` 및 `/plants/`, `/potions/`, `/skills/`, `/monsters/`, `/adventurers/`, `/items/`를 확인한다. `--check`는 커밋된 생성물이 현재 JSON과 다르면 파일을 쓰지 않고 실패한다.
+브라우저에서 `http://localhost:5500/` 및 `/plants/`, `/calc/time/`, `/quests/`, `/planner/` 같은 실제 경로를 확인한다. `--check`는 커밋된 생성물이 현재 JSON 및 홈페이지 셸과 다르면 파일을 쓰지 않고 실패한다. 예전 `#calc/time` 형식 링크는 대응하는 실제 경로로 자동 이동한다. `/calc/brew/`와 `/quests/daily/`에 해당하는 기본 화면은 중복 색인을 막기 위해 각각 `/calc/`, `/quests/`를 대표 주소로 사용한다.
 
 ## 참고
 - 이미지는 전부 **CDN 직접 로드**. `data/names.json` 의 `itemFolders` 색인으로 정확한 폴더 1곳을 시도(없으면 전 폴더 폴백).

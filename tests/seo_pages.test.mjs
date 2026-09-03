@@ -6,6 +6,11 @@ import {
   renderSeoPage,
   renderSitemap,
 } from "../scripts/seo-pages.mjs";
+import {
+  APP_ROUTE_DEFINITIONS,
+  INDEXABLE_APP_ROUTE_DEFINITIONS,
+} from "../scripts/app-pages.mjs";
+import { SITE_NAV_ITEMS, routePath } from "../js/routes.js";
 
 const repoRoot = new URL("../", import.meta.url);
 const readRepoFile = (path) => readFileSync(new URL(path, repoRoot), "utf8");
@@ -14,6 +19,7 @@ const gameData = readJson("data/gamedata.json");
 const names = readJson("data/names.json");
 const slugs = ["plants", "potions", "skills", "monsters", "adventurers", "items"];
 const siteRoot = "https://hellonoa.github.io/alcanthia_fan/";
+const sitemapDefinitions = [...SEO_PAGE_DEFINITIONS, ...INDEXABLE_APP_ROUTE_DEFINITIONS];
 
 test("homepage exposes crawlable Alcanthia content", () => {
   const html = readRepoFile("index.html");
@@ -86,7 +92,13 @@ test("rendered pages expose complete non-JavaScript content", () => {
     assert.equal((html.match(/class="seo-card-title"/g) || []).length > 0, true, `${definition.slug} must contain card images`);
     assert.match(html, /<img\s+src="https:\/\/game\.alcanthia\.com\/assets\//);
     assert.match(html, /data-seo-filter/);
-    assert.match(html, /src="\.\.\/js\/seo-filter\.js"/);
+    assert.match(html, /src="\.\.\/js\/seo-filter\.js\?v=20260904-nav"/);
+    assert.match(html, /class="site-tabs seo-site-tabs"/);
+    for (const { key } of SITE_NAV_ITEMS) {
+      assert.match(html, new RegExp(`href="\\.\\./${escapeRegExp(routePath(key))}"`));
+    }
+    assert.match(html, /class="active" aria-current="page" href="\.\.\/plants\/">📖 도감<\/a>/);
+    assert.doesNotMatch(html, /href="[^"]*#/);
 
     assertSocialMetadata(html, {
       title: definition.title,
@@ -159,29 +171,39 @@ test("renderer escapes text and excludes private or test-only data", () => {
   assert.equal(extractJsonLd(unsafePage).name, unsafeTitle);
 });
 
-test("codex navigation uses canonical static URLs instead of duplicate SPA pages", () => {
+test("navigation uses real paths instead of fragment routes", () => {
   const app = readRepoFile("js/app.js");
   const codex = readRepoFile("js/codex.js");
-  assert.match(app, /codex:\s*\{[^}]*href:\s*"\.\/plants\/"/s);
-  assert.match(app, /querySelectorAll\("button\[data-tab\]"\)/);
-  assert.doesNotMatch(app, /control\.matches\("a"\)/);
-  assert.match(app, /STATIC_CODEX_CATEGORIES/);
-  assert.match(app, /location\.replace\(`\.\/\$\{category\}\/`\)/);
+  const calc = readRepoFile("js/calc.js");
+  assert.match(app, /SITE_NAV_ITEMS/);
+  assert.match(app, /<a href="\$\{tab\.href\}" data-tab="\$\{key\}"/);
+  assert.doesNotMatch(app, /location\.hash\s*=/);
+  assert.doesNotMatch(calc, /location\.hash/);
+  assert.doesNotMatch(codex, /location\.hash/);
+  assert.match(app, /function revealActiveTab\(\)/);
   for (const slug of slugs) {
-    assert.match(codex, new RegExp(`key:\\s*"${slug}"[^}]*href:\\s*"\\.\\/${slug}\\/"`));
+    assert.match(codex, new RegExp(`routeHref\\("codex/${slug}"\\)`));
   }
-  assert.match(codex, /querySelectorAll\("#cxcats button\[data-k\]"\)/);
+  assert.match(codex, /routeHref\("codex\/achievements"\)/);
+  assert.match(codex, /routeHref\("codex\/transmute"\)/);
+
+  const filter = readRepoFile("js/seo-filter.js");
+  assert.match(filter, /activeSiteNavigation\.offsetLeft/);
 });
 
-test("sitemap contains only the seven canonical non-fragment URLs", () => {
-  const xml = renderSitemap(SEO_PAGE_DEFINITIONS);
+test("sitemap contains every indexable canonical URL and excludes noindex routes", () => {
+  const xml = renderSitemap(sitemapDefinitions);
   assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
   assert.equal(xml.includes("#"), false);
-  assert.equal((xml.match(/<loc>/g) || []).length, 7);
+  assert.equal((xml.match(/<loc>/g) || []).length, 24);
   assert.match(xml, new RegExp(`<loc>${escapeRegExp(siteRoot)}<\\/loc>`));
-  for (const definition of SEO_PAGE_DEFINITIONS) {
+  for (const definition of sitemapDefinitions) {
     assert.match(xml, new RegExp(`<loc>${escapeRegExp(definition.canonical)}<\\/loc>`));
   }
+  for (const definition of APP_ROUTE_DEFINITIONS.filter(({ indexable }) => !indexable)) {
+    assert.doesNotMatch(xml, new RegExp(`<loc>${escapeRegExp(definition.canonical)}<\\/loc>`));
+  }
+  assert.doesNotMatch(xml, /\/calc\/brew\/|\/quests\/daily\//);
 });
 
 test("committed SEO artifacts match the current local data", () => {
@@ -191,7 +213,7 @@ test("committed SEO artifacts match the current local data", () => {
     generatedPages.push(generated);
     assert.equal(readRepoFile(`${definition.slug}/index.html`), generated);
   }
-  assert.equal(readRepoFile("sitemap.xml"), renderSitemap(SEO_PAGE_DEFINITIONS));
+  assert.equal(readRepoFile("sitemap.xml"), renderSitemap(sitemapDefinitions));
 
   const combined = generatedPages.join("\n");
   for (const code of gameData.test_items || []) {

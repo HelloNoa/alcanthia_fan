@@ -4,6 +4,7 @@ import { itemIcon, plantIcon, skillIcon, monsterIcon, adventurerIcon, achievemen
 import { createSearchPicker } from "./search_picker.js";
 import { saveEnhancementEvItem } from "./calc_state.js";
 import { normalizeHighestItemRecords } from "./item_records.js";
+import { routeHref } from "./routes.js?v=20260904-clean-routes";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
 // 개발 테스트용 작물 (시험용 / aging_)
@@ -13,21 +14,19 @@ export async function renderCodex(view, sub) {
   const g = await gamedata();
   const N = await names();
   const CATS = [
-    { key: "plants", label: "🌱 작물", href: "./plants/" },
-    { key: "potions", label: "🧪 포션", href: "./potions/" },
-    { key: "skills", label: "🔮 스킬", href: "./skills/" },
-    { key: "monsters", label: "🐺 몬스터", href: "./monsters/" },
-    { key: "adventurers", label: "🧭 모험가", href: "./adventurers/" },
-    { key: "items", label: "📦 아이템", href: "./items/" },
-    { key: "achievements", label: "🏅 업적" },
-    { key: "transmute", label: "🔀 변성" },
+    { key: "plants", label: "🌱 작물", href: routeHref("codex/plants") },
+    { key: "potions", label: "🧪 포션", href: routeHref("codex/potions") },
+    { key: "skills", label: "🔮 스킬", href: routeHref("codex/skills") },
+    { key: "monsters", label: "🐺 몬스터", href: routeHref("codex/monsters") },
+    { key: "adventurers", label: "🧭 모험가", href: routeHref("codex/adventurers") },
+    { key: "items", label: "📦 아이템", href: routeHref("codex/items") },
+    { key: "achievements", label: "🏅 업적", href: routeHref("codex/achievements") },
+    { key: "transmute", label: "🔀 변성", href: routeHref("codex/transmute") },
   ];
   const initialCat = CATS.some((c) => c.key === sub) ? sub : "plants";
   view.innerHTML = `<h2>📖 도감</h2>
     <nav class="subtabs" id="cxcats">${CATS.map((c) =>
-      c.href
-        ? `<a href="${c.href}" data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</a>`
-        : `<button type="button" data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</button>`).join("")}</nav>
+      `<a href="${c.href}" data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</a>`).join("")}</nav>
     <input id="cxq" class="filter-input" placeholder="이름 검색…">
     <div id="cxbody"></div>`;
 
@@ -681,14 +680,6 @@ export async function renderCodex(view, sub) {
     }
   };
 
-  view.querySelectorAll("#cxcats button[data-k]").forEach((control) => {
-    control.onclick = () => {
-      view.querySelectorAll("#cxcats [data-k]").forEach((item) => item.classList.toggle("active", item === control));
-      cur = control.dataset.k;
-      location.hash = `codex/${cur}`;
-      render(cur, qInput.value);
-    };
-  });
   qInput.oninput = () => render(cur, qInput.value);
   render(cur);
 }

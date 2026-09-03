@@ -1,3 +1,5 @@
+import { SITE_NAV_ITEMS, routePath } from "../js/routes.js";
+
 const SITE_ROOT = "https://hellonoa.github.io/alcanthia_fan/";
 const OFFICIAL_SITE = "https://www.alcanthia.com/";
 const ASSET_CDN = "https://game.alcanthia.com/assets";
@@ -118,9 +120,14 @@ export function renderSeoPage(definition, gameData, names) {
   const navigation = SEO_PAGE_DEFINITIONS.map((page) =>
     `<a${page.slug === definition.slug ? ' aria-current="page"' : ""} href="../${escapeAttribute(page.slug)}/">${escapeHtml(CATEGORY_LABELS[page.category])} 도감</a>`
   ).concat([
-    '<a href="../#codex/achievements">업적</a>',
-    '<a href="../#codex/transmute">변성</a>',
+    '<a href="../achievements/">업적</a>',
+    '<a href="../transmute/">변성</a>',
   ]).join("\n        ");
+  const siteNavigation = SITE_NAV_ITEMS.map((item) => {
+    const href = `../${routePath(item.key)}`;
+    const current = item.key === "codex" ? ' class="active" aria-current="page"' : "";
+    return `<a${current} href="${href}">${item.label}</a>`;
+  }).join("\n    ");
   const structuredData = serializeJsonLd({
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -159,10 +166,13 @@ export function renderSeoPage(definition, gameData, names) {
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body class="seo-page">
-  <header class="seo-site-header">
-    <a class="seo-brand" href="../"><img src="../favicon.png" alt="">이끼제리 팬페이지</a>
+  <header class="site-header seo-site-header">
+    <a class="seo-brand" href="../"><img src="../favicon.png" alt=""><strong>알칸시아 공략·도감·계산기</strong><small>이끼제리 팬페이지</small></a>
     <span>알칸시아 비공식 팬 제작</span>
   </header>
+  <nav class="site-tabs seo-site-tabs" aria-label="주요 메뉴">
+    ${siteNavigation}
+  </nav>
   <nav class="seo-breadcrumb" aria-label="현재 위치">
     <a href="../">홈</a><span aria-hidden="true">/</span><span>${escapeHtml(CATEGORY_LABELS[definition.category])} 도감</span>
   </nav>
@@ -190,7 +200,7 @@ ${indent(cards, 6)}
     <p>데이터: 저장소의 gamedata.json 기반 정적 생성 · 제작자 노아</p>
     <p><a href="${OFFICIAL_SITE}" target="_blank" rel="noopener noreferrer">알칸시아 공식 사이트</a> · <a href="../">이끼제리 팬페이지 홈</a></p>
   </footer>
-  <script type="module" src="../js/seo-filter.js"></script>
+  <script type="module" src="../js/seo-filter.js?v=20260904-nav"></script>
 </body>
 </html>
 `;

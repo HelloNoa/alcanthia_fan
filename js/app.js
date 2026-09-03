@@ -3,12 +3,13 @@ import { PROXY_BASE, setProxy } from "./config.js";
 import { renderGarden } from "./garden.js";
 import { renderMarket } from "./market.js";
 import { expToLevel } from "./util.js";
-import { renderCodex } from "./codex.js";
+import { renderCodex } from "./codex.js?v=20260904-clean-routes";
 import { renderSkillTree } from "./skilltree.js";
-import { renderCalc } from "./calc.js";
-import { renderPlanner } from "./planner.js";
+import { renderCalc } from "./calc.js?v=20260904-clean-routes";
+import { renderPlanner } from "./planner.js?v=20260904-clean-routes";
 import { renderRandomEffects } from "./random_effects.js";
 import { itemIcon, adventurerIcon } from "./sprites.js";
+import { SITE_NAV_ITEMS, legacyRouteFromHash, routeHref } from "./routes.js?v=20260904-clean-routes";
 
 const view = document.getElementById("view");
 const $ = (s, r = document) => r.querySelector(s);
@@ -59,11 +60,13 @@ const parseUserId = (value) => {
     : "";
 };
 
-// 다른 탭에서 텃밭 보기 요청 (랭킹/거주민 → 텃밭 탭)
-let pendingGarden = null;
+// 다른 페이지에서 텃밭 보기 요청 (랭킹/거주민 → 텃밭 페이지)
 function openGarden(userId, nickname) {
-  pendingGarden = { q: { userId }, label: nickname };
-  selectTab("garden");
+  const target = new URL(routeHref("garden"), document.baseURI);
+  if (userId) target.searchParams.set("user", userId);
+  else if (nickname) target.searchParams.set("nickname", nickname);
+  if (nickname) target.searchParams.set("label", nickname);
+  location.assign(target.href);
 }
 
 // ---------- 텃밭 탭 (검색 + 뷰어) ----------
@@ -119,8 +122,14 @@ async function tabGarden() {
   };
   $("#go").onclick = run;
   $("#q").addEventListener("keydown", (e) => e.key === "Enter" && run());
-  if (pendingGarden) { showGarden(pendingGarden.q, pendingGarden.label); pendingGarden = null; }
-  else $("#q").focus();
+  const params = new URLSearchParams(location.search);
+  const sharedUserId = params.get("user") || "";
+  const sharedNickname = params.get("nickname") || "";
+  const sharedLabel = params.get("label") || sharedNickname;
+  if (sharedUserId || sharedNickname) {
+    $("#q").value = sharedLabel || sharedUserId;
+    showGarden(sharedUserId ? { userId: sharedUserId } : { nickname: sharedNickname }, sharedLabel);
+  } else $("#q").focus();
 }
 
 async function showGarden(query, label) {
@@ -543,13 +552,11 @@ async function tabQuests(sub) {
 
   view.innerHTML = `<h2>📋 의뢰</h2>
     <nav class="subtabs" id="questcats">${cats.map((c) =>
-      `<button data-k="${c.key}" class="${c.key === initial ? "active" : ""}">${c.label}</button>`).join("")}</nav>
+      `<a href="${routeHref(`quests/${c.key}`)}" data-k="${c.key}" class="${c.key === initial ? "active" : ""}">${c.label}</a>`).join("")}</nav>
     <div id="questbody"></div>`;
   const body = $("#questbody");
 
   const render = (key) => {
-    location.hash = `quests/${key}`;
-    view.querySelectorAll("#questcats button").forEach((b) => b.classList.toggle("active", b.dataset.k === key));
     if (key === "goals" || key === "required") {
       const base = key === "required" ? goals.filter((goal) => goal.required) : goals;
       const actions = [...new Set(base.map((goal) => goal.action))];
@@ -591,54 +598,64 @@ async function tabQuests(sub) {
       : `<div class="muted">표시할 의뢰 없음</div>`;
     hydrateIcons(body);
   };
-  view.querySelectorAll("#questcats button").forEach((b) => b.onclick = () => render(b.dataset.k));
   render(initial);
 }
 
 // ---------- 탭 라우팅 ----------
-const TABS = {
-  garden: { label: "🌱 텃밭", run: tabGarden },
-  watch: { label: "🛡️ 이끼제리 방범대", run: tabWatch },
-  planner: { label: "🌿 배치", run: () => renderPlanner(view) },
-  market: { label: "💹 거래소", run: tabMarket },
-  residents: { label: "🗺️ 거주민", run: tabResidents },
-  rank: { label: "🏆 랭킹", run: tabLeaderboard },
-  quests: { label: "📋 의뢰", run: (sub) => tabQuests(sub) },
-  codex: { label: "📖 도감", href: "./plants/", run: (sub) => renderCodex(view, sub) },
-  random: { label: "🎲 확률표", run: () => renderRandomEffects(view) },
-  skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
-  calc: { label: "🧮 계산기", run: (sub) => renderCalc(view, sub) },
+const TAB_RUNNERS = {
+  garden: tabGarden,
+  watch: tabWatch,
+  planner: () => renderPlanner(view),
+  market: tabMarket,
+  residents: tabResidents,
+  rank: tabLeaderboard,
+  quests: (sub) => tabQuests(sub),
+  codex: (sub) => renderCodex(view, sub),
+  random: () => renderRandomEffects(view),
+  skilltree: () => renderSkillTree(view),
+  calc: (sub) => renderCalc(view, sub),
 };
-const STATIC_CODEX_CATEGORIES = new Set(["plants", "potions", "skills", "monsters", "adventurers", "items"]);
+const TABS = Object.fromEntries(SITE_NAV_ITEMS.map(({ key, label }) => [
+  key,
+  { label, href: routeHref(key), run: TAB_RUNNERS[key] },
+]));
 function mountTabs() {
   const nav = $("#tabs");
-  nav.innerHTML = Object.entries(TABS).map(([k, t]) => t.href
-    ? `<a href="${t.href}" data-tab="${k}">${t.label}</a>`
-    : `<button type="button" data-tab="${k}">${t.label}</button>`).join("");
-  nav.querySelectorAll("button[data-tab]").forEach((control) => {
-    control.onclick = () => {
-      selectTab(control.dataset.tab);
-    };
-  });
+  nav.innerHTML = Object.entries(TABS).map(([key, tab]) =>
+    `<a href="${tab.href}" data-tab="${key}">${tab.label}</a>`).join("");
+}
+function revealActiveTab() {
+  if (!window.matchMedia?.("(max-width: 640px)").matches) return;
+  const nav = $("#tabs");
+  const active = nav?.querySelector(".active");
+  if (!nav || !active) return;
+  nav.scrollLeft = Math.max(0, active.offsetLeft - (nav.clientWidth - active.clientWidth) / 2);
 }
 function selectTab(key) {
-  const [routeMain, sub] = key.split("/");   // "calc/adv" → 메인 탭 + 서브탭(새로고침 유지)
-  const main = routeMain === "p" ? "planner" : routeMain;
-  if (main === "codex" && !["achievements", "transmute"].includes(sub)) {
-    const category = STATIC_CODEX_CATEGORIES.has(sub) ? sub : "plants";
-    location.replace(`./${category}/`);
-    return;
-  }
-  location.hash = key;
+  const [main, sub] = key.split("/");
   $("#tabs").querySelectorAll("[data-tab]").forEach((control) =>
     control.classList.toggle("active", control.dataset.tab === main));
+  revealActiveTab();
   (TABS[main] || TABS.garden).run(sub);
 }
 
 window.addEventListener("alcanthia:navigate", (event) => {
   const route = event.detail?.route;
-  if (typeof route === "string" && TABS[route.split("/")[0]]) selectTab(route);
+  if (typeof route === "string" && TABS[route.split("/")[0]]) {
+    location.assign(new URL(routeHref(route), document.baseURI).href);
+  }
 });
+
+function redirectLegacyHash() {
+  const legacy = legacyRouteFromHash(location.hash);
+  if (!legacy) return false;
+  const target = new URL(routeHref(legacy.route), document.baseURI);
+  const currentParams = new URLSearchParams(location.search);
+  currentParams.forEach((value, key) => target.searchParams.append(key, value));
+  if (legacy.plan) target.searchParams.set("plan", legacy.plan);
+  location.replace(target.href);
+  return true;
+}
 
 // 프록시 주소 확인/변경
 function mountProxySettings() {
@@ -662,7 +679,9 @@ function mountProxySettings() {
   };
 }
 
-mountTabs();
-mountThemeToggle();
-mountProxySettings();
-selectTab((location.hash || "#garden").slice(1));
+if (!redirectLegacyHash()) {
+  mountTabs();
+  mountThemeToggle();
+  mountProxySettings();
+  selectTab(document.body.dataset.route || "garden");
+}

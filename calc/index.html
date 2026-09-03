@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <base href="../">
   <!-- Google Tag Manager -->
   <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
   new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -20,30 +21,20 @@
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>알칸시아 공략·도감·계산기 | 이끼제리 팬페이지</title>
-  <meta name="description" content="알칸시아 작물·포션·스킬·몬스터·모험가 도감과 텃밭 배치, 스킬트리, 계산기를 제공하는 비공식 팬페이지입니다.">
+  <title>알칸시아 포션 양조 조합표 | 이끼제리 팬페이지</title>
+  <meta name="description" content="알칸시아 양조 재료 두 개를 조합했을 때 만들어지는 포션을 한눈에 확인할 수 있는 조합표입니다.">
   <meta name="google-site-verification" content="uCMjr2jFEn_XK5bCE-LDJAZExcH_6pJ8dDQF4C04oqQ">
-  <link rel="canonical" href="https://hellonoa.github.io/alcanthia_fan/">
-  <meta property="og:title" content="알칸시아 공략·도감·계산기 | 이끼제리 팬페이지">
-  <meta property="og:description" content="알칸시아 작물·포션·스킬·몬스터·모험가 도감과 텃밭 배치, 스킬트리, 계산기를 제공하는 비공식 팬페이지입니다.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://hellonoa.github.io/alcanthia_fan/calc/">
+  <meta property="og:title" content="알칸시아 포션 양조 조합표 | 이끼제리 팬페이지">
+  <meta property="og:description" content="알칸시아 양조 재료 두 개를 조합했을 때 만들어지는 포션을 한눈에 확인할 수 있는 조합표입니다.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://hellonoa.github.io/alcanthia_fan/">
+  <meta property="og:url" content="https://hellonoa.github.io/alcanthia_fan/calc/">
   <meta property="og:locale" content="ko_KR">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="알칸시아 공략·도감·계산기 | 이끼제리 팬페이지">
-  <meta name="twitter:description" content="알칸시아 작물·포션·스킬·몬스터·모험가 도감과 텃밭 배치, 스킬트리, 계산기를 제공하는 비공식 팬페이지입니다.">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "@id": "https://hellonoa.github.io/alcanthia_fan/#website",
-    "name": "이끼제리 알칸시아 팬페이지",
-    "alternateName": "알칸시아 팬페이지",
-    "url": "https://hellonoa.github.io/alcanthia_fan/",
-    "inLanguage": "ko-KR",
-    "description": "알칸시아 유저를 위한 비공식 공략·도감·계산기 팬페이지"
-  }
-  </script>
+  <meta name="twitter:title" content="알칸시아 포션 양조 조합표 | 이끼제리 팬페이지">
+  <meta name="twitter:description" content="알칸시아 양조 재료 두 개를 조합했을 때 만들어지는 포션을 한눈에 확인할 수 있는 조합표입니다.">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://hellonoa.github.io/alcanthia_fan/calc/#webpage","name":"알칸시아 포션 양조 조합표 | 이끼제리 팬페이지","url":"https://hellonoa.github.io/alcanthia_fan/calc/","inLanguage":"ko-KR","description":"알칸시아 양조 재료 두 개를 조합했을 때 만들어지는 포션을 한눈에 확인할 수 있는 조합표입니다.","isPartOf":{"@id":"https://hellonoa.github.io/alcanthia_fan/#website"},"about":{"@type":"VideoGame","name":"알칸시아","url":"https://www.alcanthia.com/"}}</script>
   <link rel="icon" type="image/png" href="./favicon.png">
   <link rel="apple-touch-icon" href="./favicon.png">
   <script>
@@ -61,7 +52,7 @@
   </script>
   <link rel="stylesheet" href="./css/style.css">
 </head>
-<body data-route="garden">
+<body class="app-route-page" data-route="calc">
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-N6BJK6R8"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -86,25 +77,21 @@
     </form>
   </dialog>
   <nav id="tabs" class="site-tabs" aria-label="주요 메뉴"></nav>
-  <main id="view"></main>
-  <section class="home-seo-intro" aria-labelledby="home-seo-title">
-    <h2 id="home-seo-title">알칸시아 팬페이지 안내</h2>
-    <p><strong>알칸시아 — 마녀의 텃밭 유저를 위한 비공식 팬페이지입니다.</strong></p>
-    <p>작물·포션·스킬·몬스터·모험가·아이템 도감과 텃밭 배치, 거래소, 스킬트리, 계산기를 한곳에서 확인할 수 있습니다.</p>
-    <nav class="home-codex-links" aria-label="알칸시아 주요 도감">
-      <a href="./plants/">작물 도감</a>
-      <a href="./potions/">포션 도감</a>
-      <a href="./skills/">스킬 도감</a>
-      <a href="./monsters/">몬스터 도감</a>
-      <a href="./adventurers/">모험가 도감</a>
-      <a href="./items/">아이템 도감</a>
-    </nav>
-    <a class="official-link" href="https://www.alcanthia.com/" target="_blank" rel="noopener noreferrer">알칸시아 공식 사이트</a>
-    <aside class="home-info" aria-label="정보">
-      <strong>정보</strong>
-      <span>데이터: 저장소의 gamedata.json 기반 정적 생성 · 제작자 노아 · 비공식 팬 제작</span>
-    </aside>
-  </section>
+  <main id="view">
+    <section class="route-seo-fallback" aria-labelledby="route-seo-title">
+      <p class="seo-eyebrow">알칸시아 공략 자료</p>
+      <h1 id="route-seo-title">알칸시아 포션 양조 조합표</h1>
+      <p>알칸시아 양조 재료 두 개를 조합했을 때 만들어지는 포션을 한눈에 확인할 수 있는 조합표입니다.</p>
+      <nav aria-label="관련 알칸시아 자료">
+        <a href="./calc/time/">알칸시아 시간 계산기</a>
+        <a href="./calc/level/">알칸시아 레벨 계산기</a>
+        <a href="./calc/ev/">알칸시아 강화 기댓값 계산기</a>
+        <a href="./calc/adv/">알칸시아 모험 시뮬레이터</a>
+        <a href="./calc/raid/">알칸시아 습격 시뮬레이터</a>
+      </nav>
+      <p class="muted">대화형 기능을 불러오는 중입니다.</p>
+    </section>
+  </main>
   <footer>
     <div class="coupang-ad">
       <script src="https://ads-partners.coupang.com/g.js"></script>

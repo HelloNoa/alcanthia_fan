@@ -1,4 +1,4 @@
-// 배치 데이터는 fragment에 넣어 정적 서버의 요청 URI 길이 제한을 피한다.
+// 새 공유 링크는 query string을 사용하고, 기존 fragment 링크도 계속 읽는다.
 const SHARE_HASH_PREFIX = "#p/";
 const LEGACY_SHARE_HASH_PREFIX = "#planner/plan/";
 const DEFLATE_BASE85_PREFIX = "z.";
@@ -156,6 +156,10 @@ export const plannerShareCodeFromLocation = ({ search = "", hash = "" } = {}) =>
   catch { return hashCode; }
 };
 
-export const plannerShareHash = (code) => `${SHARE_HASH_PREFIX}${code}`;
+export const plannerShareSearch = (code) => {
+  const params = new URLSearchParams();
+  params.set("plan", code);
+  return `?${params}`;
+};
 
 export const plannerDiscordShareText = (url) => `[알칸시아 배치 보기](${url})`;

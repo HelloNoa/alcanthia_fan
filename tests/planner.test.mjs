@@ -28,7 +28,7 @@ const {
   plannerRevivalChance,
   plannerRipenedCycleMs,
   plannerShareCodeFromLocation,
-  plannerShareHash,
+  plannerShareSearch,
   plannerStackedCauldronData,
   plannerSunsetRipenDurationMs,
   plannerToggleSharedFence,
@@ -40,11 +40,12 @@ assert.equal(plannerPresetRadius(1), 4);
 assert.equal(plannerPresetRadius(10), 13);
 assert.equal(plannerPresetRadius(20), 23);
 
-assert.equal(plannerShareHash("abc_123-xyz"), "#p/abc_123-xyz");
+assert.equal(plannerShareSearch("abc_123-xyz"), "?plan=abc_123-xyz");
 assert.equal(
-  plannerDiscordShareText("https://example.com/#p/code"),
-  "[알칸시아 배치 보기](https://example.com/#p/code)",
+  plannerDiscordShareText("https://example.com/planner/?plan=code"),
+  "[알칸시아 배치 보기](https://example.com/planner/?plan=code)",
 );
+assert.equal(plannerShareCodeFromLocation({ search: "?plan=abc_123-xyz", hash: "" }), "abc_123-xyz");
 assert.equal(plannerShareCodeFromLocation({
   search: "",
   hash: "#p/abc_123-xyz",

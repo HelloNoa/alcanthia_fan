@@ -8,15 +8,15 @@ import {
   plannerDecompressShareCode,
   plannerDiscordShareText,
   plannerShareCodeFromLocation,
-  plannerShareHash,
-} from "./planner_share.js";
+  plannerShareSearch,
+} from "./planner_share.js?v=20260904-clean-routes";
 export {
   plannerCompressShareCode,
   plannerDecompressShareCode,
   plannerDiscordShareText,
   plannerShareCodeFromLocation,
-  plannerShareHash,
-} from "./planner_share.js";
+  plannerShareSearch,
+} from "./planner_share.js?v=20260904-clean-routes";
 
 export const PLANNER_PRESET_MAX_STAGE = 20;
 export const plannerPresetRadius = (stage = 0) => {
@@ -2255,8 +2255,8 @@ export async function renderPlanner(view) {
     try {
       const cleanUrl = new URL(location.href);
       cleanUrl.searchParams.delete("plan");
-      cleanUrl.hash = "#planner";
-      history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+      cleanUrl.hash = "";
+      history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search);
     } catch {}
   } else if (incomingSharedPlanCode) {
     hint.textContent = "공유 배치 링크를 읽지 못했습니다.";
@@ -2725,7 +2725,9 @@ export async function renderPlanner(view) {
   };
   const shareUrl = async () => {
     const code = await plannerCompressShareCode(encodeGrid());
-    return location.origin + location.pathname + plannerShareHash(code);
+    const url = new URL("./planner/", document.baseURI);
+    url.search = plannerShareSearch(code);
+    return url.href;
   };
   const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const copyShare = async (text, okText) => {

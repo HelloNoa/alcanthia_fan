@@ -4,6 +4,11 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SEO_PAGE_DEFINITIONS, renderSeoPage, renderSitemap } from "./seo-pages.mjs";
+import {
+  APP_ROUTE_DEFINITIONS,
+  INDEXABLE_APP_ROUTE_DEFINITIONS,
+  renderAppRoutePage,
+} from "./app-pages.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const allowedArguments = new Set(["--check"]);
@@ -14,16 +19,24 @@ if (unknownArguments.length) {
   console.error("사용법: node scripts/generate-seo-pages.mjs [--check]");
   process.exitCode = 2;
 } else {
-  const [gameData, names] = await Promise.all([
+  const [gameData, names, homepageHtml] = await Promise.all([
     readJson(resolve(repoRoot, "data/gamedata.json")),
     readJson(resolve(repoRoot, "data/names.json")),
+    readFile(resolve(repoRoot, "index.html"), "utf8"),
   ]);
   const artifacts = [
     ...SEO_PAGE_DEFINITIONS.map((definition) => ({
       path: resolve(repoRoot, definition.slug, "index.html"),
       content: renderSeoPage(definition, gameData, names),
     })),
-    { path: resolve(repoRoot, "sitemap.xml"), content: renderSitemap(SEO_PAGE_DEFINITIONS) },
+    ...APP_ROUTE_DEFINITIONS.map((definition) => ({
+      path: resolve(repoRoot, definition.path, "index.html"),
+      content: renderAppRoutePage(definition, homepageHtml),
+    })),
+    {
+      path: resolve(repoRoot, "sitemap.xml"),
+      content: renderSitemap([...SEO_PAGE_DEFINITIONS, ...INDEXABLE_APP_ROUTE_DEFINITIONS]),
+    },
   ];
 
   if (process.argv.includes("--check")) {

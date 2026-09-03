@@ -50,13 +50,14 @@ header h1 span { color: var(--muted); font-weight: 400; font-size: 14px; }
 }
 .proxy-dialog-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-nav#tabs { display: flex; gap: 6px; padding: 12px 20px; flex-wrap: wrap; }
-nav#tabs :is(button, a) {
+nav.site-tabs { display: flex; gap: 6px; padding: 12px 20px; flex-wrap: wrap; }
+nav.site-tabs :is(button, a) {
   background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 14px;
-  font-family: inherit; line-height: inherit; text-decoration: none;
+  font-family: inherit; line-height: inherit; text-decoration: none; white-space: nowrap;
 }
-nav#tabs :is(button, a).active { background: var(--accent); border-color: var(--accent); }
+nav.site-tabs :is(button, a).active,
+nav.site-tabs :is(button, a)[aria-current="page"] { background: var(--accent); border-color: var(--accent); }
 
 .home-seo-intro {
   max-width: 1000px; margin: 0 auto; padding: 22px 20px 28px;
@@ -79,6 +80,17 @@ nav#tabs :is(button, a).active { background: var(--accent); border-color: var(--
   padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px;
 }
 .home-info strong { color: var(--ink); }
+
+.route-seo-fallback { max-width: 780px; padding: 22px 0; }
+.route-seo-fallback h1 { margin: 4px 0 10px; font-size: 26px; }
+.route-seo-fallback > p { margin: 6px 0; }
+.route-seo-fallback nav { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.route-seo-fallback nav a {
+  display: inline-flex; min-height: 36px; align-items: center; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  background: var(--panel); text-decoration: none;
+}
+.route-seo-fallback nav a:hover { border-color: var(--accent); }
 
 main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .loading, .muted { color: var(--muted); padding: 16px 0; }
@@ -333,12 +345,13 @@ table.rank .sub { color: var(--muted); font-size: 12px; }
 /* 검색 가능한 정적 도감 페이지 */
 .seo-page { overflow-x: hidden; }
 .seo-site-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  padding: 14px max(20px, calc((100% - 1000px) / 2));
+  gap: 14px;
 }
 .seo-site-header > span { color: var(--muted); font-size: 13px; text-align: right; }
 .seo-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 700; text-decoration: none; }
 .seo-brand img { width: 36px; height: 36px; object-fit: contain; }
+.seo-brand strong { font-size: 20px; }
+.seo-brand small { color: var(--muted); font-size: 14px; font-weight: 400; }
 .seo-breadcrumb, .seo-main, .seo-footer { width: min(100%, 1000px); margin-inline: auto; }
 .seo-breadcrumb {
   display: flex; gap: 8px; padding: 14px 20px 0; color: var(--muted); font-size: 13px;
@@ -669,9 +682,14 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   header h1 { font-size: 17px; }
   .header-actions { width: 100%; justify-content: space-between; gap: 8px; }
   .proxy-settings { font-size: 11px; }
-  nav#tabs { padding: 10px 12px; gap: 5px; }
-  nav#tabs :is(button, a) { padding: 7px 11px; font-size: 13px; }
+  nav.site-tabs {
+    flex-wrap: nowrap; gap: 5px; padding: 10px 12px; overflow-x: auto;
+    overscroll-behavior-inline: contain; scrollbar-width: none;
+  }
+  nav.site-tabs::-webkit-scrollbar { display: none; }
+  nav.site-tabs :is(button, a) { flex: 0 0 auto; padding: 7px 11px; font-size: 13px; }
   .home-seo-intro { padding: 18px 12px 24px; }
+  .route-seo-fallback h1 { font-size: 22px; }
   main#view { padding: 8px 12px 50px; }
   h2 { font-size: 19px; }
 
@@ -734,6 +752,10 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 @media (max-width: 640px) {
   .seo-site-header { align-items: flex-start; padding: 10px 12px; }
   .seo-site-header > span { max-width: 118px; font-size: 11px; }
+  .seo-brand { flex-wrap: wrap; gap: 2px 7px; }
+  .seo-brand img { grid-row: 1 / 3; }
+  .seo-brand strong { font-size: 16px; }
+  .seo-brand small { flex-basis: calc(100% - 43px); margin-left: 43px; font-size: 12px; }
   .seo-breadcrumb { padding: 12px 12px 0; }
   .seo-main { padding: 14px 12px 48px; }
   .seo-footer { padding: 20px 12px 26px; }
