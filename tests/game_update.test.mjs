@@ -273,6 +273,12 @@ assert.equal(
   progression.tutorialGoals.find((goal) => goal.id === "enhance_growth_potion")?.action,
   "cauldron",
 );
+const collectLootGoal = progression.tutorialGoals.find((goal) => goal.id === "collect_loot");
+assert.equal(collectLootGoal?.title, "첫 전리품 얻기");
+assert.equal(
+  collectLootGoal?.description,
+  "모험 결과를 확인하세요. 패배했다면 파티와 포션을 보강해 다시 도전하세요. 승리하면 첫 전리품을 받을 수 있습니다.",
+);
 const recordFragmentRewards = [
   ...(progression.tutorialGoals || []),
   ...(progression.oneTimeQuests || []),
@@ -360,6 +366,43 @@ assert.equal(gameData.potion_combat.veil_potion.effects[3][0].flat, 4);
 assert.equal(gameData.shop_items.includes("garden_contest_ticket"), true);
 assert.equal(gameData.shop_buy_price.garden_contest_ticket, 1000);
 assert.equal(gameData.test_items.includes("hungry_wedge"), true);
+assert.equal(names.skills.unyielding_contract, "불굴의 계약");
+assert.deepEqual(gameData.skills.unyielding_contract, {
+  name: "불굴의 계약",
+  treeId: "contract",
+  maxLevel: 1,
+  flavor: "패배로도 끊어지지 않는 계약. 새겨진 문양은 다시 길을 재촉한다.",
+  description: "모험 패배 시에도 자동 출정 유지",
+  prereqs: [{ id: "overflow_discard", level: 1 }],
+  formula: "모험 패배 시에도 자동 출정 유지",
+});
+assert.equal(gameData.skills.fine_tuning.maxLevel, 2);
+assert.equal(
+  gameData.skills.fine_tuning.formula,
+  "Lv1: 재료·결과물 보유 수량으로 자동연성 조건 설정 · Lv2: 선택한 아이템 보유 수량으로 자동연성 조건 설정",
+);
+assert.equal(
+  gameData.skills.flame_spirit.formula,
+  "Lv1: 가마솥별 레시피를 등록하여 자동 양조 · Lv2: 자동 양조, 자동 강화(은 가마솥 이상) · Lv3: 자동 양조, 자동 강화(은 가마솥 이상), 자동 제작(금 가마솥 이상) · Lv4: 자동 양조, 자동 강화(은 가마솥 이상), 자동 제작(금 가마솥 이상), 자동 변성(룬 가마솥 이상)",
+);
+assert.equal(
+  gameData.skills.fog_liberation.formula,
+  "지역효과 +100%, 모든 마녀의 텃밭 방문과 습격 허용\n습격 방어 실패 시: 1시간 동안 지역 효과 0% 적용, 1시간 생산량만큼 식물 수명 감소",
+);
+assert.equal(
+  gameData.skills.mail_delivery.formula,
+  "Lv1: 아이템을 첨부해 발송 가능 · Lv2: 아이템과 골드를 첨부해 발송 가능 · Lv3: 아이템과 골드를 첨부하고 물물교환 요청 발송 가능",
+);
+assert.equal(
+  gameData.skills.telepathy.formula,
+  "Lv1: 지역 메시지 발송 가능 · Lv2: 지역 및 전체 메시지 발송 가능",
+);
+assert.equal(gameData.skills.scissors_hand.formula, "터치당 ${e}개 한 번에 수확");
+assert.equal(gameData.skills.unlock_guild.formula, "결사 창설 가능 (결사의 주춧돌 필요)");
+assert.equal(
+  gameData.skills.wick_mastery.formula,
+  "강화 기본 성공률의 ${e*.5}% 증가 (가마솥 강화시 곱셈효과, 적용 후 성공률 최대 75%)",
+);
 assert.equal(
   gameData.achievements.some((achievement) =>
     achievement.id === "starlight_gardener"

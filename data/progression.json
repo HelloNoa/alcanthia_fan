@@ -381,8 +381,8 @@
     {
       "order": 26,
       "id": "collect_loot",
-      "title": "첫 전리품",
-      "description": "모험이 끝나면 모험 화면에서 전리품을 수령할 수 있습니다. 첫 전리품은 새 식물의 씨앗일 수도 있고 제작에 활용할 수 있는 재료가 될 수도 있습니다.",
+      "title": "첫 전리품 얻기",
+      "description": "모험 결과를 확인하세요. 패배했다면 파티와 포션을 보강해 다시 도전하세요. 승리하면 첫 전리품을 받을 수 있습니다.",
       "action": "adventure",
       "required": true,
       "rewards": [

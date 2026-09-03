@@ -85,7 +85,7 @@
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/scissors_hand.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>가위손</h2></div>
-        <dl><div><dt>계열</dt><dd>재배</dd></div><div><dt>최대 레벨</dt><dd>3</dd></div><div><dt>효과</dt><dd>터치당 수확 +Lv개</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>재배</dd></div><div><dt>최대 레벨</dt><dd>3</dd></div><div><dt>효과</dt><dd>터치당 Lv개 한 번에 수확</dd></div></dl>
         <div class="seo-card-notes"><p>손가락 끝에 깃든 수확의 마법. 작물을 어루만지면 열매가 저절로 떨어진다.</p></div>
       </article>
       <article class="seo-card">
@@ -165,7 +165,7 @@
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/flame_spirit.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>불꽃의 정령</h2></div>
-        <dl><div><dt>계열</dt><dd>연성</dd></div><div><dt>최대 레벨</dt><dd>4</dd></div><div><dt>효과</dt><dd>가마솥별 레시피를 등록하여 자동 양조</dd></div><div><dt>선행 조건</dt><dd>유령 깔때기 Lv1</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>연성</dd></div><div><dt>최대 레벨</dt><dd>4</dd></div><div><dt>효과</dt><dd>Lv1: 가마솥별 레시피를 등록하여 자동 양조 · Lv2: 자동 양조, 자동 강화(은 가마솥 이상) · Lv3: 자동 양조, 자동 강화(은 가마솥 이상), 자동 제작(금 가마솥 이상) · Lv4: 자동 양조, 자동 강화(은 가마솥 이상), 자동 제작(금 가마솥 이상), 자동 변성(룬 가마솥 이상)</dd></div><div><dt>선행 조건</dt><dd>유령 깔때기 Lv1</dd></div></dl>
         <div class="seo-card-notes"><p>가마솥 불꽃 속에 깃든 정령. 밤낮없이 타오르는 집념의 불씨.</p></div>
       </article>
       <article class="seo-card">
@@ -175,7 +175,7 @@
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/fine_tuning.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>화염 고삐</h2></div>
-        <dl><div><dt>계열</dt><dd>연성</dd></div><div><dt>최대 레벨</dt><dd>1</dd></div><div><dt>효과</dt><dd>자동연성 조건 설정</dd></div><div><dt>선행 조건</dt><dd>피어나는 손 Lv1, 심지 숙련 Lv1</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>연성</dd></div><div><dt>최대 레벨</dt><dd>2</dd></div><div><dt>효과</dt><dd>Lv1: 재료·결과물 보유 수량으로 자동연성 조건 설정 · Lv2: 선택한 아이템 보유 수량으로 자동연성 조건 설정</dd></div><div><dt>선행 조건</dt><dd>피어나는 손 Lv1, 심지 숙련 Lv1</dd></div></dl>
         <div class="seo-card-notes"><p>보이지 않는 고삐가 불꽃의 성미를 다스린다.</p></div>
       </article>
       <article class="seo-card">
@@ -200,7 +200,7 @@
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/wick_mastery.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>심지 숙련</h2></div>
-        <dl><div><dt>계열</dt><dd>연성</dd></div><div><dt>최대 레벨</dt><dd>10</dd></div><div><dt>효과</dt><dd>강화 기본 성공률의 Lv×.5% 증가 (가마솥 강화시 곱셈효과)</dd></div><div><dt>선행 조건</dt><dd>행운 숙련 Lv5</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>연성</dd></div><div><dt>최대 레벨</dt><dd>10</dd></div><div><dt>효과</dt><dd>강화 기본 성공률의 Lv×.5% 증가 (가마솥 강화시 곱셈효과, 적용 후 성공률 최대 75%)</dd></div><div><dt>선행 조건</dt><dd>행운 숙련 Lv5</dd></div></dl>
         <div class="seo-card-notes"><p>흔들리지 않는 불꽃. 강화의 성패를 가르는 집중력.</p></div>
       </article>
       <article class="seo-card">
@@ -285,7 +285,8 @@
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/fog_liberation.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>안개 해방</h2></div>
-        <dl><div><dt>계열</dt><dd>계약</dd></div><div><dt>최대 레벨</dt><dd>1</dd></div><div><dt>효과</dt><dd>—</dd></div><div><dt>선행 조건</dt><dd>수정구 점술 Lv5, 낯익은 터 Lv1</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>계약</dd></div><div><dt>최대 레벨</dt><dd>1</dd></div><div><dt>효과</dt><dd>지역효과 +100%, 모든 마녀의 텃밭 방문과 습격 허용
+      습격 방어 실패 시: 1시간 동안 지역 효과 0% 적용, 1시간 생산량만큼 식물 수명 감소</dd></div><div><dt>선행 조건</dt><dd>수정구 점술 Lv5, 낯익은 터 Lv1</dd></div></dl>
         <div class="seo-card-notes"><p>거점을 감싸던 안개를 걷어낸다. 땅의 힘은 선명해지지만, 바깥의 시선도 길을 찾는다.</p></div>
       </article>
       <article class="seo-card">
@@ -324,18 +325,23 @@
         <div class="seo-card-notes"><p>가질 수 없는 것에 미련을 두지 않는다. 손이 비어야 새것이 깃든다.</p></div>
       </article>
       <article class="seo-card">
+        <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/unyielding_contract.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>불굴의 계약</h2></div>
+        <dl><div><dt>계열</dt><dd>계약</dd></div><div><dt>최대 레벨</dt><dd>1</dd></div><div><dt>효과</dt><dd>모험 패배 시에도 자동 출정 유지</dd></div><div><dt>선행 조건</dt><dd>무소유 Lv1</dd></div></dl>
+        <div class="seo-card-notes"><p>패배로도 끊어지지 않는 계약. 새겨진 문양은 다시 길을 재촉한다.</p></div>
+      </article>
+      <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/unlock_guild.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>혈맹</h2></div>
-        <dl><div><dt>계열</dt><dd>계약</dd></div><div><dt>최대 레벨</dt><dd>1</dd></div><div><dt>효과</dt><dd>결사 개설 가능 (미구현)</dd></div><div><dt>선행 조건</dt><dd>유물 숙련 Lv10</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>계약</dd></div><div><dt>최대 레벨</dt><dd>1</dd></div><div><dt>효과</dt><dd>결사 창설 가능 (결사의 주춧돌 필요)</dd></div><div><dt>선행 조건</dt><dd>유물 숙련 Lv10</dd></div></dl>
         <div class="seo-card-notes"><p>피로 맺은 동맹. 함께하면 더 강해진다.</p></div>
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/mail_delivery.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>바람길</h2></div>
-        <dl><div><dt>계열</dt><dd>trade</dd></div><div><dt>최대 레벨</dt><dd>3</dd></div><div><dt>효과</dt><dd>아이템을 첨부해 발송 가능</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>trade</dd></div><div><dt>최대 레벨</dt><dd>3</dd></div><div><dt>효과</dt><dd>Lv1: 아이템을 첨부해 발송 가능 · Lv2: 아이템과 골드를 첨부해 발송 가능 · Lv3: 아이템과 골드를 첨부하고 물물교환 요청 발송 가능</dd></div></dl>
         <div class="seo-card-notes"><p>보이지 않는 바람길을 열어 짐이 먼 곳까지 흘러가게 한다.</p></div>
       </article>
       <article class="seo-card">
         <div class="seo-card-title"><img src="https://game.alcanthia.com/assets/skills/telepathy.png" alt="" loading="lazy" decoding="async" width="48" height="48"><h2>텔레파시</h2></div>
-        <dl><div><dt>계열</dt><dd>trade</dd></div><div><dt>최대 레벨</dt><dd>2</dd></div><div><dt>효과</dt><dd>지역 및 전체 메시지 발송 가능</dd></div><div><dt>선행 조건</dt><dd>바람길 Lv1</dd></div></dl>
+        <dl><div><dt>계열</dt><dd>trade</dd></div><div><dt>최대 레벨</dt><dd>2</dd></div><div><dt>효과</dt><dd>Lv1: 지역 메시지 발송 가능 · Lv2: 지역 및 전체 메시지 발송 가능</dd></div><div><dt>선행 조건</dt><dd>바람길 Lv1</dd></div></dl>
         <div class="seo-card-notes"><p>멀리 떨어진 마음의 파문을 더듬어 짧은 말을 전한다.</p></div>
       </article>
       <article class="seo-card">

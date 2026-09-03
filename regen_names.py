@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-names.json + gamedata 가치표/업적 재생성 스크립트 (게임 번들만으로, 이미지 다운로드 불필요)
+names.json + gamedata 주요 정보 재생성 스크립트 (게임 번들만으로, 이미지 다운로드 불필요)
 
 게임 업데이트 시:  python3 regen_names.py
 가치표만 갱신:      python3 regen_names.py --values-only
   - game.alcanthia.com 에서 최신 index-*.js 자동 탐색·다운로드
-  - 작물/아이템 이름, 스킨, 모험가, 스킬, 존, 업적, itemFolders(폴더 색인) 추출
+  - 작물/아이템 이름, 스킨, 모험가, 스킬, 존, 업적, 의뢰, itemFolders(폴더 색인) 추출
   - data/names.json 갱신
-  - data/gamedata.json 의 achievements / item_values / item_output_values / sell_price 갱신
+  - data/gamedata.json 의 items / skills / quests / achievements / 가치표 갱신
+  - data/progression.json 의 진행 목표 / 일회성 의뢰 갱신
 
 stdlib 만 사용 (urllib, re, json). 외부 패키지 없음.
 """
@@ -477,6 +478,142 @@ def parse_string_array(arr):
     if not arr or not arr.startswith("["):
         return []
     return [x.replace(r"\"", '"').replace(r"\\", "\\") for x in re.findall(r'"((?:\\.|[^"\\])*)"', arr)]
+
+
+def decode_js_string(value):
+    if not value or len(value) < 2 or value[0] not in '"`' or value[-1] != value[0]:
+        return None
+    quote = value[0]
+    text = value[1:-1]
+    return text.replace(f"\\{quote}", quote).replace(r"\\", "\\")
+
+
+JS_TEXT_TOKEN = r'(?:`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*")'
+
+
+def normalize_skill_text(value, parameter=None):
+    text = decode_js_string(value)
+    if text is not None and parameter:
+        text = re.sub(r"\b" + re.escape(parameter) + r"\b", "e", text)
+    return text
+
+
+def parse_skill_description(obj):
+    raw = js_field_value(obj, "description")
+    if not raw:
+        return None
+    direct = decode_js_string(raw)
+    if direct is not None:
+        return direct
+
+    joined = re.fullmatch(
+        r"\(\)=>\[((?:" + JS_TEXT_TOKEN + r",?)+)\]\.join\((" + JS_TEXT_TOKEN + r")\)",
+        raw,
+        re.DOTALL,
+    )
+    if joined:
+        parts = [normalize_skill_text(token) for token in re.findall(JS_TEXT_TOKEN, joined.group(1))]
+        separator = normalize_skill_text(joined.group(2))
+        if separator is not None and all(part is not None for part in parts):
+            return separator.join(parts)
+
+    match = re.fullmatch(
+        r"(?:\(\)|([A-Za-z_$][A-Za-z0-9_$]*))=>(" + JS_TEXT_TOKEN + r")",
+        raw,
+        re.DOTALL,
+    )
+    if not match:
+        arrow = re.match(r"([A-Za-z_$][A-Za-z0-9_$]*)=>(.*)", raw, re.DOTALL)
+        if not arrow:
+            return None
+        parameter, body = arrow.groups()
+        positive = re.fullmatch(
+            re.escape(parameter) + r">0\?(" + JS_TEXT_TOKEN + r"):(" + JS_TEXT_TOKEN + r")",
+            body,
+            re.DOTALL,
+        )
+        if positive:
+            yes = normalize_skill_text(positive.group(1), parameter)
+            no = normalize_skill_text(positive.group(2), parameter)
+            return yes if yes and not no else None
+
+        threshold = re.fullmatch(
+            re.escape(parameter) + r">=([0-9]+)\?(" + JS_TEXT_TOKEN + r"):(" + JS_TEXT_TOKEN + r")",
+            body,
+            re.DOTALL,
+        )
+        if threshold:
+            level, high, low = threshold.groups()
+            high_text = normalize_skill_text(high, parameter)
+            low_text = normalize_skill_text(low, parameter)
+            if high_text and low_text:
+                return f"Lv1: {low_text} · Lv{level}: {high_text}"
+
+        options = []
+        rest = body
+        exact_prefix = re.compile(
+            re.escape(parameter) + r"===([0-9]+)\?(" + JS_TEXT_TOKEN + r"):",
+            re.DOTALL,
+        )
+        while True:
+            option = exact_prefix.match(rest)
+            if not option:
+                break
+            level, token = option.groups()
+            options.append((int(level), normalize_skill_text(token, parameter)))
+            rest = rest[option.end():]
+        fallback = normalize_skill_text(rest, parameter)
+        if options and fallback is not None and all(text is not None for _, text in options):
+            if len(options) == 1 and "${e" in fallback:
+                return fallback
+            last_level = max(level for level, _ in options) + 1
+            return " · ".join([
+                *(f"Lv{level}: {text}" for level, text in options),
+                f"Lv{last_level}: {fallback}",
+            ])
+        return None
+    parameter, body = match.groups()
+    return normalize_skill_text(body, parameter)
+
+
+def parse_skills(s, stored=None):
+    obj = parent_object(s, 'magic_scythe:{name:"혼령낫"')
+    if not obj:
+        return {}
+    stored = stored or {}
+    out = {}
+    for skill_id, value in split_top(obj):
+        if not re.fullmatch(r"[a-z_]+", skill_id or ""):
+            continue
+        name = js_string_field(value, "name")
+        tree_id = js_string_field(value, "treeId")
+        max_level = js_number(js_field_value(value, "maxLevel") or "")
+        if not (name and tree_id and max_level is not None):
+            continue
+        previous = stored.get(skill_id) or {}
+        description = parse_skill_description(value)
+        if description is None:
+            description = previous.get("description")
+        formula = description or previous.get("formula")
+        prereqs = [
+            {"id": prereq_id, "level": int(level)}
+            for prereq_id, level in re.findall(
+                r'\{spellId:"([a-z_]+)",level:([0-9]+)\}',
+                js_field_value(value, "prereqs") or "",
+            )
+        ]
+        row = {
+            "name": name,
+            "treeId": tree_id,
+            "maxLevel": int(max_level),
+            "flavor": js_string_field(value, "flavor") or previous.get("flavor") or "",
+            "description": description,
+            "prereqs": prereqs,
+        }
+        if formula is not None:
+            row["formula"] = formula
+        out[skill_id] = row
+    return out
 
 
 ITEM_PERK_OVERRIDES = {
@@ -949,6 +1086,12 @@ def update_gamedata(s):
     test_items.difference_update(PUBLIC_TEST_ITEM_CODES)
     gd["test_items"] = sorted(test_items)
 
+    skills = parse_skills(s, gd.get("skills"))
+    if skills:
+        gd["skills"] = skills
+    else:
+        print("skip gamedata skills: 번들에서 스킬 정의를 추출하지 못함")
+
     gd.setdefault("zones", {}).update(CURRENT_ZONES)
     gd.setdefault("monsters", {}).update(CURRENT_MONSTERS)
     gd.setdefault("zone_effects", {})["extraction_abyss"] = []
@@ -1029,6 +1172,8 @@ def update_gamedata(s):
         print(f"  achievements: {len(achievements)}")
     if quests:
         print(f"  quests: {len(quests)}")
+    if skills:
+        print(f"  skills: {len(skills)}")
     print(f"  items: {len(stored_items)}")
     print(f"  dia_shop: {len(dia_shop)}")
 
@@ -1173,12 +1318,7 @@ def main():
         item_meta[code] = (t, field(o, "spriteKey"))
 
     # 스킬 / 존
-    skills = {}
-    obj = parent_object(s, 'magic_scythe:{name:"혼령낫"')
-    if obj:
-        for k, v in split_top(obj):
-            if re.fullmatch(r"[a-z_]+", k or "") and field(v, "name"):
-                skills[k] = field(v, "name")
+    skills = {code: skill["name"] for code, skill in parse_skills(s).items()}
     zones = {}
     obj = parent_object(s, 'beginner_forest:{name:"속삭이는 숲"')
     if obj:
