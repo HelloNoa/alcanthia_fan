@@ -13,19 +13,21 @@ export async function renderCodex(view, sub) {
   const g = await gamedata();
   const N = await names();
   const CATS = [
-    { key: "plants", label: "🌱 작물" },
-    { key: "potions", label: "🧪 포션" },
-    { key: "skills", label: "🔮 스킬" },
-    { key: "monsters", label: "🐺 몬스터" },
-    { key: "adventurers", label: "🧭 모험가" },
-    { key: "items", label: "📦 아이템" },
+    { key: "plants", label: "🌱 작물", href: "./plants/" },
+    { key: "potions", label: "🧪 포션", href: "./potions/" },
+    { key: "skills", label: "🔮 스킬", href: "./skills/" },
+    { key: "monsters", label: "🐺 몬스터", href: "./monsters/" },
+    { key: "adventurers", label: "🧭 모험가", href: "./adventurers/" },
+    { key: "items", label: "📦 아이템", href: "./items/" },
     { key: "achievements", label: "🏅 업적" },
     { key: "transmute", label: "🔀 변성" },
   ];
   const initialCat = CATS.some((c) => c.key === sub) ? sub : "plants";
   view.innerHTML = `<h2>📖 도감</h2>
     <nav class="subtabs" id="cxcats">${CATS.map((c) =>
-      `<button data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</button>`).join("")}</nav>
+      c.href
+        ? `<a href="${c.href}" data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</a>`
+        : `<button type="button" data-k="${c.key}" class="${c.key === initialCat ? "active" : ""}">${c.label}</button>`).join("")}</nav>
     <input id="cxq" class="filter-input" placeholder="이름 검색…">
     <div id="cxbody"></div>`;
 
@@ -679,10 +681,11 @@ export async function renderCodex(view, sub) {
     }
   };
 
-  view.querySelectorAll("#cxcats button").forEach((b) => {
-    b.onclick = () => {
-      view.querySelectorAll("#cxcats button").forEach((x) => x.classList.toggle("active", x === b));
-      cur = b.dataset.k;
+  view.querySelectorAll("#cxcats [data-k]").forEach((control) => {
+    control.onclick = (event) => {
+      if (control.matches("a")) event.preventDefault();
+      view.querySelectorAll("#cxcats [data-k]").forEach((item) => item.classList.toggle("active", item === control));
+      cur = control.dataset.k;
       location.hash = `codex/${cur}`;
       render(cur, qInput.value);
     };

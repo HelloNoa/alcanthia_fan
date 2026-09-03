@@ -28,11 +28,28 @@ header h1 span { color: var(--muted); font-weight: 400; font-size: 14px; }
 .proxy code { color: var(--accent); cursor: pointer; }
 
 nav#tabs { display: flex; gap: 6px; padding: 12px 20px; flex-wrap: wrap; }
-nav#tabs button {
+nav#tabs :is(button, a) {
   background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 14px;
+  font-family: inherit; line-height: inherit; text-decoration: none;
 }
-nav#tabs button.active { background: var(--accent); border-color: var(--accent); }
+nav#tabs :is(button, a).active { background: var(--accent); border-color: var(--accent); }
+
+.home-seo-intro {
+  max-width: 1000px; margin: 0 auto; padding: 22px 20px 10px;
+  overflow-wrap: anywhere;
+}
+.home-seo-intro h2 { margin: 0 0 8px; font-size: 18px; }
+.home-seo-intro p { max-width: 780px; margin: 4px 0; }
+.home-seo-intro p + p { color: var(--muted); }
+.home-codex-links { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 9px; }
+.home-codex-links a, .official-link {
+  display: inline-flex; min-height: 36px; align-items: center; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  background: var(--panel); text-decoration: none;
+}
+.home-codex-links a:hover, .official-link:hover { border-color: var(--accent); }
+.official-link { color: var(--accent); background: transparent; }
 
 main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
 .loading, .muted { color: var(--muted); padding: 16px 0; }
@@ -279,9 +296,55 @@ table.rank .sub { color: var(--muted); font-size: 12px; }
 .title-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 11px;
   border-radius: 999px; background: #2b2a47; border: 1px solid var(--line); color: var(--accent); }
 .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
-.subtabs button { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
-  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
-.subtabs button.active { background: var(--accent); border-color: var(--accent); }
+.subtabs :is(button, a) { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px;
+  line-height: inherit; text-decoration: none; }
+.subtabs :is(button, a).active { background: var(--accent); border-color: var(--accent); }
+
+/* 검색 가능한 정적 도감 페이지 */
+.seo-page { overflow-x: hidden; }
+.seo-site-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 14px max(20px, calc((100% - 1000px) / 2));
+}
+.seo-site-header > span { color: var(--muted); font-size: 13px; text-align: right; }
+.seo-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 700; text-decoration: none; }
+.seo-brand img { width: 36px; height: 36px; object-fit: contain; }
+.seo-breadcrumb, .seo-main, .seo-footer { width: min(100%, 1000px); margin-inline: auto; }
+.seo-breadcrumb {
+  display: flex; gap: 8px; padding: 14px 20px 0; color: var(--muted); font-size: 13px;
+}
+.seo-breadcrumb a, .seo-footer a { color: var(--accent); }
+.seo-main { padding: 16px 20px 64px; }
+.seo-page-intro { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.seo-page-intro .seo-eyebrow { margin: 0 0 3px; color: var(--accent); font-size: 13px; font-weight: 700; }
+.seo-page-intro h1 { margin: 0 0 8px; font-size: clamp(26px, 5vw, 38px); }
+.seo-page-intro > p:not(.seo-eyebrow) { max-width: 720px; margin: 0; color: var(--muted); }
+.seo-interactive-link {
+  display: inline-flex; min-height: 40px; align-items: center; margin-top: 14px; padding: 8px 14px;
+  border-radius: 8px; background: var(--accent); color: #fff; font-weight: 700; text-decoration: none;
+}
+.seo-category-links { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0; }
+.seo-category-links a {
+  display: inline-flex; min-height: 36px; align-items: center; padding: 6px 11px;
+  border: 1px solid var(--line); border-radius: 999px; color: var(--ink); text-decoration: none;
+}
+.seo-category-links a[aria-current="page"] { background: var(--accent); border-color: var(--accent); }
+.seo-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.seo-card {
+  min-width: 0; overflow: hidden; padding: 14px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel);
+}
+.seo-card h2 { margin: 0 0 10px; font-size: 17px; overflow-wrap: anywhere; }
+.seo-card dl { display: grid; gap: 6px; margin: 0; }
+.seo-card dl > div { display: grid; grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: 10px; }
+.seo-card dt { color: var(--muted); }
+.seo-card dd { margin: 0; text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+.seo-card-notes { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); }
+.seo-card-notes p { margin: 0; overflow-wrap: anywhere; }
+.seo-card-notes p + p { margin-top: 6px; }
+.seo-footer { padding: 22px 20px 30px; }
+.seo-footer p { margin: 3px 0; }
 
 /* 의뢰 */
 .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -572,7 +635,8 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   .header-actions { width: 100%; justify-content: space-between; gap: 8px; }
   .proxy { font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   nav#tabs { padding: 10px 12px; gap: 5px; }
-  nav#tabs button { padding: 7px 11px; font-size: 13px; }
+  nav#tabs :is(button, a) { padding: 7px 11px; font-size: 13px; }
+  .home-seo-intro { padding: 18px 12px 8px; }
   main#view { padding: 8px 12px 50px; }
   h2 { font-size: 19px; }
 
@@ -630,6 +694,15 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
   /* 표 */
   table.rank { font-size: 13px; }
   table.rank th, table.rank td { padding: 6px 6px; }
+}
+
+@media (max-width: 640px) {
+  .seo-site-header { align-items: flex-start; padding: 10px 12px; }
+  .seo-site-header > span { max-width: 118px; font-size: 11px; }
+  .seo-breadcrumb { padding: 12px 12px 0; }
+  .seo-main { padding: 14px 12px 48px; }
+  .seo-footer { padding: 20px 12px 26px; }
+  .seo-card { padding: 12px; }
 }
 
 /* ───────── 텃밭 배치 플래너 ───────── */

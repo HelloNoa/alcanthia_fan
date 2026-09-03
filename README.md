@@ -13,6 +13,9 @@ js/garden.js        텃밭 12×12 렌더러 (식물 스프라이트는 게임 CD
 js/market.js        시세 + 호가창 + 캔들차트(canvas)
 js/app.js           탭/라우팅
 data/names.json     한글 이름 맵 (작물/아이템/스킬/존) — gamedata에서 생성됨
+scripts/             검색 가능한 정적 도감 페이지 생성기
+plants/ 등           생성된 정적 도감 HTML
+sitemap.xml          홈페이지와 6개 정적 도감 URL 사이트맵
 ```
 
 ## 기능
@@ -43,6 +46,24 @@ python3 -m http.server 5500
 이름/스킨/모험가/스킬/존/폴더색인은 `data/names.json`, 게임 데이터는 `data/gamedata.json` 에 들어있음.
 로컬 갱신 도구 `regen_names.py` 는 최신 게임 번들에서 이름 색인과 `item_values` / `item_output_values` / `sell_price` 가치표를 갱신함.
 이미지는 런타임에 CDN(`game.alcanthia.com/assets`)에서 직접 로드하며, `itemFolders` 색인으로 폴더를 찾음.
+
+### 정적 도감 생성 및 검증
+
+`data/gamedata.json` 또는 `data/names.json`을 갱신한 뒤에는 검색 가능한 정적 도감과 사이트맵도 반드시 다시 생성한다.
+
+```bash
+node scripts/generate-seo-pages.mjs
+node scripts/generate-seo-pages.mjs --check
+node --test tests/*.test.mjs
+```
+
+생성된 페이지를 포함한 로컬 미리보기:
+
+```bash
+python3 -m http.server 5500
+```
+
+브라우저에서 `http://localhost:5500/` 및 `/plants/`, `/potions/`, `/skills/`, `/monsters/`, `/adventurers/`, `/items/`를 확인한다. `--check`는 커밋된 생성물이 현재 JSON과 다르면 파일을 쓰지 않고 실패한다.
 
 ## 참고
 - 이미지는 전부 **CDN 직접 로드**. `data/names.json` 의 `itemFolders` 색인으로 정확한 폴더 1곳을 시도(없으면 전 폴더 폴백).

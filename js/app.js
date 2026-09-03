@@ -604,24 +604,29 @@ const TABS = {
   residents: { label: "🗺️ 거주민", run: tabResidents },
   rank: { label: "🏆 랭킹", run: tabLeaderboard },
   quests: { label: "📋 의뢰", run: (sub) => tabQuests(sub) },
-  codex: { label: "📖 도감", run: (sub) => renderCodex(view, sub) },
+  codex: { label: "📖 도감", href: "./plants/", run: (sub) => renderCodex(view, sub) },
   random: { label: "🎲 확률표", run: () => renderRandomEffects(view) },
   skilltree: { label: "🌳 스킬트리", run: () => renderSkillTree(view) },
   calc: { label: "🧮 계산기", run: (sub) => renderCalc(view, sub) },
 };
 function mountTabs() {
   const nav = $("#tabs");
-  nav.innerHTML = Object.entries(TABS).map(([k, t]) =>
-    `<button data-tab="${k}">${t.label}</button>`).join("");
-  nav.querySelectorAll("button").forEach((b) =>
-    b.onclick = () => selectTab(b.dataset.tab));
+  nav.innerHTML = Object.entries(TABS).map(([k, t]) => t.href
+    ? `<a href="${t.href}" data-tab="${k}">${t.label}</a>`
+    : `<button type="button" data-tab="${k}">${t.label}</button>`).join("");
+  nav.querySelectorAll("[data-tab]").forEach((control) => {
+    control.onclick = (event) => {
+      if (control.matches("a")) event.preventDefault();
+      selectTab(control.dataset.tab);
+    };
+  });
 }
 function selectTab(key) {
   const [routeMain, sub] = key.split("/");   // "calc/adv" → 메인 탭 + 서브탭(새로고침 유지)
   const main = routeMain === "p" ? "planner" : routeMain;
   location.hash = key;
-  $("#tabs").querySelectorAll("button").forEach((b) =>
-    b.classList.toggle("active", b.dataset.tab === main));
+  $("#tabs").querySelectorAll("[data-tab]").forEach((control) =>
+    control.classList.toggle("active", control.dataset.tab === main));
   (TABS[main] || TABS.garden).run(sub);
 }
 
