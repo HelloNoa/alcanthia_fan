@@ -2,6 +2,7 @@ import { gamedata } from "./api.js";
 import { itemIcon } from "./sprites.js";
 
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString());
+const MIN_RANDOM_WEIGHT = 1e-6;
 const pct = (v) => {
   const p = v * 100;
   return `${p >= 10 ? p.toFixed(1) : p >= 1 ? p.toFixed(2) : p.toFixed(3)}%`;
@@ -25,10 +26,11 @@ export const RANDOM_EFFECTS = {
     label: "랜덤 씨앗",
     exponentPerEnh: 0.35,
     exponentCap: 1.2,
+    expectedValueCap: true,
     effectLabel: "혜성 +강",
     formula: "하늘에서 랜덤 씨앗 획득 (강화 시 고가치 씨앗 확률 증가)",
     base: "하늘에서 랜덤 씨앗 획득 (강화 시 고가치 씨앗 확률 증가)",
-    note: "씨앗은 +0으로 지급됩니다.",
+    note: "씨앗은 +0으로 지급됩니다. 기대가치는 혜성포션 가치(800×3^강화)를 넘지 않도록 보정됩니다.",
   },
   mirage_potion: {
     kind: "potion",
@@ -83,6 +85,31 @@ const randomCandidates = (g, cfg) => Object.entries(g.items || {})
     && randomValueOf(g, code, true) != null)
   .map(([code]) => code);
 
+const weightedExpectedValue = (entries, minValue, exponent) => {
+  const weights = entries.map((it) => Math.max(
+    Math.pow(it.value / minValue, exponent),
+    MIN_RANDOM_WEIGHT,
+  ));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  return entries.reduce((sum, it, i) => sum + it.value * weights[i] / total, 0);
+};
+
+// 공식 게임은 혜성포션의 기대가치가 포션 자체의 출력가치를 넘으면
+// 가중치 지수를 낮춘다. +0에서는 지수가 음수가 될 수도 있다.
+const cappedExponent = (entries, minValue, requested, maxExpectedValue) => {
+  if (!Number.isFinite(maxExpectedValue)
+    || weightedExpectedValue(entries, minValue, requested) <= maxExpectedValue) return requested;
+
+  let low = -64;
+  let high = requested;
+  for (let i = 0; i < 32; i++) {
+    const mid = (low + high) / 2;
+    if (weightedExpectedValue(entries, minValue, mid) < maxExpectedValue) low = mid;
+    else high = mid;
+  }
+  return weightedExpectedValue(entries, minValue, high) <= maxExpectedValue ? high : low;
+};
+
 export function randomDistribution(g, code, enh, sourceEnh = 0) {
   const cfg = RANDOM_EFFECTS[code];
   if (!cfg) return null;
@@ -94,15 +121,23 @@ export function randomDistribution(g, code, enh, sourceEnh = 0) {
   if (!entries.length) return null;
 
   const minValue = Math.min(...entries.map((it) => it.value));
-  const exponent = Math.min(enh * cfg.exponentPerEnh, cfg.exponentCap);
-  const weights = entries.map((it) => Math.pow(it.value / minValue, exponent));
+  const requestedExponent = Math.min(enh * cfg.exponentPerEnh, cfg.exponentCap);
+  const capBase = cfg.expectedValueCap ? randomValueOf(g, code, true) : null;
+  const maxExpectedValue = capBase == null ? Infinity : capBase * Math.pow(3, enh);
+  const exponent = cfg.expectedValueCap
+    ? cappedExponent(entries, minValue, requestedExponent, maxExpectedValue)
+    : requestedExponent;
+  const weights = entries.map((it) => Math.max(
+    Math.pow(it.value / minValue, exponent),
+    MIN_RANDOM_WEIGHT,
+  ));
   const total = weights.reduce((sum, w) => sum + w, 0);
   const rows = entries.map((it, i) => ({ ...it, prob: weights[i] / total }))
     .sort((a, b) => b.prob - a.prob
       || b.value - a.value
       || (g.items?.[a.code]?.name || a.code).localeCompare(g.items?.[b.code]?.name || b.code));
   const expected = rows.reduce((sum, it) => sum + it.value * it.prob, 0);
-  return { cfg, exponent, expected, resultEnh, rows };
+  return { cfg, exponent, expected, maxExpectedValue, resultEnh, rows };
 }
 
 const evalFormula = (tpl, e) => String(tpl || "").replace(/\$\{([^}]+)\}/g, (_, expr) => {
