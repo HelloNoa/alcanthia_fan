@@ -2,7 +2,7 @@ import { api, names, gamedata, progression } from "./api.js";
 import { PROXY_BASE, setProxy } from "./config.js";
 import { renderGarden } from "./garden.js";
 import { renderMarket } from "./market.js";
-import { expToLevel } from "./util.js";
+import { renderLeaderboard } from "./leaderboard.js";
 import { renderCodex } from "./codex.js?v=20260904-clean-routes";
 import { renderSkillTree } from "./skilltree.js";
 import { renderCalc } from "./calc.js?v=20260904-clean-routes";
@@ -407,61 +407,13 @@ async function tabResidents() {
 
 // ---------- 랭킹 탭 ----------
 const fmt = (n) => Number(n || 0).toLocaleString();
-const LB_CATS = [
-  { key: "level", label: "🌱 레벨", col: "레벨",
-    val: (e) => `Lv ${expToLevel(e.exp)}`, sub: (e) => `${fmt(e.exp)} exp` },
-  { key: "gold", label: "💰 골드", col: "누적 골드",
-    val: (e) => fmt(e.total_gold_earned), sub: () => "" },
-  { key: "adventure", label: "⚔️ 모험", col: "모험 완료",
-    val: (e) => `${fmt(e.adventures_completed)}회`,
-    sub: (e) => `존 Lv${e.max_zone_level} · 최소 ${e.best_zone_min_turn}턴` },
-  { key: "pvp", label: "🏟️ PvP", col: "레이팅",
-    val: (e) => `${fmt(e.rating)}`, sub: () => "" },
-];
 
 async function tabLeaderboard() {
   loading();
-  let d;
-  try { d = await api.leaderboard(); } catch (e) { return error(e); }
-  const avail = LB_CATS.filter((c) => d[c.key]?.top?.length);
-  if (!avail.length) { view.innerHTML = `<pre class="raw">${JSON.stringify(d, null, 2)}</pre>`; return; }
-
-  view.innerHTML = `<h2>🏆 랭킹</h2>
-    <nav class="subtabs" id="lbcats">${avail.map((c, i) =>
-      `<button data-k="${c.key}" class="${i === 0 ? "active" : ""}">${c.label}</button>`).join("")}</nav>
-    <p class="muted">행을 클릭하면 텃밭을 봅니다</p>
-    <div id="lbbody"></div>`;
-
-  const renderCat = (key) => {
-    const cat = LB_CATS.find((c) => c.key === key);
-    const sec = d[key];
-    const myId = sec.me?.userId;
-    const rows = sec.top.map((e, i) => {
-      const uid = e.user_id || "";
-      const me = uid && uid === myId;
-      const nick = e.nickname || "익명";
-      const badge = e.achievement_modifier ? `<span class="title-badge">${e.achievement_modifier}</span>` : "";
-      return `<tr class="${me ? "me" : ""}" data-uid="${uid}" data-nick="${e.nickname || ""}">
-        <td class="rk">${i + 1}</td>
-        <td class="nick">${nick}${badge}</td>
-        <td class="val">${cat.val(e)}</td>
-        <td class="sub">${cat.sub(e)}</td></tr>`;
-    }).join("");
-    const body = document.getElementById("lbbody");
-    body.innerHTML = `<table class="rank"><thead><tr>
-      <th>#</th><th>닉네임</th><th>${cat.col}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
-    body.querySelectorAll("tbody tr").forEach((tr) => {
-      if (tr.dataset.uid) tr.onclick = () => openGarden(tr.dataset.uid, tr.dataset.nick);
-    });
-  };
-
-  document.querySelectorAll("#lbcats button").forEach((b) => {
-    b.onclick = () => {
-      document.querySelectorAll("#lbcats button").forEach((x) => x.classList.toggle("active", x === b));
-      renderCat(b.dataset.k);
-    };
-  });
-  renderCat(avail[0].key);
+  try {
+    const [data, game] = await Promise.all([api.leaderboard(), gamedata()]);
+    renderLeaderboard(view, data, game, openGarden);
+  } catch (e) { error(e); }
 }
 
 // ---------- 의뢰 탭 ----------

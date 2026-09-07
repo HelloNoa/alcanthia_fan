@@ -368,15 +368,20 @@ canvas#m-candle { width: 100%; height: auto; }
 .ob-row .price, .ob-row .qty { position: relative; z-index: 1; }
 
 /* 랭킹 */
+.rank-description { line-height: 1.7; }
+.rank-table-scroll { max-width: 100%; overflow-x: auto; }
+.rank-user { border: 0; padding: 2px 0; background: none; color: var(--ink); font: inherit;
+  text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; overflow-wrap: anywhere; }
+.rank-user:hover { color: var(--accent); }
+.rank-user:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 table.rank { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.rank th, table.rank td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 table.rank th { color: var(--muted); font-weight: 600; }
-table.rank tbody tr { cursor: pointer; }
 table.rank tbody tr:hover { background: var(--panel); }
 table.rank tr.me { background: #2a2747; }
 table.rank .rk { color: var(--gold); font-weight: 700; width: 48px; }
 table.rank .val { color: var(--gold); font-weight: 600; white-space: nowrap; }
-table.rank .sub { color: var(--muted); font-size: 12px; }
+table.rank .sub { margin-top: 4px; color: var(--muted); font-size: 12px; font-weight: 400; }
 .title-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 11px;
   border-radius: 999px; background: #2b2a47; border: 1px solid var(--line); color: var(--accent); }
 .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }

@@ -46,7 +46,7 @@ const ROUTE_METADATA = Object.freeze({
   rank: {
     title: "알칸시아 랭킹 조회 | 이끼제리 팬페이지",
     heading: "알칸시아 랭킹 조회",
-    description: "알칸시아 공개 랭킹에서 레벨, 골드, 모험과 PvP 순위를 확인하는 팬 도구입니다.",
+    description: "알칸시아 공개 랭킹에서 지맥 회복 누적 지분, 레벨, 누적 골드와 지역·악몽 단계별 모험 기록 순위를 확인하는 팬 도구입니다.",
     indexable: false,
   },
   quests: {
