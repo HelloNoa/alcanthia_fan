@@ -21,6 +21,23 @@ const slugs = ["plants", "potions", "skills", "monsters", "adventurers", "items"
 const siteRoot = "https://hellonoa.github.io/alcanthia_fan/";
 const sitemapDefinitions = [...SEO_PAGE_DEFINITIONS, ...INDEXABLE_APP_ROUTE_DEFINITIONS];
 
+test("every public page promotes the same clearly unofficial Discord community", () => {
+  const paths = ["index.html", ...SEO_PAGE_DEFINITIONS.map(({ slug }) => `${slug}/index.html`),
+    ...APP_ROUTE_DEFINITIONS.map(({ path }) => `${path}/index.html`)];
+  for (const path of paths) {
+    const html = readRepoFile(path);
+    const banners = [...html.matchAll(/<aside class="community-banner"[\s\S]*?<\/aside>/g)];
+    assert.equal(banners.length, 1, `${path} must show exactly one community banner`);
+    const banner = banners[0][0];
+    assert.match(banner, /알칸시아 사설 디스코드/);
+    assert.match(banner, /이끼제리에서 운영하는 비공식 커뮤니티/);
+    assert.match(banner, /<a[^>]*href="https:\/\/discord\.gg\/jb8uWuEnQ"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+    assert.match(banner, /디스코드 참여/);
+    assert.doesNotMatch(banner, /<iframe|<script/);
+    assert.ok(html.indexOf(banner) < html.indexOf("<main"), `${path} must show the invitation above page content`);
+  }
+});
+
 test("homepage exposes crawlable Alcanthia content", () => {
   const html = readRepoFile("index.html");
   assert.match(html, /<title>알칸시아 공략·도감·계산기 \| 이끼제리 팬페이지<\/title>/);

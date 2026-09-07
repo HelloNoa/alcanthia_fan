@@ -186,7 +186,13 @@ function HB(e,t,i,s,a,g,r){const u=t.units.filter(p=>p!==e&&p.hp<=0),n=W8(u,p=>p
 function YB(e,t){for(const i of t){const s=i.effects.filter(u=>u.op==="mp"&&(_h(u)>0||lf(u)>0));if(s.length===0)continue;const a=os(s,u=>e.maxMp*lf(u)/100+_h(u));if(e.maxMp-e.mp<a)continue;const g=e.mp+a;if(e.skills.some(u=>{const n=wp(e,u.mpCost);return n<=e.mp||n>g?!1:!e.cooldowns[u.id]}))return i.action}return null};
 function pb(e){return{...e,units:e.units.map(t=>({...t,hp:t.maxHp,mp:t.maxMp,hasCrystalDivinationRevived:!1,cooldowns:{},statusEffects:[],fluorescence:0})),potions:ml(e.potions.map(t=>t?{itemCode:t.itemCode,enhancement:t.enhancement,effects:t.effects||[],used:!1}:null))}};
 function Ky(e,t,i){const s=e.filter(g=>g.hp>0);if(s.length<2)return;const a=s.filter(g=>Ou(g).length>=t);if(a.length!==0)return a.reduce((g,r)=>Ou(r).length>Ou(g).length?r:g)};
-function OI(e,t){return e.hp>0?!1:(e.hp=Math.min(e.maxHp,Math.max(1,Math.round(t))),!0)};
+function OI(e,t){
+  if(e.hp>0)return!1;
+  e.hp=Math.min(e.maxHp,Math.max(1,Math.round(t)));
+  // 2026-09-07: 모든 부활 경로에서 기존 버프와 디버프를 제거한다.
+  e.statusEffects=[];
+  return!0;
+};
 function Uc(e,t){const i=e.statusEffects.findIndex(s=>s.effectId===t.effectId);i>=0?e.statusEffects[i]=t:e.statusEffects.push(t)};
 function rawStatusDamage(e,t){const i=e.coefficient>0?e.casterAtk*e.coefficient:t.maxHp*e.percent/100+e.flat;return e.type==="burn"?ao(i,t):i};
 function YI(e,t){return applyDamageMultiplier(rawStatusDamage(e,t),t)};
