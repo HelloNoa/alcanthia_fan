@@ -93,6 +93,25 @@ nav.site-tabs :is(button, a)[aria-current="page"] { background: var(--accent); b
 .route-seo-fallback nav a:hover { border-color: var(--accent); }
 
 main#view { padding: 8px 20px 60px; max-width: 1000px; margin: 0 auto; }
+.patch-notes { padding-top: 14px; overflow-wrap: anywhere; }
+.patch-notes h1 { margin: 6px 0 12px; font-size: clamp(24px, 4vw, 32px); }
+.patch-notes > p { margin: 10px 0; }
+.patch-source a { color: var(--accent); }
+.patch-meta, .patch-count { color: var(--muted); font-size: 13px; }
+.patch-search { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 24px; }
+.patch-search[hidden] { display: none; }
+.patch-search input { flex: 1; min-width: min(240px, 100%); border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); color: var(--ink); font: inherit; }
+.patch-list { display: grid; gap: 12px; }
+.patch-note { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.patch-note[hidden] { display: none; }
+.patch-note summary { cursor: pointer; padding: 16px; font-weight: 700; }
+.patch-note summary small { display: block; margin: 6px 0 0 18px; color: var(--muted); font-weight: 400; }
+.patch-note summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 12px; }
+.patch-badge { display: inline-block; background: var(--accent); color: white; font-size: 11px; border-radius: 99px; padding: 2px 8px; margin-left: 8px; }
+.patch-body { padding: 0 18px 14px; border-top: 1px solid var(--line); }
+.patch-body h3 { font-size: 15px; margin: 18px 0 10px; }
+.patch-body ul { padding-left: 22px; margin: 0; }
+.patch-body li { white-space: pre-wrap; margin: 10px 0; line-height: 1.7; }
 .loading, .muted { color: var(--muted); padding: 16px 0; }
 .err, .err-box { color: var(--sell); }
 .err-box { background: #3a1f24; border: 1px solid #5a2a2f; padding: 14px; border-radius: 10px; }

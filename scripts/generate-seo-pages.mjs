@@ -19,10 +19,11 @@ if (unknownArguments.length) {
   console.error("사용법: node scripts/generate-seo-pages.mjs [--check]");
   process.exitCode = 2;
 } else {
-  const [gameData, names, homepageHtml] = await Promise.all([
+  const [gameData, names, homepageHtml, patchNotes] = await Promise.all([
     readJson(resolve(repoRoot, "data/gamedata.json")),
     readJson(resolve(repoRoot, "data/names.json")),
     readFile(resolve(repoRoot, "index.html"), "utf8"),
+    readJson(resolve(repoRoot, "data/patch-notes.json")),
   ]);
   const artifacts = [
     ...SEO_PAGE_DEFINITIONS.map((definition) => ({
@@ -31,7 +32,7 @@ if (unknownArguments.length) {
     })),
     ...APP_ROUTE_DEFINITIONS.map((definition) => ({
       path: resolve(repoRoot, definition.path, "index.html"),
-      content: renderAppRoutePage(definition, homepageHtml),
+      content: renderAppRoutePage(definition, homepageHtml, { patchNotes }),
     })),
     {
       path: resolve(repoRoot, "sitemap.xml"),

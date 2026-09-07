@@ -1,4 +1,5 @@
-import { APP_ROUTE_ENTRIES, routeHref } from "../js/routes.js";
+import { APP_ROUTE_ENTRIES, SITE_NAV_ITEMS, routeHref } from "../js/routes.js";
+import { renderPatchNotesContent } from "./patch-notes-page.mjs";
 
 const SITE_ROOT = "https://hellonoa.github.io/alcanthia_fan/";
 const OFFICIAL_SITE = "https://www.alcanthia.com/";
@@ -6,6 +7,12 @@ const HOME_TITLE = "알칸시아 공략·도감·계산기 | 이끼제리 팬페
 const HOME_DESCRIPTION = "알칸시아 작물·포션·스킬·몬스터·모험가 도감과 텃밭 배치, 스킬트리, 계산기를 제공하는 비공식 팬페이지입니다.";
 
 const ROUTE_METADATA = Object.freeze({
+  "patch-notes": {
+    title: "알칸시아 패치내역·업데이트 | 이끼제리 팬페이지",
+    heading: "알칸시아 패치내역",
+    description: "알칸시아 공식 본서버의 업데이트와 오류 수정 내역을 날짜별로 확인하고 검색할 수 있는 비공식 팬페이지입니다.",
+    indexable: true,
+  },
   garden: {
     title: "알칸시아 텃밭 조회 | 이끼제리 팬페이지",
     heading: "알칸시아 텃밭 조회",
@@ -164,7 +171,7 @@ export const INDEXABLE_APP_ROUTE_DEFINITIONS = Object.freeze(
 
 const DEFINITION_BY_ROUTE = new Map(APP_ROUTE_DEFINITIONS.map((definition) => [definition.route, definition]));
 
-export function renderAppRoutePage(definition, homepageHtml) {
+export function renderAppRoutePage(definition, homepageHtml, { patchNotes } = {}) {
   if (!definition?.title || !definition?.description || !definition?.canonical) {
     throw new Error(`완전하지 않은 앱 경로 SEO 정의: ${definition?.route || "알 수 없음"}`);
   }
@@ -208,7 +215,11 @@ export function renderAppRoutePage(definition, homepageHtml) {
       `\n  <script type="application/ld+json">${structuredData}</script>`,
     )
     .replace("<body data-route=\"garden\">", `<body class="app-route-page" data-route="${definition.route}">`)
-    .replace('<main id="view"></main>', renderStaticRouteContent(definition))
+    .replace('<nav id="tabs" class="site-tabs" aria-label="주요 메뉴"></nav>',
+      definition.route === "patch-notes"
+        ? `<nav id="tabs" class="site-tabs" aria-label="주요 메뉴">${SITE_NAV_ITEMS.map(({ key, label }) => `<a href="${routeHref(key)}"${key === "patch-notes" ? ' class="active" aria-current="page"' : ""}>${label}</a>`).join("")}</nav>`
+        : '<nav id="tabs" class="site-tabs" aria-label="주요 메뉴"></nav>')
+    .replace('<main id="view"></main>', definition.route === "patch-notes" ? renderPatchNotesContent(patchNotes) : renderStaticRouteContent(definition))
     .replace(/\n  <section class="home-seo-intro"[\s\S]*?<\/section>/, "");
 }
 

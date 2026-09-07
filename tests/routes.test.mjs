@@ -32,6 +32,7 @@ test("top-level navigation resolves to real directories", () => {
     "random/",
     "skilltree/",
     "calc/",
+    "patch-notes/",
   ]);
   for (const { key } of SITE_NAV_ITEMS) assert.equal(routeHref(key).includes("#"), false);
 });
@@ -57,9 +58,9 @@ test("legacy fragment routes map to their real-path destinations", () => {
 
 test("generated app route entries are complete and match committed files", () => {
   const homepage = readRepoFile("index.html");
-  assert.equal(APP_ROUTE_ENTRIES.length, 22);
+  assert.equal(APP_ROUTE_ENTRIES.length, 23);
   assert.equal(APP_ROUTE_DEFINITIONS.length, APP_ROUTE_ENTRIES.length);
-  assert.equal(INDEXABLE_APP_ROUTE_DEFINITIONS.length, 17);
+  assert.equal(INDEXABLE_APP_ROUTE_DEFINITIONS.length, 18);
   assert.equal(new Set(APP_ROUTE_ENTRIES.map(({ path }) => path)).size, APP_ROUTE_ENTRIES.length);
   assert.equal(APP_ROUTE_ENTRIES.some(({ path }) => path === "calc/brew"), false);
   assert.equal(APP_ROUTE_ENTRIES.some(({ path }) => path === "quests/daily"), false);
@@ -71,7 +72,7 @@ test("generated app route entries are complete and match committed files", () =>
   }
 
   for (const definition of APP_ROUTE_DEFINITIONS) {
-    const generated = renderAppRoutePage(definition, homepage);
+    const generated = renderAppRoutePage(definition, homepage, { patchNotes: JSON.parse(readRepoFile("data/patch-notes.json")) });
     assert.equal(readRepoFile(`${definition.path}/index.html`), generated, `${definition.path} must be regenerated`);
     assert.match(generated, new RegExp(`<body class="app-route-page" data-route="${definition.route}">`));
     assert.match(generated, new RegExp(`<title>${escapeRegExp(definition.title)}<\\/title>`));

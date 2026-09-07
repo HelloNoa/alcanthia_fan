@@ -24,6 +24,7 @@ sitemap.xml          홈페이지·정적 도감·공개 공략 도구의 색인
 - 💹 **거래소**: 아이템별 시세 / 매수·매도 호가창 / 캔들 차트
 - 🗺️ **거주민**: 존별 공개 플레이어 목록 → 텃밭 바로보기
 - 🏆 **랭킹**: 전역 랭킹 표
+- 📢 **패치내역**: 공식 본서버 업데이트·오류 수정 내역, 날짜/내용 검색, 최신순 보기
 
 ## 로컬 실행
 ES 모듈이라 `file://` 로는 안 되고 정적 서버가 필요함.
@@ -39,9 +40,30 @@ python3 -m http.server 5500
 
 ## 배포 (GitHub Pages)
 1. 이 폴더를 레포 루트로 push
-2. Settings → Pages → Branch: main / root
+2. Settings → Pages → Build and deployment → Source: **GitHub Actions** (기존 main / root 방식에서 한 번 변경)
 3. 프록시(`alcanthia_worker`)는 공개 주소로 배포하고, 그 주소를 우상단 proxy 에 설정
 4. 프록시의 `.env` `ALLOWED_ORIGIN` 을 팬페이지 도메인으로 (CORS)
+
+`.github/workflows/pages.yml`이 `main` push, 수동 실행, 15분 간격 예약 실행을 처리한다. 변경 후 Actions에서 **Sync patch notes and deploy Pages → Run workflow**로 최초 배포를 확인한다. 별도 PAT/유료 러너는 필요하지 않다. `contents: read`, `pages: write`, `id-token: write` 권한만 사용하며 저장소에 자동 커밋하지 않는다.
+
+### 공식 패치내역 자동 수집
+
+- **본서버만** 수집: `https://game.alcanthia.com/api/version`으로 버전을 확인하고, 바뀌었을 때 공식 HTML이 가리키는 게임 번들에서 `date / highlights / fixes`만 추출한다. 게임 JS는 실행하지 않는다. 테스트 서버 내역이나 게임 수치 데이터는 갱신하지 않는다.
+- 매시 **7·22·37·52분(UTC, 한국도 같은 분)** 확인. GitHub 예약 실행은 지연/누락될 수 있으며 공개 저장소 활동이 60일 없으면 예약이 비활성화될 수 있다.
+- 마지막으로 **배포에 성공한** `data/patch-notes.json`을 기준으로 비교한다. 버전이 같으면 큰 번들 다운로드와 예약 배포를 건너뛴다. 버전이 바뀌면 정적 HTML·사이트맵을 재생성하고 전체 테스트를 통과한 뒤 배포한다. push/수동 실행은 버전이 같아도 사이트 변경을 배포한다.
+- 수집/검증/배포 실패 시 기존 사이트와 패치내역을 유지한다. 실패한 새 버전은 다음 예약 실행에서 다시 시도한다. 파싱 형식이 달라지면 Actions 실패 로그를 확인하고 수집기를 수정한다.
+- 배포된 JSON이 최신 기록이며 저장소의 JSON은 로컬 미리보기용 기준 자료다. 공개 파일만 별도 폴더에 복사해 배포하므로 `.git`, 개발 도구, `raid-recommender/`는 포함하지 않는다. 아티팩트 보관은 1일이다.
+
+로컬에서 최신 내역을 반영하려면:
+
+```bash
+node scripts/sync-patch-notes.mjs
+node scripts/generate-seo-pages.mjs
+node scripts/generate-seo-pages.mjs --check
+node --test tests/*.test.mjs
+```
+
+`/patch-notes/`에서 확인한다. 모든 패치 문구는 정적 HTML에도 포함되어 JavaScript 없이 읽을 수 있고, JavaScript를 켜면 검색할 수 있다. `--force`는 같은 버전도 다시 추출하고, `--deployed`는 배포된 JSON을 기준으로 확인한다. 수집 실패 시 로컬 JSON을 덮어쓰지 않는다.
 
 ## 데이터
 이름/스킨/모험가/스킬/존/폴더색인은 `data/names.json`, 게임 데이터는 `data/gamedata.json` 에 들어있음.

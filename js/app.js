@@ -9,7 +9,8 @@ import { renderCalc } from "./calc.js?v=20260904-clean-routes";
 import { renderPlanner } from "./planner.js?v=20260904-clean-routes";
 import { renderRandomEffects } from "./random_effects.js";
 import { itemIcon, adventurerIcon } from "./sprites.js";
-import { SITE_NAV_ITEMS, legacyRouteFromHash, routeHref } from "./routes.js?v=20260904-clean-routes";
+import { SITE_NAV_ITEMS, legacyRouteFromHash, routeHref } from "./routes.js?v=20260908-patch-notes";
+import { mountPatchNotes } from "./patch-notes.js";
 
 const view = document.getElementById("view");
 const $ = (s, r = document) => r.querySelector(s);
@@ -614,6 +615,7 @@ const TAB_RUNNERS = {
   random: () => renderRandomEffects(view),
   skilltree: () => renderSkillTree(view),
   calc: (sub) => renderCalc(view, sub),
+  "patch-notes": () => mountPatchNotes(view),
 };
 const TABS = Object.fromEntries(SITE_NAV_ITEMS.map(({ key, label }) => [
   key,

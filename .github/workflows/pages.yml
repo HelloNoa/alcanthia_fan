@@ -1,0 +1,62 @@
+name: Sync patch notes and deploy Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Every 15 minutes, away from the busy start of each hour (UTC).
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Always publish the current main, including when a queued run starts.
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check official production patch notes
+        id: sync
+        run: node scripts/sync-patch-notes.mjs --deployed
+      - name: Generate and verify public pages
+        if: github.event_name != 'schedule' || steps.sync.outputs.changed == 'true'
+        run: |
+          node scripts/generate-seo-pages.mjs
+          node scripts/generate-seo-pages.mjs --check
+          node --test tests/*.test.mjs
+          node scripts/prepare-pages.mjs "$RUNNER_TEMP/alcanthia-pages"
+      - name: Configure Pages
+        if: github.event_name != 'schedule' || steps.sync.outputs.changed == 'true'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Upload public site
+        if: github.event_name != 'schedule' || steps.sync.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/alcanthia-pages
+          retention-days: 1
+      - name: Deploy Pages
+        if: github.event_name != 'schedule' || steps.sync.outputs.changed == 'true'
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

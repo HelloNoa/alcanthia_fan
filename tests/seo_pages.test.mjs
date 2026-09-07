@@ -195,7 +195,7 @@ test("sitemap contains every indexable canonical URL and excludes noindex routes
   const xml = renderSitemap(sitemapDefinitions);
   assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
   assert.equal(xml.includes("#"), false);
-  assert.equal((xml.match(/<loc>/g) || []).length, 24);
+  assert.equal((xml.match(/<loc>/g) || []).length, 25);
   assert.match(xml, new RegExp(`<loc>${escapeRegExp(siteRoot)}<\\/loc>`));
   for (const definition of sitemapDefinitions) {
     assert.match(xml, new RegExp(`<loc>${escapeRegExp(definition.canonical)}<\\/loc>`));

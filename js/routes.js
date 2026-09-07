@@ -10,6 +10,7 @@ export const SITE_NAV_ITEMS = Object.freeze([
   { key: "random", label: "🎲 확률표" },
   { key: "skilltree", label: "🌳 스킬트리" },
   { key: "calc", label: "🧮 계산기" },
+  { key: "patch-notes", label: "📢 패치내역" },
 ].map((item) => Object.freeze(item)));
 
 export const CALC_ROUTE_KEYS = Object.freeze(["brew", "time", "level", "ev", "adv", "raid"]);
