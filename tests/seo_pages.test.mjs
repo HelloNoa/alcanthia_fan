@@ -31,7 +31,7 @@ test("every public page promotes the same clearly unofficial Discord community",
     const banner = banners[0][0];
     assert.match(banner, /알칸시아 사설 디스코드/);
     assert.match(banner, /이끼제리에서 운영하는 비공식 커뮤니티/);
-    assert.match(banner, /<a[^>]*href="https:\/\/discord\.gg\/jb8uWuEnQ"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+    assert.match(banner, /<a[^>]*href="https:\/\/discord\.gg\/tBz3KXSvR"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
     assert.match(banner, /디스코드 참여/);
     assert.doesNotMatch(banner, /<iframe|<script/);
     assert.ok(html.indexOf(banner) < html.indexOf("<main"), `${path} must show the invitation above page content`);
