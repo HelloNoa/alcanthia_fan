@@ -6,6 +6,7 @@ const {
   farmersBatonCovers,
   farmersBatonRange,
   plannerEmitterRange,
+  plannerConditionMap,
   plannerCanStackCauldron,
   plannerCompressShareCode,
   plannerDecompressShareCode,
@@ -120,6 +121,64 @@ assert.equal(plannerEmitterRange("fairy_lantern", 10, 0, true), 1);
 assert.equal(plannerEmitterRange("sunlight_flower", 5, 0, true), 6);
 assert.equal(plannerEmitterRange("poison_flower", 3, 0, false), 1);
 assert.equal(plannerEmitterRange("dew_root", 3, 2, true), 6);
+
+// Root barriers block ground effects from either stored side of a shared edge.
+const effectGrid = () => Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ p: null })));
+for (const [side, opposite, dr, dc] of [["t", "b", -1, 0], ["r", "l", 0, 1], ["b", "t", 1, 0], ["l", "r", 0, -1]]) {
+  for (const targetSide of [false, true]) {
+    for (const fence of ["root_barrier", { code: "root_barrier", enhancement: 4, variantId: "root_barrier:swamp_thicket" }]) {
+      const grid = effectGrid();
+      grid[2][2] = { p: "poison_flower" };
+      const target = grid[2 + dr][2 + dc];
+      target.p = "herb";
+      assert.equal(plannerConditionMap(grid)[2 + dr][2 + dc].has("poisonous"), true);
+      (targetSide ? target : grid[2][2]).fences = { [targetSide ? opposite : side]: fence };
+      assert.equal(plannerConditionMap(grid)[2 + dr][2 + dc].has("poisonous"), false, `${side}, targetSide=${targetSide}`);
+    }
+  }
+}
+
+for (const code of ["rustic_fence", "flower_trellis_arch"]) {
+  const grid = [[{ p: "poison_flower", fences: { r: { code } } }, { p: "herb" }]];
+  assert.equal(plannerConditionMap(grid)[0][1].has("poisonous"), true, code);
+}
+
+// Expanded range follows either one-bend (L-shaped) path, not an arbitrary detour.
+const expandedEffects = effectGrid();
+expandedEffects[2][2] = { p: "poison_flower", e: 4, fences: { r: "root_barrier" } };
+const enhancedEffects = (grid) => plannerConditionMap(grid, { vein: true });
+assert.equal(enhancedEffects(expandedEffects)[2][4].has("poisonous"), false, "straight path blocked");
+assert.equal(enhancedEffects(expandedEffects)[3][3].has("poisonous"), true, "second L-shaped path remains open");
+expandedEffects[2][2].fences.b = "root_barrier";
+assert.equal(enhancedEffects(expandedEffects)[3][3].has("poisonous"), false, "both L-shaped paths blocked");
+delete expandedEffects[2][2].fences;
+expandedEffects[2][3].fences = { r: "root_barrier" };
+expandedEffects[3][2].fences = { b: "root_barrier" };
+assert.equal(enhancedEffects(expandedEffects)[4][4].has("poisonous"), false, "zigzag path does not bypass blocked L-shaped paths");
+expandedEffects[2][3].fences = {};
+assert.equal(enhancedEffects(expandedEffects)[4][4].has("poisonous"), true, "barrier removal recalculates immediately");
+expandedEffects[2][3] = null;
+assert.equal(enhancedEffects(expandedEffects)[4][4].has("poisonous"), false, "uncultivated gap also blocks a ground path");
+expandedEffects[4][3] = { p: "poison_flower" };
+assert.equal(enhancedEffects(expandedEffects)[4][4].has("poisonous"), true, "another unblocked emitter still poisons the target");
+assert.equal(enhancedEffects([[{ p: "poison_flower" }]])[0][0].has("poisonous"), false);
+assert.deepEqual(plannerConditionMap([]), []);
+
+// Humidity and sunlight use the same barrier rule; anti-magic does not.
+for (const [id, condition] of [["dew_root", "humid"], ["sunlight_flower", "sunlit"], ["crystal_fountain", "humid"], ["fairy_lantern", "sunlit"], ["witch_scarecrow", "anti_magic"]]) {
+  const source = { [id.endsWith("flower") || id === "dew_root" ? "p" : "orn"]: id, fences: { r: "root_barrier" } };
+  assert.equal(plannerConditionMap([[source, { p: "herb" }]])[0][1].has(condition), id === "witch_scarecrow", id);
+}
+const localEffects = [[
+  { p: "poison_flower", fences: { r: "root_barrier" } },
+  { p: "herb", cond: ["toxic", "poisonous"], plantCond: ["poisoned"], floor: "water_channel" },
+  { p: "herb", floor: "lava_channel" },
+]];
+const localEffectsBefore = structuredClone(localEffects);
+const localConditions = plannerConditionMap(localEffects, { zone: "misty_swamp" });
+assert.deepEqual([...localConditions[0][1]].sort(), ["humid", "poisonous", "toxic"]);
+assert.deepEqual([...localConditions[0][2]], ["arid"]);
+assert.deepEqual(localEffects, localEffectsBefore, "barriers do not erase saved conditions or mutate the layout");
 
 assert.equal(plannerInheritanceChance(0, 5), 0);
 assert.equal(plannerInheritanceChance(5, 0), 0);

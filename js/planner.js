@@ -83,6 +83,33 @@ export const plannerEmitterRange = (id, enhancement = 0, rootDom = 0, vein = fal
     : 0;
   return 1 + rootBonus + enhancementBonus;
 };
+export function plannerConditionMap(grid, { rootDom = 0, vein = false, zone = "" } = {}) {
+  const rows = grid.length, cols = grid[0]?.length || 0;
+  const conditions = Array.from({ length: rows }, () => Array.from({ length: cols }, () => new Set()));
+  const groundEffectReaches = plannerGroundEffectChecker(grid);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const cell = grid[r][c];
+    const id = cell?.p || cell?.orn;
+    if (!EMIT[id]) continue;
+    const range = plannerEmitterRange(id, cell.e, rootDom, vein);
+    for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
+      if ((dr === 0 && dc === 0) || Math.abs(dr) + Math.abs(dc) > range) continue;
+      const y = r + dr, x = c + dc;
+      if (y < 0 || y >= rows || x < 0 || x >= cols) continue;
+      if (id !== "witch_scarecrow" && !groundEffectReaches(r, c, y, x)) continue;
+      conditions[y][x].add(EMIT[id]);
+    }
+  }
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    (grid[r][c]?.cond || []).forEach((condition) => conditions[r][c].add(condition));
+    const floor = grid[r][c]?.floor;
+    if (floor === "water_channel") conditions[r][c].add("humid");
+    else if (floor === "lava_channel") conditions[r][c].add("arid");
+    if (zone === "misty_swamp") conditions[r][c].add("humid");
+    if (conditions[r][c].has("arid")) conditions[r][c].delete("humid");
+  }
+  return conditions;
+}
 export const plannerInheritanceChance = (plantEnhancement = 0, level = 0) => {
   const enhancement = Math.max(0, Math.floor(Number(plantEnhancement) || 0));
   const skillLevel = Math.max(0, Math.min(5, Math.floor(Number(level) || 0)));
@@ -561,6 +588,33 @@ const fenceData = (raw) => {
   if (variantId) normalized.variantId = variantId;
   return normalized;
 };
+function plannerGroundEffectChecker(grid) {
+  const rows = grid.length, cols = grid[0]?.length || 0;
+  const horizontal = Array.from({ length: rows }, () => new Uint16Array(cols));
+  const vertical = Array.from({ length: cols }, () => new Uint16Array(rows));
+  const isBarrier = (cell, side) => fenceData(cell?.fences?.[side])?.code === "root_barrier";
+  // Count blocked shared edges once per recalculation, including fences stored on either tile.
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols - 1; c++) {
+    const left = grid[r][c], right = grid[r][c + 1];
+    const blocked = !left || !right || isBarrier(left, "r") || isBarrier(right, "l");
+    horizontal[r][c + 1] = horizontal[r][c] + Number(blocked);
+  }
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows - 1; r++) {
+    const top = grid[r][c], bottom = grid[r + 1][c];
+    const blocked = !top || !bottom || isBarrier(top, "b") || isBarrier(bottom, "t");
+    vertical[c][r + 1] = vertical[c][r] + Number(blocked);
+  }
+  return (sourceRow, sourceCol, targetRow, targetCol) => {
+    const top = Math.min(sourceRow, targetRow), bottom = Math.max(sourceRow, targetRow);
+    const left = Math.min(sourceCol, targetCol), right = Math.max(sourceCol, targetCol);
+    // In-game ground propagation checks the two one-bend paths, not arbitrary BFS detours.
+    const verticalFirst = vertical[sourceCol][bottom] === vertical[sourceCol][top]
+      && horizontal[targetRow][right] === horizontal[targetRow][left];
+    const horizontalFirst = horizontal[sourceRow][right] === horizontal[sourceRow][left]
+      && vertical[targetCol][bottom] === vertical[targetCol][top];
+    return verticalFirst || horizontalFirst;
+  };
+}
 const OPPOSITE_SIDE = { t: "b", r: "l", b: "t", l: "r" };
 const SIDE_STEP = {
   t: [-1, 0],
@@ -1271,11 +1325,6 @@ export async function renderPlanner(view) {
     }
   };
 
-  const emitterOf = (cell) => {
-    if (!cell) return null;
-    const id = cell.p || cell.orn;
-    return id && EMIT[id] ? { id, emit: EMIT[id], e: cell.e || 0 } : null;
-  };
   const plantAt = (r, c) => { const z = grid[r][c]; return z && z.p ? z : null; };
   const effectivePlantAt = (r, c) => virtualPollMap.get(`${r}:${c}`)?.clone || plantAt(r, c);
   const ornAt = (r, c) => { const z = grid[r][c]; return z && z.orn ? z : null; };
@@ -1298,32 +1347,6 @@ export async function renderPlanner(view) {
     const row = Array.from({ length: CANVAS }, (_, x) => cellRef(r, x));
     const col = Array.from({ length: CANVAS }, (_, y) => cellRef(y, c));
     return (filled(row) ? 1 : 0) + (filled(col) ? 1 : 0);
-  };
-
-  // 조건맵 (범위: 이슬뿌리+뿌리지배, 강화된 식물만 맥읽기 적용)
-  const buildConds = () => {
-    condMap = Array.from({ length: CANVAS }, () => Array.from({ length: CANVAS }, () => new Set()));
-    for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) {
-      const em = emitterOf(grid[r][c]);
-      if (!em) continue;
-      const range = plannerEmitterRange(em.id, em.e, opt.rootDom, opt.vein);
-      for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
-        if ((dr === 0 && dc === 0) || Math.abs(dr) + Math.abs(dc) > range) continue;
-        const y = r + dr, x = c + dc;
-        if (y < 0 || y >= CANVAS || x < 0 || x >= CANVAS) continue;
-        condMap[y][x].add(em.emit);
-      }
-    }
-    for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) {
-      (grid[r][c]?.cond || []).forEach((x) => condMap[r][c].add(x));
-      const floor = grid[r][c]?.floor;
-      if (floor === "water_channel") condMap[r][c].add("humid");
-      else if (floor === "lava_channel") {
-        condMap[r][c].add("arid");
-      }
-      if (opt.zone === "misty_swamp") condMap[r][c].add("humid");
-      if (condMap[r][c].has("arid")) condMap[r][c].delete("humid");
-    }
   };
 
   const plantConds = (cell, cond) => {
@@ -1495,7 +1518,7 @@ export async function renderPlanner(view) {
 
   const recompute = () => {
     plannerDeduplicateSharedFences(grid);
-    buildConds();
+    condMap = plannerConditionMap(grid, opt);
     buildBatonMap();
     virtualPollMap = pollTargets();
     const want = computeWin();
