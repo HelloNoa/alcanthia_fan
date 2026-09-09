@@ -74,24 +74,50 @@ const EMIT = {
 const RANGE_SCALING_PLANT_EMITTERS = new Set([
   "dew_root", "sunlight_flower", "poison_flower",
 ]);
-export const plannerEmitterRange = (id, enhancement = 0, rootDom = 0, vein = false) => {
+const RANGE_SCALING_ORNAMENT_EMITTERS = new Set(["crystal_fountain", "fairy_lantern"]);
+const SELF_EFFECT_EMITTERS = new Set(["sunlight_flower", "crystal_fountain", "fairy_lantern"]);
+export const plannerEffectivePlantEnhancement = (cell, conditions) => (
+  Math.max(0, Math.floor(Number(cell?.e) || 0))
+  + Number(Boolean(cell?.p && conditions?.has("composted")))
+);
+export const plannerEmitterRange = (id, enhancement = 0, rootDom = 0, vein = false, {
+  mossJelly = false, venom = false, composted = false,
+} = {}) => {
+  const level = Math.max(0, Math.floor(Number(enhancement) || 0));
+  if (RANGE_SCALING_ORNAMENT_EMITTERS.has(id)) return 1 + level;
   const rootBonus = id === "dew_root"
-    ? Math.max(0, Math.floor(Number(rootDom) || 0))
+    ? Math.max(0, Math.min(2, Math.floor(Number(rootDom) || 0)))
     : 0;
   const enhancementBonus = vein && RANGE_SCALING_PLANT_EMITTERS.has(id)
-    ? Math.max(0, Math.floor(Number(enhancement) || 0))
+    ? level + Number(Boolean(composted))
     : 0;
-  return 1 + rootBonus + enhancementBonus;
+  const potionBonus = Number(Boolean((id === "dew_root" && mossJelly) || (id === "poison_flower" && venom)));
+  return 1 + rootBonus + enhancementBonus + potionBonus;
 };
-export function plannerConditionMap(grid, { rootDom = 0, vein = false, zone = "" } = {}) {
+export function plannerConditionMap(grid, {
+  rootDom = 0, vein = false, zone = "", mossJelly = false, venom = false, compost = false,
+} = {}) {
   const rows = grid.length, cols = grid[0]?.length || 0;
   const conditions = Array.from({ length: rows }, () => Array.from({ length: cols }, () => new Set()));
   const groundEffectReaches = plannerGroundEffectChecker(grid);
+  // Supply is an explicit simulation assumption, not inferred from placing an empty bin.
+  // Compute compost first: its non-stacking +1 enhancement can expand plant emitters.
+  if (compost) for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (grid[r][c]?.orn !== "compost_bin") continue;
+    conditions[r][c].add("composted");
+    for (const [dr, dc] of Object.values(SIDE_STEP)) {
+      const y = r + dr, x = c + dc;
+      if (grid[y]?.[x] && groundEffectReaches(r, c, y, x)) conditions[y][x].add("composted");
+    }
+  }
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const cell = grid[r][c];
     const id = cell?.p || cell?.orn;
     if (!EMIT[id]) continue;
-    const range = plannerEmitterRange(id, cell.e, rootDom, vein);
+    const range = plannerEmitterRange(id, cell.e, rootDom, vein, {
+      mossJelly, venom, composted: conditions[r][c].has("composted"),
+    });
+    if (SELF_EFFECT_EMITTERS.has(id)) conditions[r][c].add(EMIT[id]);
     for (let dr = -range; dr <= range; dr++) for (let dc = -range; dc <= range; dc++) {
       if ((dr === 0 && dc === 0) || Math.abs(dr) + Math.abs(dc) > range) continue;
       const y = r + dr, x = c + dc;
@@ -243,7 +269,7 @@ const plannerPlantSkinLabel = (plantId, skinId, displayName = "", plantName = ""
     || suffix.split("_").filter(Boolean).join(" ")
     || skinId;
 };
-const COND_KR = { humid: "습기", fertile: "비옥", toxic: "독성 토양", poisonous: "유독(중독 부여)", sunlit: "햇살", anti_magic: "항마", arid: "사막화" };
+const COND_KR = { humid: "습기", fertile: "비옥", toxic: "독성 토양", poisonous: "유독(중독 부여)", sunlit: "햇살", anti_magic: "항마", arid: "사막화", composted: "퇴비 (식물 강화도 +1)" };
 const COND_COLOR = { humid: "#3b6ea5", fertile: "#47b96b", toxic: "#6a9f3a", poisonous: "#8f5ac8", sunlit: "#d9a92e", anti_magic: "#9b6cff", arid: "#c26b2c" };
 const COND_ORDER = ["humid", "fertile", "toxic", "poisonous", "sunlit", "anti_magic", "arid"];  // 중첩 테두리 순서(고정)
 const PLANT_COND_KR = { poisoned: "중독", poison_immune: "중독 면역", encroached: "잠식", frozen: "결빙", anti_magic: "항마" };
@@ -911,8 +937,9 @@ export async function renderPlanner(view) {
   const selectedSkins = new Map();
   const selectedVariants = new Map();
   let badgesVisible = loadBadgeVisibility();
-  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, sunsetRipen: false, echoResonance: false, rootDom: 0, vein: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, inheritance: 0, revival: 0, uptime: 100, gust: false };
+  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, sunsetRipen: false, echoResonance: false, rootDom: 0, vein: false, mossJelly: false, venom: false, compost: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, inheritance: 0, revival: 0, uptime: 100, gust: false };
   let condMap = null;
+  let detailCell = null;
 
   view.innerHTML = `<h2>🌿 텃밭 배치 테스트</h2>
     <p class="muted">개간으로 흙을 깔고 작물·장식물을 배치 · 인접효과/생산량 실시간 계산</p>
@@ -959,8 +986,13 @@ export async function renderPlanner(view) {
           <label class="chk" id="pl-echo-resonance-wrap" style="display:none" title="공명포션으로 같은 종의 생산 진행도를 맞춘 뒤 종별 수확 시점을 최대한 분리하는 경우"><input type="checkbox" id="pl-echo-resonance"> 공명포션으로 종별 수확 타이밍 분리</label>
           <div class="muted">지역효과 계수 <b id="pl-zone-coeff">0.00</b></div>
           <div class="pl-zone-note" id="pl-zone-note">${zoneNoteHtml(opt)}</div>
+          <div class="pl-sksec">효과 범위 <span class="muted">(거리 = 가로 이동 + 세로 이동)</span></div>
           <label class="lvlabel">뿌리 지배 <input id="pl-root" type="range" min="0" max="2" value="0"><b id="pl-rootv">0</b></label>
           <label class="chk"><input type="checkbox" id="pl-vein"> 맥읽기 (강화만큼 범위↑)</label>
+          <label class="chk"><input type="checkbox" id="pl-moss-jelly"> 이끼젤리 (이슬뿌리 거리 +1)</label>
+          <label class="chk"><input type="checkbox" id="pl-venom"> 맹독포션 (독꽃 거리 +1)</label>
+          <label class="chk" title="배치한 모든 퇴비함에 재료를 계속 공급한다고 가정합니다. 빈 퇴비함은 효과가 없습니다."><input type="checkbox" id="pl-compost"> 퇴비함 재료 공급 가정 (인접 식물 +1)</label>
+          <p class="muted">수정 분수·요정 등불 거리 = 강화도 +1. 퇴비는 중첩되지 않으며 뿌리장벽에 막힙니다. 범위·생산 보너스 설정은 저장·공유되지 않습니다.</p>
           <label class="chk"><input type="checkbox" id="pl-sturdy"> 단단한 줄기 (강화 작물 최대생산 ×(강화+1))</label>
           <div class="pl-sksec">생산 스킬 <span class="muted">(시간·토양은 강화도별 중첩)</span></div>
           <label class="lvlabel">시간 숙련 <input id="pl-time" type="range" min="0" max="10" value="0"><b id="pl-timev">0</b></label>
@@ -1398,12 +1430,13 @@ export async function renderPlanner(view) {
     // 통합 공식: 한 생애 maxHarvests개를 (성장시간 + maxHarvests×생산간격) 동안 생산 (재배 반복 가정)
     // → 간격 큰 작물(밤그늘뿌리=1시간)은 간격 제한, 간격 작은 작물(약초)은 성장시간 제한이 자동 적용
     // 스킬: 시간숙련(생산간격↓), 토양숙련(성장시간↓) — (1-rate×Lv)^(강화+1) 곱연산
-    const e1 = (z.e || 0) + 1;
+    const effectiveEnhancement = plannerEffectivePlantEnhancement(z, cond);
+    const e1 = effectiveEnhancement + 1;
     const intervalEff = (prod?.interval_ms || 0) * Math.pow(Math.max(0, 1 - 0.01 * opt.timeM), e1);
     const growEff = P.growTime_ms * Math.pow(Math.max(0, 1 - 0.05 * opt.soilM), e1) * (cond.has("fertile") ? 0.5 : 1);
     const baseH = (P.maxHarvests == null || !isFinite(P.maxHarvests)) ? 1e9 : P.maxHarvests;
     // 단단한 줄기: 강화 작물(e>0)의 최대생산 ×(강화+1)
-    const sturdyHarvests = (opt.sturdy && (z.e || 0) > 0 && isFinite(baseH)) ? baseH * ((z.e || 0) + 1) : baseH;
+    const sturdyHarvests = (opt.sturdy && effectiveEnhancement > 0 && isFinite(baseH)) ? baseH * e1 : baseH;
     const harvests = opt.zone === "golden_fields" && isFinite(sturdyHarvests)
       ? Math.floor(sturdyHarvests * (1 + 0.5 * zc))
       : sturdyHarvests;
@@ -1424,7 +1457,7 @@ export async function renderPlanner(view) {
     const outputCode = nativeRipen?.itemCode || prod?.itemCode;
     // 작물 강화도는 유전 확률에만 관여하며 산물 강화도로 직접 이어지지 않는다.
     const outputEnh = ripened && !nativeRipen ? 1 : 0;
-    const inheritanceChance = plannerInheritanceChance(z.e, opt.inheritance);
+    const inheritanceChance = plannerInheritanceChance(effectiveEnhancement, opt.inheritance);
     const cycle = ripened
       ? plannerRipenedCycleMs({
           growTimeMs: growEff,
@@ -1440,7 +1473,7 @@ export async function renderPlanner(view) {
       : 0;
     const perHour = harvestEventsPerHour * m * plentyMultiplier(opt);
     return {
-      ...z, P, cond, plantCond, same, diversity, crystalBonus, m, prod, gated, paused,
+      ...z, P, cond, plantCond, same, diversity, crystalBonus, m, prod, gated, paused, effectiveEnhancement,
       zoneCoeff: zc,
       dryBlocked: aridBlocked, aridBlocked, toxicBlocked,
       waterKilled, fireProtected: waterKills(z.p, P) && cond.has("arid"),
@@ -1480,7 +1513,8 @@ export async function renderPlanner(view) {
     for (const [code, amount] of source) addHarvestEvents(target, code, amount);
     return target;
   };
-  const propagatedEnh = (src, wind) => opt.vein ? Math.min(src.e || 0, wind.e || 0) : 0;
+  const propagatedEnh = (src, wind, windCond) => opt.vein
+    ? Math.min(src.e || 0, plannerEffectivePlantEnhancement(wind, windCond)) : 0;
   const pollTargets = () => {
     const targets = new Map();
     for (let r = 0; r < CANVAS; r++) for (let c = 0; c < CANVAS; c++) {
@@ -1506,7 +1540,7 @@ export async function renderPlanner(view) {
           tr, tc, sr, sc, wind, src,
           clone: {
             p: src.p,
-            e: propagatedEnh(src, wind),
+            e: propagatedEnh(src, wind, condMap[r][c]),
             ...(src.skinId ? { skinId: src.skinId } : {}),
             ...(plantCond.length ? { plantCond } : {}),
           },
@@ -1661,6 +1695,7 @@ export async function renderPlanner(view) {
     applyEchoProduction(pollResult.totals, allHarvestEvents);
     renderSummary(totals, planted, tilled, blockedProduction);
     renderPollSum(pollResult.totals);
+    if (detailCell) showDetail(...detailCell);
   };
 
   const renderSummary = (totals, planted, tilled, blockedProduction = 0) => {
@@ -1736,6 +1771,16 @@ export async function renderPlanner(view) {
 
   const soilCondTxt = (cond) => [...(cond || [])].map((x) => COND_KR[x] || x).join(", ") || "없음";
   const plantCondTxt = (pc) => [...(pc || [])].map((x) => PLANT_COND_KR[x] || x).join(", ") || "없음";
+  const effectRangeHtml = (cell, conditions) => {
+    const id = cell?.p || cell?.orn;
+    if (!EMIT[id]) return "";
+    const range = plannerEmitterRange(id, cell.e, opt.rootDom, opt.vein, {
+      mossJelly: opt.mossJelly, venom: opt.venom, composted: conditions?.has("composted"),
+    });
+    const barrierNote = id === "witch_scarecrow" ? "항마는 뿌리장벽에 차단되지 않습니다."
+      : "뿌리장벽과 미개간 칸에 따라 실제 도달 칸이 줄어듭니다.";
+    return `<div class="d-row" title="가로 이동 + 세로 이동 거리. 대각선 한 칸은 거리 2입니다. ${barrierNote}">효과 거리 <b>${range}칸</b> <span class="muted">(가로 + 세로)</span></div>`;
+  };
   const fenceDetailHtml = (cell) => {
     const entries = SIDES.map((side) => {
       const fence = fenceData(cell?.fences?.[side]);
@@ -1758,6 +1803,7 @@ export async function renderPlanner(view) {
   };
 
   const showDetail = (r, c) => {
+    detailCell = [r, c];
     const cell = grid[r][c];
     const orn = ornAt(r, c);
     const floorAppearanceHtml = cell?.floor
@@ -1810,9 +1856,10 @@ export async function renderPlanner(view) {
             : `<div class="d-row muted">올린 가마솥 없음</div>`}`;
       } else {
         const enhancementLine = `<div class="d-row">강화 <b>+${orn.e || 0}</b></div>`;
-        eff = enhancementLine + (EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>`
+        eff = enhancementLine + (EMIT[orn.orn] ? `<div class="d-row">효과 <b>${COND_KR[EMIT[orn.orn]]} 부여</b></div>${effectRangeHtml(orn, condMap?.[r]?.[c])}`
           : ORN_NOTE[orn.orn] ? `<div class="d-row">${ORN_NOTE[orn.orn]}</div>`
           : `<div class="d-row muted">장식 (효과 없음)</div>`);
+        if (orn.orn === "compost_bin") eff += `<div class="d-row">재료 공급 가정 <b>${opt.compost ? "가동 중 · 자신과 상하좌우 1칸에 퇴비 부여" : "꺼짐 · 퇴비 효과 없음"}</b></div>`;
       }
       const enhTitle = plannerOrnamentSupportsEnhancement(orn.orn) && (orn.e || 0) > 0
         ? ` <span class="pl-enhb-inl">+${orn.e}</span>` : "";
@@ -1882,15 +1929,17 @@ export async function renderPlanner(view) {
       <div class="d-row">식물 상태 <b>${plantCondTxt(st.plantCond)}</b></div>
       <div class="d-row">같은 이웃 <b>${st.same}</b> · 이웃 종류 <b>${st.diversity}</b>${st.P.oneShot ? ' <span class="muted">(과밀 면제)</span>' : st.crystalBonus > 0 ? ' <span class="muted">(수정갱도 한 줄 · 과밀 무시)</span>' : ""}</div>
       <div class="d-row">생산 배율 <b class="${st.m > 1 ? "up" : st.m < 1 ? "down" : ""}">×${st.m.toFixed(2)}</b></div>
+      ${effectRangeHtml(st, st.cond)}
       ${fenceDetailHtml(cell)}`;
+    if (st.cond.has("composted")) lines += `<div class="d-row up">유효 강화도 <b>+${st.effectiveEnhancement}</b> <span class="muted">(기본 +${st.e || 0} · 퇴비 +1)</span></div>`;
     if (st.crystalBonus > 0) lines += `<div class="d-row up">수정갱도 배치 <b>+${Math.round(st.crystalBonus * 20 * st.zoneCoeff)}%</b> <span class="muted">(계수 ${st.zoneCoeff.toFixed(2)})</span></div>`;
     if (st.fireProtected) lines += `<div class="d-row up">사막화로 물 공급 차단 <span class="muted">(불씨덩굴 보호)</span></div>`;
     if (st.prod) {
       const blocked = autoHarvestBlocked(st);
       const inf = st.P.maxHarvests == null || !isFinite(st.P.maxHarvests);
-      const boosted = opt.sturdy && (st.e || 0) > 0 && !inf;
+      const boosted = opt.sturdy && st.effectiveEnhancement > 0 && !inf;
       const life = inf ? "무한"
-        : boosted ? `${st.P.maxHarvests}회 → <b class="up">${Math.round(st.harvests)}회</b> <span class="muted">(단단한 줄기 ×${(st.e || 0) + 1})</span>`
+        : boosted ? `${st.P.maxHarvests}회 → <b class="up">${Math.round(st.harvests)}회</b> <span class="muted">(단단한 줄기 ×${st.effectiveEnhancement + 1})</span>`
         : `${Math.round(st.harvests)}회`;
       lines += st.prod.interval_ms >= 1000
         ? `<div class="d-row">생산주기 <b>${fmtDuration(st.prod.interval_ms)}</b> · 수명 ${life}</div>`
@@ -2027,6 +2076,9 @@ export async function renderPlanner(view) {
   };
   view.querySelector("#pl-root").oninput = (e) => { opt.rootDom = +e.target.value; view.querySelector("#pl-rootv").textContent = opt.rootDom; recompute(); };
   view.querySelector("#pl-vein").onchange = (e) => { opt.vein = e.target.checked; recompute(); };
+  for (const [id, key] of [["pl-moss-jelly", "mossJelly"], ["pl-venom", "venom"], ["pl-compost", "compost"]]) {
+    view.querySelector(`#${id}`).onchange = (e) => { opt[key] = e.target.checked; recompute(); };
+  }
   view.querySelector("#pl-sturdy").onchange = (e) => { opt.sturdy = e.target.checked; recompute(); };
   view.querySelector("#pl-gust").onchange = (e) => { opt.gust = e.target.checked; recompute(); };
   const skSlider = (id, key) => view.querySelector(id).oninput = (e) => {

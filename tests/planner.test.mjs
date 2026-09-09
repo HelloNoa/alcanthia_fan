@@ -116,8 +116,8 @@ assert.deepEqual(plannerStackedCauldronData({ itemCode: "rune_cauldron", e: 99 }
 assert.equal(plannerStackedCauldronData({ code: "cauldron_controller", enhancement: 3 }), null);
 
 assert.equal(plannerEmitterRange("witch_scarecrow", 10, 0, true), 1);
-assert.equal(plannerEmitterRange("crystal_fountain", 10, 0, true), 1);
-assert.equal(plannerEmitterRange("fairy_lantern", 10, 0, true), 1);
+assert.equal(plannerEmitterRange("crystal_fountain", 10, 0, true), 11);
+assert.equal(plannerEmitterRange("fairy_lantern", 10, 0, true), 11);
 assert.equal(plannerEmitterRange("sunlight_flower", 5, 0, true), 6);
 assert.equal(plannerEmitterRange("poison_flower", 3, 0, false), 1);
 assert.equal(plannerEmitterRange("dew_root", 3, 2, true), 6);
