@@ -301,6 +301,7 @@ const ORN = {
   levitation_chest: "부유상자", compost_bin: "퇴비함", campfire: "모닥불",
   rustic_fence: "낡은 울타리", root_barrier: "뿌리장벽", pedestal: "전시대",
   whispering_tea_table: "속삭임 찻상", starlight_garden_trophy: "별빛 정원 트로피",
+  garden_sign: "나무 표지판",
 };
 const ENHANCEABLE_ORNAMENTS = new Set(Object.keys(ORN));
 export const plannerOrnamentSupportsEnhancement = (code) =>
@@ -314,6 +315,7 @@ const ORN_NOTE = {
   levitation_chest: "가까운 가마솥의 재료 보관",
   compost_bin: "초당 아이템 1개 소모 · 인접 식물 강화도 +1",
   pedestal: "장비 전시",
+  garden_sign: "아이템 그림이나 짧은 문구로 텃밭 꾸미기",
   mana_sprayer: "인접 식물 포션 공급",
   farmers_baton: "주변 작물 상태 관측 및 관리",
   warding_stone: "은신한 공격자의 선공 확률 감소",
