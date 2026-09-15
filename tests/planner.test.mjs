@@ -378,6 +378,15 @@ assert.deepEqual(importedDuplicateBoundary.grid[0][0].fences, {
 });
 assert.equal(importedDuplicateBoundary.grid[0][1].fences, undefined);
 
+for (const code of ["garden_sign", "guild_foundation_stone", "deep_lens", "leyline_well"]) {
+  const result = plannerGridFromGardenProfile({
+    grid: [[{ cultivated: true, ornament: { items: [{ itemKey: `${code}+3` }] } }]],
+  }, { canvas: 1 });
+  assert.deepEqual(result.grid[0][0], { orn: code, e: 3 });
+  assert.equal(result.stats.ornaments, 1);
+  assert.deepEqual(result.skipped, []);
+}
+
 const importedGarden = plannerGridFromGardenProfile({
   defaultPlantSkins: { herb: "herb_starlit" },
   grid: [
