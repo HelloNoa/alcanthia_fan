@@ -37,6 +37,17 @@ test("rejects executable expressions, ambiguous arrays, invalid fields and trunc
   assert.equal(globalThis.intrusion, undefined);
 });
 
+test("reads mixed patch and announcement entries without evaluating announcement templates", () => {
+  const patch = literal.slice(1, -1).replace("{date:", '{kind:"patch",date:');
+  const announcement = '{kind:"announcement",date:new Date("2026-09-11T12:05:35+09:00"),title:"점검",body:`예정: ${[new Date("2026-09-11")].map(t=>({text:`${t}`})).join(" ~ ")} ${globalThis.intrusion = true}`}';
+  for (const entries of [`${patch},${announcement}`, `${announcement},${patch}`]) {
+    assert.deepEqual(extractPatchNotes(`[${entries}]`), extractPatchNotes(literal));
+  }
+  assert.equal(globalThis.intrusion, undefined);
+  assert.throws(() => extractPatchNotes(`[${announcement.slice(0, -3)},${patch}]`));
+  assert.throws(() => extractPatchNotes(`[${patch.replace('kind:"patch"', 'kind:"unknown"')}]`));
+});
+
 test("entry script is restricted to the official origin and assets", () => {
   assert.equal(findBundleUrl('<script crossorigin src="./assets/index-test.js" type="module"></script>'), bundleUrl);
   for (const src of ['https://evil.test/assets/index.js', '//evil.test/assets/index.js', '/api/admin.js', '/assets/test.js?x=1']) {

@@ -718,6 +718,7 @@ SYNCED_SPECIAL_RECIPE_OUTPUTS = (
     "restored_binding_token", "guild_foundation_stone", "deep_lens", "leyline_well",
     "extraction_catalyst", "onyx_ore", "refined_onyx", "recovery_catalyst",
     "leyline_stitching_needle", "earth_breath", "guardian_censer", "unnamed_key",
+    "garden_sign",
 )
 
 
@@ -836,7 +837,7 @@ def parse_achievements(s):
 
 
 def parse_npcs(s):
-    obj = parent_object(s, 'hestia:{name:"헤스티아",spriteKey:"npc_witch"')
+    obj = parent_object(s, 'hestia:{name:"헤스티아",spriteKey:')
     if not obj:
         return {}
     keep = {"hestia", "doran", "kai", "ella", "moon_priest", "aria", "jake", "miru"}

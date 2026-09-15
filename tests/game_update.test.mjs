@@ -115,6 +115,7 @@ assert.equal(
   true,
 );
 for (const [output, inputs, requiredLevel] of [
+  ["garden_sign", "pedestal,wooden_plank", 3],
   ["levitation_chest", "storage_chest,levitation_core", 3],
   ["compost_bin", "storage_chest,mud", 7],
 ]) {

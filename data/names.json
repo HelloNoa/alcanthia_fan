@@ -188,6 +188,7 @@
 "whispering_tea_table": "속삭임 찻상",
 "starlight_garden_trophy": "별빛 정원 트로피",
 "garden_contest_ticket": "텃밭 콘테스트 참가권",
+"garden_sign": "나무 표지판",
 "pedestal": "전시대",
 "telescope": "망원경",
 "working_shelf": "작업 선반",
@@ -375,6 +376,14 @@
 "tropical_cove": "열대 해변"
 },
 "skins": {
+"crystal_succulent_opal": "crystal_succulent_opal",
+"dew_root_rose_dew": "dew_root_rose_dew",
+"sunlight_flower_rose_sun": "sunlight_flower_rose_sun",
+"poison_flower_monkshood": "poison_flower_monkshood",
+"moonlight_mushroom_pink_lace": "moonlight_mushroom_pink_lace",
+"blue_moss_frost_pearl": "blue_moss_frost_pearl",
+"star_flower_rose_glass": "star_flower_rose_glass",
+"moonlight_mushroom_lollipop": "moonlight_mushroom_lollipop",
 "red_flower_blue_petal": "red_flower_blue_petal",
 "red_flower_yellow_petal": "red_flower_yellow_petal",
 "herb_golden_petal": "herb_golden_petal",
@@ -441,6 +450,14 @@
 "moonlight_mushroom_potted": "moonlight_mushroom_potted"
 },
 "skinNames": {
+"crystal_succulent_opal": "오팔 수정다육",
+"dew_root_rose_dew": "분홍 이슬뿌리",
+"sunlight_flower_rose_sun": "분홍 햇살꽃",
+"poison_flower_monkshood": "투구꽃 독꽃",
+"moonlight_mushroom_pink_lace": "분홍 레이스 달빛버섯",
+"blue_moss_frost_pearl": "진주빛 푸른이끼",
+"star_flower_rose_glass": "분홍 유리 별꽃",
+"moonlight_mushroom_lollipop": "롤리팝 달빛버섯",
 "red_flower_blue_petal": "푸른잎 붉은꽃",
 "red_flower_yellow_petal": "노란잎 붉은꽃",
 "herb_golden_petal": "황금약초",
@@ -507,6 +524,10 @@
 "moonlight_mushroom_potted": "달빛버섯 화분"
 },
 "itemVariantSprites": {
+"root_barrier:white_iron_blossom": "root_barrier_white_iron_blossom",
+"crystal_fountain:whale": "crystal_fountain_whale",
+"warding_stone:beacon": "warding_stone_beacon",
+"mana_sprayer:heart_perfume": "mana_sprayer_heart_perfume",
 "fairy_lantern:acorn": "fairy_lantern_acorn",
 "fairy_lantern:crystal_flower": "fairy_lantern_crystal_flower",
 "witch_scarecrow:fearstalk": "witch_scarecrow_fearstalk",
@@ -563,6 +584,26 @@
 "town_teleporter:cottage_well": "town_teleporter_cottage"
 },
 "itemVariants": {
+"root_barrier:white_iron_blossom": {
+"itemCode": "root_barrier",
+"name": "흰 철제 꽃덩굴 울타리",
+"sprite": "root_barrier_white_iron_blossom"
+},
+"crystal_fountain:whale": {
+"itemCode": "crystal_fountain",
+"name": "고래 분수",
+"sprite": "crystal_fountain_whale"
+},
+"warding_stone:beacon": {
+"itemCode": "warding_stone",
+"name": "봉화대 경계석",
+"sprite": "warding_stone_beacon"
+},
+"mana_sprayer:heart_perfume": {
+"itemCode": "mana_sprayer",
+"name": "하트 향수 마력분사기",
+"sprite": "mana_sprayer_heart_perfume"
+},
 "fairy_lantern:acorn": {
 "itemCode": "fairy_lantern",
 "name": "도토리등불",
@@ -971,6 +1012,7 @@
 "whispering_tea_table": "whispering_tea_table",
 "starlight_garden_trophy": "starlight_garden_trophy",
 "garden_contest_ticket": "garden_contest_ticket",
+"garden_sign": "garden_sign",
 "pedestal": "equipment_pedestal",
 "telescope": "telescope",
 "working_shelf": "working_shelf",
@@ -1192,6 +1234,7 @@
 "whispering_tea_table": "items/ornament",
 "starlight_garden_trophy": "items/ornament",
 "garden_contest_ticket": "items/materials",
+"garden_sign": "items/ornament",
 "equipment_pedestal": "items/ornament",
 "telescope": "items/ornament",
 "working_shelf": "items/ornament",
@@ -1294,6 +1337,10 @@
 "tablet_shield": "items/equipment",
 "default_cauldron": "items/cauldrons",
 "lucky_cauldron": "items/cauldrons",
+"root_barrier_white_iron_blossom": "items/ornament",
+"crystal_fountain_whale": "items/ornament",
+"warding_stone_beacon": "items/ornament",
+"mana_sprayer_heart_perfume": "items/ornament",
 "fairy_lantern_acorn": "items/ornament",
 "fairy_lantern_crystal_flower": "items/ornament",
 "witch_scarecrow_fearstalk": "items/ornament",

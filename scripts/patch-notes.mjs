@@ -39,7 +39,7 @@ function validateNotes(notes) {
 }
 
 export function extractPatchNotes(bundle) {
-  const candidates = [...bundle.matchAll(/\[\s*\{\s*date\s*:\s*new\s+Date\s*\(/g)];
+  const candidates = [...bundle.matchAll(/\[\s*\{\s*(?:kind\s*:\s*["'](?:patch|announcement)["']\s*,\s*)?date\s*:\s*new\s+Date\s*\(/g)];
   if (candidates.length !== 1) throw new Error(`패치내역 배열을 하나로 식별하지 못했습니다 (${candidates.length}개).`);
   let offset = candidates[0].index;
   const skip = () => { while (/\s/.test(bundle[offset] || "") && offset < bundle.length) offset++; };
@@ -49,7 +49,33 @@ export function extractPatchNotes(bundle) {
     offset += token.length;
   };
   const peek = () => { skip(); return bundle[offset]; };
-  const string = () => {
+  // Announcement bodies may format dates inside templates. Skip their syntax
+  // without evaluating it; patch text still accepts literal strings only.
+  const skipExpression = (end, depth = 0) => {
+    if (depth > 64) throw new Error("공지 표현식이 너무 깊습니다.");
+    while (offset < bundle.length) {
+      const ch = bundle[offset++];
+      if (ch === end) return;
+      if (["\"", "'", "`"].includes(ch)) {
+        let closed = false;
+        while (offset < bundle.length) {
+          const c = bundle[offset++];
+          if (c === "\\") { offset++; continue; }
+          if (c === ch) { closed = true; break; }
+          if (ch === "`" && c === "$" && bundle[offset] === "{") {
+            offset++; skipExpression("}", depth + 1);
+          }
+        }
+        if (!closed) throw new Error("공지 문자열이 끝나지 않습니다.");
+      } else if ("{[(".includes(ch)) {
+        skipExpression({ "{": "}", "[": "]", "(": ")" }[ch], depth + 1);
+      } else if ("}])".includes(ch) || ch === "/") {
+        throw new Error("지원하지 않는 공지 표현식입니다.");
+      }
+    }
+    throw new Error("공지 표현식이 끝나지 않습니다.");
+  };
+  const string = (announcement = false) => {
     skip();
     const quote = bundle[offset++];
     if (!['"', "'", "`"].includes(quote)) throw new Error("패치내역은 문자열이어야 합니다.");
@@ -57,7 +83,10 @@ export function extractPatchNotes(bundle) {
     while (offset < bundle.length && result.length <= 20000) {
       const ch = bundle[offset++];
       if (ch === quote) return result;
-      if (quote === "`" && ch === "$" && bundle[offset] === "{") throw new Error("문자열 내 실행 구문은 허용하지 않습니다.");
+      if (quote === "`" && ch === "$" && bundle[offset] === "{") {
+        if (!announcement) throw new Error("문자열 내 실행 구문은 허용하지 않습니다.");
+        offset++; skipExpression("}"); continue;
+      }
       if (ch !== "\\") {
         if (quote !== "`" && /[\r\n]/.test(ch)) throw new Error("잘못된 문자열 개행입니다.");
         result += ch;
@@ -93,17 +122,25 @@ export function extractPatchNotes(bundle) {
     return values;
   };
   const notes = [];
+  let entries = 0;
   take("[");
   while (peek() !== "]") {
-    if (notes.length >= 2000) throw new Error("패치내역이 너무 많습니다.");
+    if (++entries > 2000) throw new Error("패치내역이 너무 많습니다.");
     take("{");
     const note = {};
     while (peek() !== "}") {
       const key = /^[a-zA-Z]+/.exec(bundle.slice(offset))?.[0];
-      if (!["date", "highlights", "fixes"].includes(key) || Object.hasOwn(note, key)) throw new Error("알 수 없거나 중복된 패치내역 필드입니다.");
+      const fields = note.kind === "announcement" ? ["date", "title", "body"] : ["kind", "date", "highlights", "fixes"];
+      if (!fields.includes(key) || Object.hasOwn(note, key)) throw new Error("알 수 없거나 중복된 패치내역 필드입니다.");
       take(key);
       take(":");
-      if (key === "date") {
+      if (key === "kind") {
+        if (Object.keys(note).length) throw new Error("공지 종류는 첫 필드여야 합니다.");
+        note.kind = string();
+        if (!["patch", "announcement"].includes(note.kind)) throw new Error("알 수 없는 공지 종류입니다.");
+      } else if (key === "title" || key === "body") {
+        note[key] = string(key === "body");
+      } else if (key === "date") {
         take("new"); take("Date"); take("(");
         note.date = string();
         take(")");
@@ -111,7 +148,12 @@ export function extractPatchNotes(bundle) {
       if (peek() !== "}") take(",");
     }
     take("}");
-    notes.push({ highlights: [], fixes: [], ...note });
+    if (note.kind === "announcement") {
+      if (!validDate(note.date) || typeof note.title !== "string" || typeof note.body !== "string") throw new Error("공지 필드가 올바르지 않습니다.");
+    } else {
+      delete note.kind;
+      notes.push({ highlights: [], fixes: [], ...note });
+    }
     if (peek() !== "]") take(",");
   }
   take("]");
