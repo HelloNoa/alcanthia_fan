@@ -295,7 +295,8 @@
 "beast_horn": "짐승뿔",
 "dia_scepter": "다이아 셉터",
 "dia_plate": "다이아 플레이트",
-"tablet_shield": "석판 방패"
+"tablet_shield": "석판 방패",
+"merchant_stall": "작은 판매대"
 },
 "skills": {
 "magic_scythe": "혼령낫",
@@ -1119,7 +1120,8 @@
 "beast_horn": "beast_horn",
 "dia_scepter": "dia_scepter",
 "dia_plate": "dia_plate",
-"tablet_shield": "tablet_shield"
+"tablet_shield": "tablet_shield",
+"merchant_stall": "merchant_stall"
 },
 "itemFolders": {
 "herb_seed": "plants/seeds",
@@ -1394,6 +1396,7 @@
 "storage_chest_picnic": "items/ornament",
 "hourglass_crystal_orb": "items/ornament",
 "town_teleporter_broom": "items/ornament",
-"town_teleporter_cottage": "items/ornament"
+"town_teleporter_cottage": "items/ornament",
+"merchant_stall": "items/ornament"
 }
 }

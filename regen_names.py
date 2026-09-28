@@ -718,7 +718,7 @@ SYNCED_SPECIAL_RECIPE_OUTPUTS = (
     "restored_binding_token", "guild_foundation_stone", "deep_lens", "leyline_well",
     "extraction_catalyst", "onyx_ore", "refined_onyx", "recovery_catalyst",
     "leyline_stitching_needle", "earth_breath", "guardian_censer", "unnamed_key",
-    "garden_sign",
+    "garden_sign", "merchant_stall",
 )
 
 
