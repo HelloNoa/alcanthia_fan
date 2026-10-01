@@ -87,11 +87,45 @@ try {
   await page.locator("#raid-defender-form button").click();
   await page.waitForFunction(() => JSON.parse(localStorage.getItem("alc_raid_sim_v1")).defenderUserId === "new-defender");
   assert.equal((await stored()).defenderParty.adventurers[0].equipEnh, 9);
+  // A pending or failed import must never simulate the previous opponent.
+  await page.evaluate(async () => {
+    const { api } = await import("/js/api.js");
+    const original = api.garden;
+    api.garden = query => query.nickname === "slow-defender"
+      ? new Promise(resolve => { window.finishRaidImport = async () => resolve(await original(query)); })
+      : query.nickname === "missing-defender"
+        ? Promise.reject(new Error("대상을 찾을 수 없습니다"))
+        : original(query);
+  });
+  await page.locator("#raid-defender-query").fill("slow-defender");
+  await page.locator("#raid-defender-form button").click();
+  await page.locator("#raid-run").click();
+  assert.ok((await page.locator("#raid-result").textContent()).includes("불러오는 중"));
+  await page.evaluate(() => window.finishRaidImport());
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("alc_raid_sim_v1")).defenderUserId === "slow-defender");
+  await page.locator("#raid-defender-query").fill("missing-defender");
+  await page.locator("#raid-defender-form button").click();
+  await page.locator("#raid-defender-profile.error").waitFor();
+  await page.locator("#raid-run").click();
+  assert.ok((await page.locator("#raid-result").textContent()).includes("불러오지 못했습니다"));
+  assert.equal(await page.locator(".raid-final-rate").count(), 0);
+  await page.locator("#raid-defender-query").fill("recovered-defender");
+  await page.locator("#raid-defender-form button").click();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("alc_raid_sim_v1")).defenderUserId === "recovered-defender");
+  // A late response from an older search must not replace the newer user.
+  await page.locator("#raid-defender-query").fill("slow-defender");
+  await page.locator("#raid-defender-form button").click();
+  await page.locator("#raid-defender-query").fill("latest-defender");
+  await page.locator("#raid-defender-form").evaluate(form => form.dispatchEvent(new Event("submit", { cancelable: true })));
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("alc_raid_sim_v1")).defenderUserId === "latest-defender");
+  await page.evaluate(() => window.finishRaidImport());
+  assert.equal((await stored()).defenderUserId, "latest-defender");
+  assert.ok((await page.locator("#raid-defender-profile").textContent()).includes("latest-defender"));
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   if (process.env.RAID_SCREENSHOT) await page.screenshot({ path: process.env.RAID_SCREENSHOT, fullPage: true });
   assert.deepEqual(errors, []);
-  console.log("Raid defense editing: import, edits, simulation inputs, opening chance, empty party, restore, reload, user switch and mobile passed.");
+  console.log("Raid defense editing: import, edits, simulation inputs, opening chance, empty party, restore, reload, user switch, pending/failed imports, stale responses and mobile passed.");
 } finally {
   await browser.close();
 }

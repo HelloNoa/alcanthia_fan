@@ -140,6 +140,7 @@ export async function raidSim(body) {
     ? null
     : clamp(stored.stealthEnhancement, 0, 40);
   let lastResult = null;
+  const imports = { attacker: { request: 0 }, defender: { request: 0 } };
 
   body.innerHTML = `
     <div class="raid-sim">
@@ -278,6 +279,12 @@ export async function raidSim(body) {
 
   const renderProfileState = (side, normalized, loadingMessage = "") => {
     const element = query(`#raid-${side}-profile`);
+    if (imports[side].error) {
+      element.className = "raid-profile-state error";
+      element.textContent = imports[side].error;
+      return;
+    }
+    if (imports[side].pending) loadingMessage = "공개 프로필을 불러오는 중...";
     if (loadingMessage) {
       element.className = "raid-profile-state loading";
       element.textContent = loadingMessage;
@@ -304,6 +311,11 @@ export async function raidSim(body) {
 
   const editableErrors = () => {
     const errors = [];
+    for (const side of ["attacker", "defender"]) {
+      const label = side === "attacker" ? "공격" : "방어";
+      if (imports[side].pending) errors.push(`${label} 프로필을 불러오는 중입니다. 완료 후 다시 계산하세요.`);
+      if (imports[side].error) errors.push(`${label} ${imports[side].error}`);
+    }
     if (!attackerProfile) errors.push("공격 유저를 불러와야 합니다.");
     if (!defenderProfile) errors.push("방어 유저를 불러와야 합니다.");
     for (const [profile, party] of [[attackerProfile, attackerParty], [defenderProfile, defenderParty]]) {
@@ -574,10 +586,17 @@ export async function raidSim(body) {
     }
     const form = query(`#raid-${side}-form`);
     const button = form.querySelector("button");
+    const request = ++imports[side].request;
+    imports[side].pending = true;
+    imports[side].error = "";
+    lastResult = null;
+    resultElement.innerHTML = "";
     button.disabled = true;
     renderProfileState(side, null, "공개 프로필을 불러오는 중...");
     try {
       const payload = await api.garden(userQuery(value));
+      if (request !== imports[side].request) return;
+      imports[side].pending = false;
       const normalized = normalizeRaidProfile(payload, gameData);
       if (side === "attacker") {
         attackerProfile = normalized;
@@ -599,11 +618,14 @@ export async function raidSim(body) {
       saveSettings();
       renderAllProfiles();
     } catch (error) {
-      const state = query(`#raid-${side}-profile`);
-      state.className = "raid-profile-state error";
-      state.textContent = `프로필을 불러오지 못했습니다: ${error.message}`;
+      if (request !== imports[side].request) return;
+      imports[side].error = `프로필을 불러오지 못했습니다: ${error.message}`;
+      renderProfileState(side, null);
     } finally {
-      button.disabled = false;
+      if (request === imports[side].request) {
+        imports[side].pending = false;
+        button.disabled = false;
+      }
     }
   }
 
@@ -718,6 +740,11 @@ export async function raidSim(body) {
     resultElement.innerHTML = `<div class="raid-result-empty">양측 편성과 포션을 적용해 전투를 계산하고 있습니다.</div>`;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     try {
+      const currentErrors = editableErrors();
+      if (currentErrors.length) {
+        resultElement.innerHTML = `<div class="err-box"><b>시뮬레이션을 실행할 수 없습니다.</b>${currentErrors.map((error) => `<span>${escapeHtml(error)}</span>`).join("")}</div>`;
+        return;
+      }
       const defenderFirst = raidWinRate(
         attackerParty,
         defenderParty,
