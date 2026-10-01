@@ -671,6 +671,29 @@ const plannerSharedFenceRefs = (grid, row, col, side) => {
   if (neighbor) refs.push({ cell: neighbor, side: OPPOSITE_SIDE[side] });
   return refs;
 };
+// Pollination crosses two shared edges; trellis arches are the only passable fences.
+export function plannerPollinationPath(grid, row, col, dr, dc) {
+  const side = Object.keys(SIDE_STEP).find((key) => {
+    const step = SIDE_STEP[key];
+    return step[0] === dr && step[1] === dc;
+  });
+  if (!side || !grid?.[row]?.[col]) return [];
+  const path = [];
+  for (let step = 1; step <= 2; step++) {
+    const targetRow = row + dr, targetCol = col + dc;
+    if (!grid?.[targetRow]?.[targetCol]) break;
+    const blocked = plannerSharedFenceRefs(grid, row, col, side).some((ref) => {
+      const fence = fenceData(ref.cell.fences?.[ref.side]);
+      return fence && fence.code !== "flower_trellis_arch";
+    });
+    if (blocked) break;
+    path.push([targetRow, targetCol]);
+    row = targetRow;
+    col = targetCol;
+  }
+  return path;
+}
+
 const deleteFenceRef = ({ cell, side }) => {
   if (!cell?.fences) return;
   delete cell.fences[side];
@@ -1397,7 +1420,6 @@ export async function renderPlanner(view) {
   };
 
   // 바람꽃 수분 경로 (4방향 직선) — 거리는 고정(수분레벨), 맥읽기는 범위 아닌 번식작물 강화도에 영향
-  const POLL_REACH = 2; // 수분레벨1(이웃 탐색) + 1(복제 위치)
   const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
   const pollSet = () => {
     const s = new Set();
@@ -1405,9 +1427,7 @@ export async function renderPlanner(view) {
       const z = plantAt(r, c);
       if (!z || z.p !== "wind_blossom") continue;
       for (const [dr, dc] of DIRS)
-        for (let k = 1; k <= POLL_REACH; k++) {
-          const y = r + dr * k, x = c + dc * k;
-          if (y < 0 || y >= CANVAS || x < 0 || x >= CANVAS) break;
+        for (const [y, x] of plannerPollinationPath(grid, r, c, dr, dc)) {
           s.add(y * CANVAS + x);
         }
     }
@@ -1528,12 +1548,11 @@ export async function renderPlanner(view) {
       const wind = plantAt(r, c);
       if (!wind || wind.p !== "wind_blossom") continue;
       for (const [dr, dc] of DIRS) {
-        const sr = r + dr, sc = c + dc;
-        if (sr < 0 || sr >= CANVAS || sc < 0 || sc >= CANVAS) continue;
+        const path = plannerPollinationPath(grid, r, c, dr, dc);
+        if (path.length !== 2) continue;
+        const [[sr, sc], [tr, tc]] = path;
         const src = plantAt(sr, sc);
         if (!src || src.p === "wind_blossom") continue;
-        const tr = sr + dr, tc = sc + dc;
-        if (tr < 0 || tr >= CANVAS || tc < 0 || tc >= CANVAS) continue;
         const tcell = grid[tr]?.[tc];
         if (!tcell || tcell.p || tcell.orn) continue;
         const key = `${tr}:${tc}`;
