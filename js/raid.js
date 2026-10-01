@@ -86,7 +86,7 @@ function makeProfileErrorMarkup(errors) {
   return `<div class="raid-data-errors">
     <b>정확도 확인 필요</b>
     ${errors.map((error) => `<span>${escapeHtml(error)}</span>`).join("")}
-    <small>공개 정보 또는 최신 게임데이터가 충분하지 않아 시뮬레이션을 실행하지 않습니다.</small>
+    <small>불러온 원본 정보의 확인 사항입니다. 편성을 수정한 경우 수정된 정보를 기준으로 검사합니다.</small>
   </div>`;
 }
 
@@ -134,6 +134,8 @@ export async function raidSim(body) {
   let attackerProfile = null;
   let defenderProfile = null;
   let attackerParty = { adventurers: [], potions: [] };
+  let defenderParty = { adventurers: [], potions: [] };
+  let wardingOverride = null; // null uses the imported garden; -1 means no active stone.
   let stealthEnhancement = stored.stealthEnhancement == null
     ? null
     : clamp(stored.stealthEnhancement, 0, 40);
@@ -144,16 +146,16 @@ export async function raidSim(body) {
       <div class="raid-title-row">
         <div>
           <h3>🛡️ 실제 유저 습격 시뮬레이터</h3>
-          <p class="muted">공개 방어 파티를 기준으로 계산하며 게임 서버에 습격을 요청하지 않습니다.</p>
+          <p class="muted">양측 공개 파티를 불러와 편성과 강화도를 바꿔 테스트하세요. 변경은 시뮬레이터에만 적용됩니다.</p>
         </div>
-        <span class="raid-readonly">읽기 전용</span>
+        <span class="raid-readonly">가상 전투</span>
       </div>
 
       <div class="raid-user-grid">
         <section class="raid-user-panel defender">
           <div class="raid-panel-head">
             <div><span class="raid-side-label">방어</span><b>방어 유저 불러오기</b></div>
-            <span class="muted">실제 공개 정보 고정</span>
+            <span class="muted">불러온 뒤 편집 가능</span>
           </div>
           <form class="raid-user-search" id="raid-defender-form">
             <input id="raid-defender-query" type="search" autocomplete="off" placeholder="닉네임 또는 유저 ID" aria-label="방어 유저 검색">
@@ -192,7 +194,13 @@ export async function raidSim(body) {
           </div>
           <div class="raid-opening-row">
             <span id="raid-warding-icon" class="raid-rule-icon"></span>
-            <b>방어 경계석</b>
+            <label for="raid-warding-mode"><b>방어 경계석</b></label>
+            <select id="raid-warding-mode">
+              <option value="profile">불러온 정보</option>
+              <option value="none">없음</option>
+              <option value="custom">강화도 지정</option>
+            </select>
+            <label id="raid-warding-custom" class="adv-enh" hidden>+<input id="raid-warding-enh" class="adv-enh-in" type="number" min="0" max="999" value="0" aria-label="방어 경계석 강화도"></label>
             <span id="raid-warding-rate" class="raid-opening-rate">방어 프로필에서 자동 확인</span>
           </div>
         </div>
@@ -221,7 +229,9 @@ export async function raidSim(body) {
   const settingsSnapshot = () => ({
     attackerUserId: attackerProfile?.userId || stored.attackerUserId || "",
     defenderUserId: defenderProfile?.userId || stored.defenderUserId || "",
-    attackerParty,
+    attackerParty: attackerProfile ? attackerParty : stored.attackerParty,
+    defenderParty: defenderProfile ? defenderParty : stored.defenderParty,
+    wardingOverride: defenderProfile ? wardingOverride : stored.wardingOverride,
     stealthEnhancement,
   });
   const saveSettings = () => writeStoredSettings(settingsSnapshot());
@@ -230,9 +240,16 @@ export async function raidSim(body) {
     resultElement.innerHTML = `<div class="raid-result-empty">편성이 변경되었습니다. 승률을 다시 계산하세요.</div>`;
     saveSettings();
   };
+  const effectiveWarding = () => wardingOverride == null
+    ? defenderProfile?.wardingStones
+    : { known: true, enhancements: wardingOverride < 0 ? [] : [wardingOverride] };
   const updateOpeningRate = () => {
+    query("#raid-warding-mode").disabled = !defenderProfile;
+    query("#raid-warding-mode").value = wardingOverride == null ? "profile" : wardingOverride < 0 ? "none" : "custom";
+    query("#raid-warding-custom").hidden = wardingOverride == null || wardingOverride < 0;
+    query("#raid-warding-enh").value = Math.max(0, wardingOverride || 0);
     const baseChance = stealthOpeningChance(stealthEnhancement);
-    const warding = defenderProfile?.wardingStones;
+    const warding = effectiveWarding();
     const levels = warding?.enhancements || [];
     const multiplier = wardingStoneMultiplier(levels);
     const finalChance = raidAttackerOpeningChance(stealthEnhancement, levels);
@@ -272,11 +289,12 @@ export async function raidSim(body) {
       return;
     }
     const availability = describeRaidAvailability(normalized.raidAvailability);
+    const party = side === "attacker" ? attackerParty : defenderParty;
     element.className = `raid-profile-state loaded${side === "defender" && availability.canRaid === false ? " blocked" : ""}`;
     element.innerHTML = `
       <div class="raid-profile-name">
         <b>${escapeHtml(normalized.nickname || "이름 없음")}</b>
-        <span>모험가 ${normalized.party.adventurers.length} · 포션 ${normalized.party.potions.length}</span>
+        <span>모험가 ${party.adventurers.length} · 포션 ${party.potions.length}</span>
       </div>
       ${side === "defender" ? `<div class="raid-availability ${availability.canRaid === true ? "open" : availability.canRaid === false ? "closed" : ""}">
         ${escapeHtml(availability.label)}
@@ -284,131 +302,100 @@ export async function raidSim(body) {
       ${makeProfileErrorMarkup(normalized.errors)}`;
   };
 
-  const appendIcon = (element, renderer, key, className = "ic") => {
-    if (key) renderer(element, key, className);
-  };
-
-  const renderReadOnlyParty = () => {
-    const element = query("#raid-defender-party");
-    element.replaceChildren();
-    if (!defenderProfile) return;
-    const { adventurers, potions } = defenderProfile.party;
-    if (!adventurers.length) {
-      element.innerHTML = `<div class="raid-empty-party"><b>방어 파티 없음</b><span>게임 규칙에 따라 공격 측이 전투 없이 승리합니다.</span></div>`;
-      return;
-    }
-
-    const memberList = document.createElement("div");
-    memberList.className = "raid-readonly-members";
-    adventurers.forEach((member) => {
-      const adventurer = gameData.adventurers?.[member.id];
-      const card = document.createElement("article");
-      card.className = "raid-readonly-member";
-      card.innerHTML = `
-        <span class="raid-member-avatar"></span>
-        <div class="raid-member-copy">
-          <div><b>${escapeHtml(adventurer?.name || member.id)}</b><span>${escapeHtml(adventurer?.title || roleName(adventurer?.type))}</span></div>
-          <div class="raid-equipment-line">
-            <span class="raid-equipment-icon"></span>
-            <span>${member.equip ? `${escapeHtml(itemName(member.equip))} +${member.equipEnh}` : "장비 없음"}</span>
-          </div>
-          <div class="raid-gem-list"></div>
-        </div>`;
-      memberList.appendChild(card);
-      appendIcon(card.querySelector(".raid-member-avatar"), adventurerIcon, adventurer?.spriteKey, "raid-avatar-img");
-      appendIcon(card.querySelector(".raid-equipment-icon"), itemIcon, member.equip, "ic");
-      const gemList = card.querySelector(".raid-gem-list");
-      if (!member.engraved?.length) {
-        gemList.innerHTML = `<span class="muted">세공 없음</span>`;
-      } else {
-        member.engraved.forEach((gem) => {
-          const chip = document.createElement("span");
-          chip.className = "raid-gem-chip";
-          chip.innerHTML = `<i></i><span>${escapeHtml(itemName(gem.itemCode))} +${gem.enhancement}</span>`;
-          gemList.appendChild(chip);
-          appendIcon(chip.querySelector("i"), itemIcon, gem.itemCode, "ic");
-        });
-      }
-    });
-    element.appendChild(memberList);
-
-    const potionBlock = document.createElement("div");
-    potionBlock.className = "raid-readonly-potions";
-    potionBlock.innerHTML = `<b>방어 포션</b><div></div>`;
-    const potionList = potionBlock.querySelector("div");
-    if (!potions.length) {
-      potionList.innerHTML = `<span class="muted">포션 없음</span>`;
-    } else {
-      potions.forEach((potion) => {
-        const chip = document.createElement("span");
-        chip.className = "raid-potion-chip";
-        chip.innerHTML = `<i></i><span>${escapeHtml(itemName(potion.code))} +${potion.enh}</span>`;
-        potionList.appendChild(chip);
-        appendIcon(chip.querySelector("i"), itemIcon, potion.code, "ic");
-      });
-    }
-    element.appendChild(potionBlock);
-  };
-
   const editableErrors = () => {
     const errors = [];
     if (!attackerProfile) errors.push("공격 유저를 불러와야 합니다.");
     if (!defenderProfile) errors.push("방어 유저를 불러와야 합니다.");
-    if (attackerProfile?.errors?.length) errors.push(...attackerProfile.errors);
-    if (defenderProfile?.errors?.length) errors.push(...defenderProfile.errors);
-    if (stealthEnhancement != null && defenderProfile && !defenderProfile.wardingStones?.known) {
+    for (const [profile, party] of [[attackerProfile, attackerParty], [defenderProfile, defenderParty]]) {
+      if (profile?.errors?.length && JSON.stringify(party) === JSON.stringify(normalizeEditableParty(profile.party))) {
+        errors.push(...profile.errors);
+      }
+    }
+    if (stealthEnhancement != null && defenderProfile && !effectiveWarding()?.known) {
       errors.push("방어 텃밭 정보가 없어 경계석 효과를 확인할 수 없습니다.");
     }
     if (!attackerParty.adventurers.length) errors.push("공격 모험가를 1명 이상 편성해야 합니다.");
     if (!attackerParty.potions.length) errors.push("실제 습격 규칙상 공격 포션이 최소 1개 필요합니다.");
-    if (attackerProfile && attackerParty.adventurers.length > attackerProfile.caps.adventurers) {
-      errors.push(`공격 유저의 파티 한도는 ${attackerProfile.caps.adventurers}명입니다.`);
-    }
-    if (attackerProfile && attackerParty.potions.length > attackerProfile.caps.potions) {
-      errors.push(`공격 유저의 포션 한도는 ${attackerProfile.caps.potions}개입니다.`);
-    }
-    const seen = new Set();
-    attackerParty.adventurers.forEach((member) => {
-      if (!gameData.adventurers?.[member.id]) errors.push(`알 수 없는 공격 모험가: ${member.id}`);
-      if (seen.has(member.id)) errors.push(`같은 모험가는 한 번만 편성할 수 있습니다: ${gameData.adventurers?.[member.id]?.name || member.id}`);
-      seen.add(member.id);
-      if (member.equip && !gameData.equipment_stats?.[member.equip]) errors.push(`알 수 없는 공격 장비: ${member.equip}`);
-      (member.engraved || []).filter(Boolean).forEach((gem) => {
-        if (!gameData.gem_effects?.[gem.itemCode]) errors.push(`알 수 없는 공격 세공: ${gem.itemCode}`);
+    for (const [label, profile, party] of [
+      ["공격", attackerProfile, attackerParty], ["방어", defenderProfile, defenderParty],
+    ]) {
+      if (profile && party.adventurers.length > profile.caps.adventurers) {
+        errors.push(`${label} 유저의 파티 한도는 ${profile.caps.adventurers}명입니다.`);
+      }
+      if (profile && party.potions.length > profile.caps.potions) {
+        errors.push(`${label} 유저의 포션 한도는 ${profile.caps.potions}개입니다.`);
+      }
+      const seen = new Set();
+      party.adventurers.forEach((member) => {
+        if (!gameData.adventurers?.[member.id]) errors.push(`알 수 없는 ${label} 모험가: ${member.id}`);
+        if (seen.has(member.id)) errors.push(`같은 모험가는 한 번만 편성할 수 있습니다: ${gameData.adventurers?.[member.id]?.name || member.id}`);
+        seen.add(member.id);
+        if (member.equip && !gameData.equipment_stats?.[member.equip]) errors.push(`알 수 없는 ${label} 장비: ${member.equip}`);
+        (member.engraved || []).filter(Boolean).forEach((gem) => {
+          if (!gameData.gem_effects?.[gem.itemCode]) errors.push(`알 수 없는 ${label} 세공: ${gem.itemCode}`);
+        });
       });
-    });
-    attackerParty.potions.forEach((potion) => {
-      if (!gameData.potion_combat?.[potion.code]) errors.push(`알 수 없는 공격 포션: ${potion.code}`);
-    });
+      party.potions.forEach((potion) => {
+        if (!gameData.potion_combat?.[potion.code]) errors.push(`알 수 없는 ${label} 포션: ${potion.code}`);
+      });
+    }
     return [...new Set(errors)];
   };
 
-  const renderEditableParty = () => {
-    const element = query("#raid-attacker-party");
+  const renderEditableParty = (side) => {
+    const isAttacker = side === "attacker";
+    const label = isAttacker ? "공격" : "방어";
+    const profile = isAttacker ? attackerProfile : defenderProfile;
+    const party = isAttacker ? attackerParty : defenderParty;
+    const element = query(`#raid-${side}-party`);
     element.replaceChildren();
-    if (!attackerProfile) return;
+    if (!profile) return;
+    renderProfileState(side, profile);
+
+    const resetButton = document.createElement("button");
+    resetButton.type = "button";
+    resetButton.className = "adv-add";
+    resetButton.textContent = "불러온 편성으로 되돌리기";
+    resetButton.onclick = () => {
+      if (isAttacker) attackerParty = normalizeEditableParty(profile.party);
+      else {
+        defenderParty = normalizeEditableParty(profile.party);
+        wardingOverride = null;
+        updateOpeningRate();
+      }
+      markChanged();
+      renderEditableParty(side);
+    };
+    element.appendChild(resetButton);
 
     const partyHeader = document.createElement("div");
     partyHeader.className = "raid-edit-section-head";
-    partyHeader.innerHTML = `<div><b>공격 모험가</b><span>${attackerParty.adventurers.length}/${attackerProfile.caps.adventurers}</span></div>`;
+    partyHeader.innerHTML = `<div><b>${label} 모험가</b><span>${party.adventurers.length}/${profile.caps.adventurers}</span></div>`;
     const addMemberButton = document.createElement("button");
     addMemberButton.type = "button";
     addMemberButton.className = "adv-add";
     addMemberButton.textContent = "+ 모험가";
-    addMemberButton.disabled = attackerParty.adventurers.length >= attackerProfile.caps.adventurers;
+    addMemberButton.disabled = party.adventurers.length >= profile.caps.adventurers;
     addMemberButton.onclick = () => {
-      const next = adventurerEntries.find(([id]) => !attackerParty.adventurers.some((member) => member.id === id));
+      const next = adventurerEntries.find(([id]) => !party.adventurers.some((member) => member.id === id));
       if (!next) return;
-      attackerParty.adventurers.push({ id: next[0], equip: undefined, equipEnh: 0, engraved: [] });
+      party.adventurers.push({ id: next[0], equip: undefined, equipEnh: 0, engraved: [] });
       markChanged();
-      renderEditableParty();
+      renderEditableParty(side);
     };
     partyHeader.appendChild(addMemberButton);
     element.appendChild(partyHeader);
 
+    if (!isAttacker && !party.adventurers.length) {
+      const empty = document.createElement("div");
+      empty.className = "raid-empty-party";
+      empty.innerHTML = "<b>방어 파티 없음</b><span>공격 측이 전투 없이 승리합니다. 모험가를 추가해 방어 편성을 구성할 수 있습니다.</span>";
+      element.appendChild(empty);
+    }
+
     const memberList = document.createElement("div");
     memberList.className = "raid-edit-members";
-    attackerParty.adventurers.forEach((member, memberIndex) => {
+    party.adventurers.forEach((member, memberIndex) => {
       member.engraved ||= [];
       const card = document.createElement("article");
       card.className = "raid-edit-member";
@@ -424,13 +411,13 @@ export async function raidSim(body) {
         value: member.id,
         choices: adventurerChoices,
         placeholder: "모험가 검색",
-        ariaLabel: `공격 모험가 ${memberIndex + 1} 검색`,
+        ariaLabel: `${label} 모험가 ${memberIndex + 1} 검색`,
         className: "adv-adventurer-picker",
         iconRenderer: (holder, choice, imageClass) => adventurerIcon(holder, choice.iconKey, imageClass),
         onSelect: (code) => {
-          attackerParty.adventurers[memberIndex].id = code;
+          party.adventurers[memberIndex].id = code;
           markChanged();
-          renderEditableParty();
+          renderEditableParty(side);
         },
       }));
       main.querySelector('[data-picker="equipment"]').replaceWith(createSearchPicker({
@@ -441,10 +428,10 @@ export async function raidSim(body) {
         className: "adv-equip-picker",
         iconRenderer: (holder, choice, imageClass) => itemIcon(holder, choice.code, imageClass),
         onSelect: (code) => {
-          attackerParty.adventurers[memberIndex].equip = code || undefined;
-          if (!code) attackerParty.adventurers[memberIndex].engraved = [];
+          party.adventurers[memberIndex].equip = code || undefined;
+          if (!code) party.adventurers[memberIndex].engraved = [];
           markChanged();
-          renderEditableParty();
+          renderEditableParty(side);
         },
       }));
       main.querySelector('input[type="number"]').oninput = (event) => {
@@ -453,9 +440,9 @@ export async function raidSim(body) {
         markChanged();
       };
       main.querySelector(".adv-x").onclick = () => {
-        attackerParty.adventurers.splice(memberIndex, 1);
+        party.adventurers.splice(memberIndex, 1);
         markChanged();
-        renderEditableParty();
+        renderEditableParty(side);
       };
 
       const sockets = document.createElement("div");
@@ -480,7 +467,7 @@ export async function raidSim(body) {
             const previous = member.engraved[socketIndex]?.enhancement || 0;
             member.engraved[socketIndex] = code ? { itemCode: code, enhancement: previous } : null;
             markChanged();
-            renderEditableParty();
+            renderEditableParty(side);
           },
         }));
         row.querySelector('input[type="number"]').oninput = (event) => {
@@ -492,7 +479,7 @@ export async function raidSim(body) {
         row.querySelector(".adv-socket-x").onclick = () => {
           member.engraved.splice(socketIndex, 1);
           markChanged();
-          renderEditableParty();
+          renderEditableParty(side);
         };
       });
       const addSocketButton = document.createElement("button");
@@ -505,7 +492,7 @@ export async function raidSim(body) {
         if (!member.equip) return;
         member.engraved.push(null);
         markChanged();
-        renderEditableParty();
+        renderEditableParty(side);
       };
       sockets.appendChild(addSocketButton);
       card.appendChild(sockets);
@@ -515,27 +502,27 @@ export async function raidSim(body) {
 
     const potionHeader = document.createElement("div");
     potionHeader.className = "raid-edit-section-head potion";
-    potionHeader.innerHTML = `<div><b>공격 포션</b><span>${attackerParty.potions.length}/${attackerProfile.caps.potions} · 최소 1개</span></div>`;
+    potionHeader.innerHTML = `<div><b>${label} 포션</b><span>${party.potions.length}/${profile.caps.potions}${isAttacker ? " · 최소 1개" : ""}</span></div>`;
     const addPotionButton = document.createElement("button");
     addPotionButton.type = "button";
     addPotionButton.className = "adv-add";
     addPotionButton.textContent = "+ 포션";
-    addPotionButton.disabled = attackerParty.potions.length >= attackerProfile.caps.potions;
+    addPotionButton.disabled = party.potions.length >= profile.caps.potions;
     addPotionButton.onclick = () => {
       if (!potionCodes.length) return;
-      attackerParty.potions.push({ code: potionCodes[0], enh: 0 });
+      party.potions.push({ code: potionCodes[0], enh: 0 });
       markChanged();
-      renderEditableParty();
+      renderEditableParty(side);
     };
     potionHeader.appendChild(addPotionButton);
     element.appendChild(potionHeader);
 
     const potionList = document.createElement("div");
     potionList.className = "raid-edit-potions";
-    if (!attackerParty.potions.length) {
-      potionList.innerHTML = `<div class="raid-required-warning">실행하려면 공격 포션을 1개 이상 추가하세요.</div>`;
+    if (isAttacker && !party.potions.length) {
+      potionList.innerHTML = `<div class="raid-required-warning">실행하려면 ${label} 포션을 1개 이상 추가하세요.</div>`;
     }
-    attackerParty.potions.forEach((potion, potionIndex) => {
+    party.potions.forEach((potion, potionIndex) => {
       const row = document.createElement("div");
       row.className = "adv-row";
       row.innerHTML = `
@@ -547,12 +534,12 @@ export async function raidSim(body) {
         value: potion.code,
         choices: potionChoices,
         placeholder: "포션 검색",
-        ariaLabel: `공격 포션 ${potionIndex + 1} 검색`,
+        ariaLabel: `${label} 포션 ${potionIndex + 1} 검색`,
         iconRenderer: (holder, choice, imageClass) => itemIcon(holder, choice.code, imageClass),
         onSelect: (code) => {
-          attackerParty.potions[potionIndex].code = code;
+          party.potions[potionIndex].code = code;
           markChanged();
-          renderEditableParty();
+          renderEditableParty(side);
         },
       }));
       row.querySelector('input[type="number"]').oninput = (event) => {
@@ -561,9 +548,9 @@ export async function raidSim(body) {
         markChanged();
       };
       row.querySelector(".adv-x").onclick = () => {
-        attackerParty.potions.splice(potionIndex, 1);
+        party.potions.splice(potionIndex, 1);
         markChanged();
-        renderEditableParty();
+        renderEditableParty(side);
       };
     });
     element.appendChild(potionList);
@@ -572,8 +559,8 @@ export async function raidSim(body) {
   const renderAllProfiles = () => {
     renderProfileState("attacker", attackerProfile);
     renderProfileState("defender", defenderProfile);
-    renderEditableParty();
-    renderReadOnlyParty();
+    renderEditableParty("attacker");
+    renderEditableParty("defender");
     updateOpeningRate();
   };
 
@@ -601,6 +588,10 @@ export async function raidSim(body) {
         attackerInput.value = normalized.nickname || normalized.userId;
       } else {
         defenderProfile = normalized;
+        const canRestore = restoreDraft && stored.defenderUserId === normalized.userId;
+        defenderParty = normalizeEditableParty(canRestore && stored.defenderParty ? stored.defenderParty : normalized.party);
+        wardingOverride = canRestore && stored.wardingOverride != null
+          ? clamp(stored.wardingOverride, -1, 999) : null;
         defenderInput.value = normalized.nickname || normalized.userId;
       }
       lastResult = null;
@@ -729,7 +720,7 @@ export async function raidSim(body) {
     try {
       const defenderFirst = raidWinRate(
         attackerParty,
-        defenderProfile.party,
+        defenderParty,
         gameData,
         "enemy_first_interleaved",
         RAID_TRIALS,
@@ -737,7 +728,7 @@ export async function raidSim(body) {
       );
       const attackerFirst = raidWinRate(
         attackerParty,
-        defenderProfile.party,
+        defenderParty,
         gameData,
         "ally_first_interleaved",
         RAID_TRIALS,
@@ -745,19 +736,19 @@ export async function raidSim(body) {
       );
       const attackerFirstChance = raidAttackerOpeningChance(
         stealthEnhancement,
-        defenderProfile.wardingStones?.enhancements,
+        effectiveWarding()?.enhancements,
       );
       const combined = combineRaidRates(defenderFirst, attackerFirst, attackerFirstChance);
       const defenderSample = simulateRaid(
         attackerParty,
-        defenderProfile.party,
+        defenderParty,
         gameData,
         "enemy_first_interleaved",
         RAID_SEED,
       );
       const attackerSample = simulateRaid(
         attackerParty,
-        defenderProfile.party,
+        defenderParty,
         gameData,
         "ally_first_interleaved",
         RAID_SEED,
@@ -785,6 +776,18 @@ export async function raidSim(body) {
   query("#raid-defender-form").onsubmit = (event) => {
     event.preventDefault();
     loadProfile("defender", defenderInput.value);
+  };
+  query("#raid-warding-mode").onchange = (event) => {
+    wardingOverride = event.target.value === "profile" ? null
+      : event.target.value === "none" ? -1
+      : Math.max(0, ...(defenderProfile?.wardingStones?.enhancements || []));
+    updateOpeningRate();
+    markChanged();
+  };
+  query("#raid-warding-enh").oninput = (event) => {
+    wardingOverride = Math.floor(clamp(event.target.value, 0, 999));
+    updateOpeningRate();
+    markChanged();
   };
   stealthSelect.onchange = () => {
     stealthEnhancement = stealthSelect.value === "" ? null : clamp(stealthSelect.value, 0, 40);
