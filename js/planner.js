@@ -1,3 +1,4 @@
+import { PLANNER_OPTION_FIELDS, normalizePlannerOptions, encodePlannerOptions, decodePlannerOptions } from "./planner_options.js";
 import { api, gamedata, names } from "./api.js";
 import { wardingStoneMultiplier } from "./raid_profile.js";
 import { plantIcon, itemIcon, fmtDuration, loadImg, CDN } from "./sprites.js";
@@ -26,6 +27,7 @@ export const plannerPresetRadius = (stage = 0) => {
 const CANVAS = plannerPresetRadius(PLANNER_PRESET_MAX_STAGE) * 2 + 1;
 const CENTER = (CANVAS - 1) / 2;
 const STORE = "alc_planner_v3";
+const OPTIONS_STORE = "alc_planner_options_v1";
 const BADGE_STORE = "alc_planner_badges";
 const PEDESTAL = "pedestal";
 const LEGACY_PEDESTAL = "equipment_pedestal";
@@ -967,7 +969,11 @@ export async function renderPlanner(view) {
   const selectedSkins = new Map();
   const selectedVariants = new Map();
   let badgesVisible = loadBadgeVisibility();
-  const opt = { harvest: false, resist: 0, zone: "", familiar: 0, fog: false, raid: false, sunsetRipen: false, echoResonance: false, rootDom: 0, vein: false, mossJelly: false, venom: false, compost: false, sturdy: false, timeM: 0, soilM: 0, plenty: 0, inheritance: 0, revival: 0, uptime: 100, gust: false };
+  let savedOptions;
+  try { savedOptions = JSON.parse(localStorage.getItem(OPTIONS_STORE)); } catch {}
+  const opt = sharedPlanLoaded
+    ? decodePlannerOptions(new URLSearchParams(location.search).get("conditions"), PRODUCTION_ZONES)
+    : normalizePlannerOptions(savedOptions, PRODUCTION_ZONES);
   let condMap = null;
   let detailCell = null;
 
@@ -1022,7 +1028,7 @@ export async function renderPlanner(view) {
           <label class="chk"><input type="checkbox" id="pl-moss-jelly"> 이끼젤리 (이슬뿌리 거리 +1)</label>
           <label class="chk"><input type="checkbox" id="pl-venom"> 맹독포션 (독꽃 거리 +1)</label>
           <label class="chk" title="배치한 모든 퇴비함에 재료를 계속 공급한다고 가정합니다. 빈 퇴비함은 효과가 없습니다."><input type="checkbox" id="pl-compost"> 퇴비함 재료 공급 가정 (인접 식물 +1)</label>
-          <p class="muted">수정 분수·요정 등불 거리 = 강화도 +1. 퇴비는 중첩되지 않으며 뿌리장벽에 막힙니다. 범위·생산 보너스 설정은 저장·공유되지 않습니다.</p>
+          <p class="muted">수정 분수·요정 등불 거리 = 강화도 +1. 퇴비는 중첩되지 않으며 뿌리장벽에 막힙니다. 포션·스킬·지역·생산 조건도 배치와 함께 저장·공유됩니다.</p>
           <label class="chk"><input type="checkbox" id="pl-sturdy"> 단단한 줄기 (강화 작물 최대생산 ×(강화+1))</label>
           <div class="pl-sksec">생산 스킬 <span class="muted">(시간·토양은 강화도별 중첩)</span></div>
           <label class="lvlabel">시간 숙련 <input id="pl-time" type="range" min="0" max="10" value="0"><b id="pl-timev">0</b></label>
@@ -2112,6 +2118,22 @@ export async function renderPlanner(view) {
   };
   skSlider("#pl-time", "timeM"); skSlider("#pl-soil", "soilM"); skSlider("#pl-plenty", "plenty");
   skSlider("#pl-inheritance", "inheritance"); skSlider("#pl-revival", "revival"); skSlider("#pl-uptime", "uptime");
+  const restoreOptions = (options) => {
+    Object.assign(opt, normalizePlannerOptions(options, PRODUCTION_ZONES));
+    for (const [key, id, fallback] of PLANNER_OPTION_FIELDS) {
+      const control = view.querySelector(`#${id}`);
+      if (typeof fallback === "boolean") control.checked = opt[key];
+      else control.value = opt[key];
+      const label = view.querySelector(`#${id}v`);
+      if (label) label.textContent = opt[key];
+    }
+    updateZoneCoeff();
+  };
+  for (const event of ["input", "change"]) {
+    view.querySelector(".pl-opts").addEventListener(event, (e) => {
+      if (PLANNER_OPTION_FIELDS.some(([, id]) => id === e.target.id)) save();
+    });
+  }
   // 밭 프리셋: 초기 5×5(25칸) → 다이아몬드 확장. 추가칸 = 링 4r (r4:+16, r5:+20, r6:+24, r7:+28)
   // 누적: 25 → 41 → 61 → 85 → 113, 강화석 비용 = max(0, 중심거리-3)
   const CTR = CENTER;
@@ -2348,7 +2370,7 @@ export async function renderPlanner(view) {
   };
 
   setMode("plant");
-  recompute();
+  restoreOptions(opt);
   detail.innerHTML = `<h3>칸 정보</h3><p class="muted">칸에 마우스를 올리면 상세가 표시됩니다</p>`;
   // 공유 링크로 열었으면 내 플래너에 저장하고 URL 정리
   if (sharedPlanLoaded) {
@@ -2356,6 +2378,7 @@ export async function renderPlanner(view) {
     try {
       const cleanUrl = new URL(location.href);
       cleanUrl.searchParams.delete("plan");
+      cleanUrl.searchParams.delete("conditions");
       cleanUrl.hash = "";
       history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search);
     } catch {}
@@ -2389,7 +2412,10 @@ export async function renderPlanner(view) {
   }
   function save() {
     plannerDeduplicateSharedFences(grid);
-    try { localStorage.setItem(STORE, JSON.stringify(grid)); } catch {}
+    try {
+      localStorage.setItem(STORE, JSON.stringify(grid));
+      localStorage.setItem(OPTIONS_STORE, JSON.stringify(opt));
+    } catch {}
   }
   function normalizeGrid(source) {
     const g = plannerFitGrid(source);
@@ -2812,8 +2838,13 @@ export async function renderPlanner(view) {
       : `<p class="muted" style="padding:4px 0">저장된 배치 없음</p>`;
     slotsBox.querySelectorAll("[data-load]").forEach((b) => b.onclick = () => {
       const code = getSlots()[decodeURIComponent(b.dataset.load)];
-      let g0; try { g0 = code[0] === "[" ? JSON.parse(code) : decodeGrid(code); } catch { g0 = decodeGrid(code); }
-      if (g0) { grid = normalizeGrid(g0); recompute(); save(); }
+      let g0, options;
+      try {
+        const saved = JSON.parse(code);
+        g0 = Array.isArray(saved) ? saved : saved.grid;
+        options = Array.isArray(saved) ? null : saved.options;
+      } catch { g0 = decodeGrid(code); }
+      if (Array.isArray(g0)) { grid = normalizeGrid(g0); restoreOptions(options); save(); }
     });
     slotsBox.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => {
       const s2 = getSlots(); delete s2[decodeURIComponent(b.dataset.del)]; setSlots(s2); renderSlots();
@@ -2822,12 +2853,13 @@ export async function renderPlanner(view) {
   view.querySelector("#pl-save-btn").onclick = () => {
     const inp = view.querySelector("#pl-slotname");
     const name = (inp.value || "").trim() || "배치 " + (Object.keys(getSlots()).length + 1);
-    const s = getSlots(); s[name] = JSON.stringify(grid); setSlots(s); inp.value = ""; renderSlots(); // JSON(바닥·울타리 보존)
+    const s = getSlots(); s[name] = JSON.stringify({ grid, options: opt }); setSlots(s); inp.value = ""; renderSlots(); // JSON(바닥·울타리 보존)
   };
   const shareUrl = async () => {
     const code = await plannerCompressShareCode(encodeGrid());
     const url = new URL("./planner/", document.baseURI);
     url.search = plannerShareSearch(code);
+    url.searchParams.set("conditions", encodePlannerOptions(opt, PRODUCTION_ZONES));
     return url.href;
   };
   const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
