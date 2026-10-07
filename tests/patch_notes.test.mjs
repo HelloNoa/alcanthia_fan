@@ -48,6 +48,16 @@ test("reads mixed patch and announcement entries without evaluating announcement
   assert.throws(() => extractPatchNotes(`[${patch.replace('kind:"patch"', 'kind:"unknown"')}]`));
 });
 
+test("skips test-server entries without evaluating their nested metadata", () => {
+  const patch = literal.slice(1, -1).replace("{date:", '{kind:"patch",date:');
+  const testServer = '{kind:"test-server",date:new Date("2026-10-02T01:30:00+09:00"),title:"5차 테스트 서버",links:[{label:"사전 패치노트",href:"https://alcanthia.com/pre-patch-notes.html"}],body:`안내 ${globalThis.intrusion = true}`,testContent:`내용 ${new Date("2026-10-01")}`,testServer:{id:"test-server-assignment",endsAt:new Date("2026-10-05T00:00:00+09:00")}}';
+  for (const entries of [`${patch},${testServer}`, `${testServer},${patch}`]) {
+    assert.deepEqual(extractPatchNotes(`[${entries}]`), extractPatchNotes(literal));
+  }
+  assert.equal(globalThis.intrusion, undefined);
+  assert.throws(() => extractPatchNotes(`[${patch},${testServer.slice(0, -1)}]`));
+});
+
 test("entry script is restricted to the official origin and assets", () => {
   assert.equal(findBundleUrl('<script crossorigin src="./assets/index-test.js" type="module"></script>'), bundleUrl);
   for (const src of ['https://evil.test/assets/index.js', '//evil.test/assets/index.js', '/api/admin.js', '/assets/test.js?x=1']) {

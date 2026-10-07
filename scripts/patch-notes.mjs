@@ -39,7 +39,7 @@ function validateNotes(notes) {
 }
 
 export function extractPatchNotes(bundle) {
-  const candidates = [...bundle.matchAll(/\[\s*\{\s*(?:kind\s*:\s*["'](?:patch|announcement)["']\s*,\s*)?date\s*:\s*new\s+Date\s*\(/g)];
+  const candidates = [...bundle.matchAll(/\[\s*\{\s*(?:kind\s*:\s*["'](?:patch|announcement|test-server)["']\s*,\s*)?date\s*:\s*new\s+Date\s*\(/g)];
   if (candidates.length !== 1) throw new Error(`패치내역 배열을 하나로 식별하지 못했습니다 (${candidates.length}개).`);
   let offset = candidates[0].index;
   const skip = () => { while (/\s/.test(bundle[offset] || "") && offset < bundle.length) offset++; };
@@ -49,8 +49,9 @@ export function extractPatchNotes(bundle) {
     offset += token.length;
   };
   const peek = () => { skip(); return bundle[offset]; };
-  // Announcement bodies may format dates inside templates. Skip their syntax
-  // without evaluating it; patch text still accepts literal strings only.
+  // Announcement bodies may format dates inside templates, and non-production
+  // entries may contain nested metadata. Skip their syntax without evaluating
+  // it; patch text still accepts literal strings only.
   const skipExpression = (end, depth = 0) => {
     if (depth > 64) throw new Error("공지 표현식이 너무 깊습니다.");
     while (offset < bundle.length) {
@@ -128,6 +129,7 @@ export function extractPatchNotes(bundle) {
     if (++entries > 2000) throw new Error("패치내역이 너무 많습니다.");
     take("{");
     const note = {};
+    let skipped = false;
     while (peek() !== "}") {
       const key = /^[a-zA-Z]+/.exec(bundle.slice(offset))?.[0];
       const fields = note.kind === "announcement" ? ["date", "title", "body"] : ["kind", "date", "highlights", "fixes"];
@@ -137,6 +139,12 @@ export function extractPatchNotes(bundle) {
       if (key === "kind") {
         if (Object.keys(note).length) throw new Error("공지 종류는 첫 필드여야 합니다.");
         note.kind = string();
+        if (note.kind === "test-server") {
+          if (peek() === "}") take("}");
+          else { take(","); skipExpression("}"); }
+          skipped = true;
+          break;
+        }
         if (!["patch", "announcement"].includes(note.kind)) throw new Error("알 수 없는 공지 종류입니다.");
       } else if (key === "title" || key === "body") {
         note[key] = string(key === "body");
@@ -146,6 +154,10 @@ export function extractPatchNotes(bundle) {
         take(")");
       } else note[key] = strings();
       if (peek() !== "}") take(",");
+    }
+    if (skipped) {
+      if (peek() !== "]") take(",");
+      continue;
     }
     take("}");
     if (note.kind === "announcement") {
