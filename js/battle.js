@@ -163,7 +163,7 @@ function kI(e,t,i,s,a,g,r,u,n,o=!1,q=!1){
         break;
       }
       case"cleanse":{
-        for(const v of f)v.hp<=0||(v.statusEffects=v.statusEffects.filter(m=>m.type!=="burn"&&m.type!=="confusion"&&m.type!=="poison"&&m.type!=="stun"&&m.type!=="sleep"&&m.type!=="heal_block"));
+        for(const v of f)v.hp<=0||(v.statusEffects=v.statusEffects.filter(KI));
         break;
       }
       case"dispel":{
@@ -266,7 +266,14 @@ function Sm(e,t,i){return t<=1?null:e==="enemy_all"?i?"아군 전체":"적 전�
 function XB(e,t,i,s){const a=[];for(const u of t){if(!u.effects.some(d=>d.op==="status"||Lb(d)||d.op==="cleanse"||d.op==="dispel"||d.op==="dispel_all")||ZB(u.effects)||QB(u.effects)||JB(u.effects)||u.effects.some(d=>d.op==="cooldown_reduce")||o9(u.effects,e,i,s)||GI(u.effects)&&!$I(u.effects,i,s))continue;const o=a9(u.effects,i,s,e),p=l9(u.effects,s,e),{allyTarget:l,enemyTarget:h}=n9(u.effects,i,s,e);a.push({value:o,canKill:p,action:{...u.action,allyTarget:l,enemyTarget:h}})}if(a.length===0)return null;if(a[0].action.kind==="potion")return a[0].action;const g=a.filter(u=>u.canKill),r=g.length>0?g:a;return r.length>1&&r.sort((u,n)=>n.value-u.value),r[0].action};
 function Xh(e,t){e.statusEffects=e.statusEffects.filter(i=>i.type!==t)};
 function ym(e,t){return os(e,i=>t.maxHp*lf(i)/100+_h(i))};
-function o9(e,t,i,s){for(const a of e){if(a.op==="dispel"||a.op==="dispel_all"){if((a.target==="enemy_all"?s.filter(u=>u.hp>0):a.target==="enemy_one"?s.filter(u=>u.hp>0).slice(0,1):[]).some(u=>u.statusEffects.length>0))return!1;continue}if(Lb(a)){if(Av(a.target,i,s).some(u=>u.mp>0))return!1;continue}if(a.op!=="status")continue;if((()=>{switch(a.target){case"self":return[t];case"ally_one":case"ally_all":return i.filter(r=>r.hp>0);case"enemy_one":case"enemy_all":return s.filter(r=>r.hp>0)}})().some(r=>!r.statusEffects.some(u=>u.effectId===a.effectId)))return!1}return!0};
+function o9(e,t,i,s){for(const a of e){
+  // Production cleanse checks the actual recipient(s), including self-only antidote.
+  if(a.op==="cleanse"){
+    const targets=a.target==="self"?[t]:a.target==="ally_one"||a.target==="ally_all"?i.filter(u=>u.hp>0):[];
+    if(targets.some(u=>u.statusEffects.some(effect=>!KI(effect))))return!1;
+    continue;
+  }
+if(a.op==="dispel"||a.op==="dispel_all"){if((a.target==="enemy_all"?s.filter(u=>u.hp>0):a.target==="enemy_one"?s.filter(u=>u.hp>0).slice(0,1):[]).some(u=>u.statusEffects.length>0))return!1;continue}if(Lb(a)){if(Av(a.target,i,s).some(u=>u.mp>0))return!1;continue}if(a.op!=="status")continue;if((()=>{switch(a.target){case"self":return[t];case"ally_one":case"ally_all":return i.filter(r=>r.hp>0);case"enemy_one":case"enemy_all":return s.filter(r=>r.hp>0)}})().some(r=>!r.statusEffects.some(u=>u.effectId===a.effectId)))return!1}return!0};
 function l9(e,t,i){if(!i)return!1;const s=t.filter(a=>a.hp>0);if(s.length===0)return!1;for(const a of e){if(a.op!=="status"||a.status!=="burn"&&a.status!=="poison")continue;const g=a.coefficient??0,r=Math.abs(a.flat??0),u=Math.abs(a.percent??0);if(s.some(n=>{const o=g>0?Vi(i)*g:n.maxHp*u/100+r,p=a.status==="burn"?ao(o,n):o;return n.hp<=applyDamageMultiplier(p,n)}))return!0}return!1};
 function W8(e,t){const i=t??(s=>s);return U8(e,(s,a)=>i(s)>i(a)?s:a)};
 function BI(e,t,i,s,a,g){if(!t.units.some(o=>(o.engravedGems?.length??0)>0)&&!i.units.some(o=>(o.engravedGems?.length??0)>0))return;const r=new Map;for(const o of e)o.delta<0&&r.set(o.unitId,(r.get(o.unitId)??0)+-o.delta);if(r.size===0)return;const u=[],n=[];for(const[o,p]of r){const{unit:l}=FI(o,t,i);if(!l||l.hp<=0)continue;const h=(l.engravedGems??[]).filter(m=>m.itemCode==="refined_crystal");if(h.length===0)continue;const d=os(h,m=>HP(m.enhancement)),c=p*d/100;if(c<=0)continue;const f=l.mp;l.mp=Math.min(l.maxMp,l.mp+c);const v=l.mp-f;v>0&&(u.push({unitId:l.id,delta:v,newMp:l.mp}),n.push(`${l.name}(+${Math.round(v)})`))}u.length!==0&&a.push({type:"skill",turn:s,actorId:u[0].unitId,skillId:"crystal_absorb",text:`마력 흡수: ${n.join(", ")}`,hpChanges:[],mpChanges:u,cdChanges:[],snapshots:_e(g)})};
@@ -318,7 +325,13 @@ function HP(e){return(e+1)*10};
 function $P(e){return(e+1)*5};
 function onyxDamageMultiplier(e){const t=(e??[]).filter(i=>i.itemCode==="refined_onyx");if(t.length!==0)return Math.pow(.95,Math.max(...t.map(i=>i.enhancement))+1)};
 function applyDamageMultiplier(e,t){return e*(t.damageTakenMultiplier??1)};
-function a9(e,t,i,s){let a=0;for(const g of e){if(g.op==="dispel"||g.op==="dispel_all"){const l=bv(g.target)?t.filter(h=>h.hp>0):i.filter(h=>h.hp>0);a+=os(l,h=>h.statusEffects.length)*100;continue}if(g.op!=="status")continue;const r=Math.abs(g.flat??0),u=Math.abs(g.percent??0),n=g.coefficient??0;let o=g.status==="taunt"?1/0:r;if(n>0&&s)o+=Vi(s)*n;else if(u>0){const l=bv(g.target)?t.filter(h=>h.hp>0):i.filter(h=>h.hp>0);if(l.length>0){const h=Math.max(...l.map(d=>c9(g.status,d)));o+=h*u/100}}const p=h9(g.target,t,i);a+=o*g.duration*p}return a+Mv(e,t,i)};
+function a9(e,t,i,s){let a=0;for(const g of e){
+  if(g.op==="cleanse"){
+    const targets=bv(g.target)?t.filter(u=>u.hp>0):i.filter(u=>u.hp>0);
+    a+=os(targets,u=>u.statusEffects.filter(effect=>!KI(effect)).length)*100;
+    continue;
+  }
+if(g.op==="dispel"||g.op==="dispel_all"){const l=bv(g.target)?t.filter(h=>h.hp>0):i.filter(h=>h.hp>0);a+=os(l,h=>h.statusEffects.length)*100;continue}if(g.op!=="status")continue;const r=Math.abs(g.flat??0),u=Math.abs(g.percent??0),n=g.coefficient??0;let o=g.status==="taunt"?1/0:r;if(n>0&&s)o+=Vi(s)*n;else if(u>0){const l=bv(g.target)?t.filter(h=>h.hp>0):i.filter(h=>h.hp>0);if(l.length>0){const h=Math.max(...l.map(d=>c9(g.status,d)));o+=h*u/100}}const p=h9(g.target,t,i);a+=o*g.duration*p}return a+Mv(e,t,i)};
 function Mv(e,t,i){let s=0;for(const a of e){if(!Lb(a))continue;const g=Av(a.target,t,i);s+=os(g,r=>{const u=Math.abs(_h(a))+r.maxMp*Math.abs(lf(a))/100;return Math.min(r.mp,u)})}return s};
 function e9(e,t,i){const s=i.filter(g=>g.hp>0);let a=0;for(const g of s){const r=Sv(g),u=d9(g);a+=u;const n=Gy(g);n?e.id===n&&(a+=r):a+=r}return a};
 function GB(e,t,i,s,a,g){const r=it[e.itemCode].name,u=e.enhancement+1,n=Ky(i.units,u);let o=`${t.name}: ${r} — 전염시킬 부정 상태 부족`;if(n){const p=Ou(n).slice(0,u),l=i.units.filter(h=>h.hp>0&&h!==n);for(const h of l)for(const d of p)Uc(h,{...d});o=`${t.name}: ${r} 사용! ${n.name}의 부정 상태 ${p.length}개 전염`}s.push({type:"potion_use",turn:a,actorId:t.id,itemCode:e.itemCode,text:o,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(g)})};

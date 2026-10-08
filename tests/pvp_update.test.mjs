@@ -76,3 +76,39 @@ else:
   const result = spawnSync('python3',['-c',code],{cwd:new URL('..',import.meta.url),encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
 });
+
+const inflict = (...effects) => ({id:'inflict',name:'inflict',type:'status',mpCost:0,cooldown:99,effects});
+const status = (type, flat=0) => ({op:'status',effectId:`fixture_${type}_${flat}`,target:'enemy_all',status:type,flat,duration:8});
+test('purification is used after debuffs appear and cleans the whole party while preserving buffs', () => {
+  const result = run(side([unit('a',[hit],true),unit('c',[hit],true)], [potion('purification_potion')]),
+    side([unit('b',[inflict(status('poison',1),status('blind'),status('backflow'),status('atk_buff',-5),status('def_buff',12))])]), 'ally_first');
+  const uses = result.events.filter(e=>e.itemCode==='purification_potion');
+  assert.equal(uses.length,1);
+  assert.equal(uses[0].turn,2);
+  for (const id of ['a','c']) {
+    const buffs = uses[0].snapshots.find(u=>u.unitId===id).statusEffects;
+    assert.deepEqual(buffs.map(s=>s.type),['def_buff']);
+    assert.equal(buffs[0].flat,12);
+  }
+});
+test('antidote cleans only the acting unit', () => {
+  const result = run(side([unit('a',[hit],true),unit('c',[hit],true)], [potion('antidote_potion')]),
+    side([unit('b',[inflict(status('poison',1))])]), 'enemy_first_interleaved');
+  const use = result.events.find(e=>e.itemCode==='antidote_potion');
+  assert.ok(use);
+  assert.equal(use.actorId,'a');
+  assert.deepEqual(use.snapshots.find(u=>u.unitId==='a').statusEffects,[]);
+  assert.equal(use.snapshots.find(u=>u.unitId==='c').statusEffects[0].type,'poison');
+});
+test('cleanse potions are saved when there are only positive effects', () => {
+  for(const code of ['purification_potion','antidote_potion']) {
+    const result = run(side([unit('a',[hit],true)], [potion(code)]),
+      side([unit('b',[inflict(status('def_buff',12))])]), 'enemy_first_interleaved');
+    assert.equal(result.events.some(e=>e.itemCode===code),false);
+  }
+});
+test('a disabled actor cannot drink purification until able to act', () => {
+  const result = run(side([unit('a',[hit],true)], [potion('purification_potion')]),
+    side([unit('b',[inflict(status('stun'),status('poison',1))])]), 'enemy_first_interleaved');
+  assert.equal(result.events.some(e=>e.itemCode==='purification_potion' && e.turn===1),false);
+});
