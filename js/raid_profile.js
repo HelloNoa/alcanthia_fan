@@ -27,10 +27,17 @@ function equipmentKeyFor(profile, defenseParty, member, adventurerId) {
     }
   }
 
-  const direct = defenseParty?.equipment?.[adventurerId]
-    || defenseParty?.adventurerEquipment?.[adventurerId]
-    || profile?.adventurerEquipment?.[adventurerId];
-  return typeof direct === "string" ? direct : direct?.itemKey;
+  // An explicit per-mode equipment map can intentionally leave a member bare.
+  const equipment = defenseParty?.equipment ?? defenseParty?.adventurerEquipment ?? profile?.adventurerEquipment;
+  const direct = equipment?.[adventurerId];
+  if (typeof direct === "string") return direct;
+  if (direct?.itemKey) return direct.itemKey;
+  if (direct?.itemCode) {
+    const gems = (direct.engraved || []).filter(Boolean)
+      .map(gem => `${gem.itemCode}+${Math.max(0, Number(gem.enhancement) || 0)}`).join(",");
+    return `${direct.itemCode}+${Math.max(0, Number(direct.enhancement) || 0)}${gems ? `(${gems})` : ""}`;
+  }
+  return undefined;
 }
 
 function normalizePotion(raw) {
@@ -75,14 +82,15 @@ function normalizeWardingStones(profile, payload) {
   };
 }
 
-export function normalizeRaidProfile(payload, gameData) {
+export function normalizeRaidProfile(payload, gameData, mode = "raid") {
   const profile = payload?.profile || payload || {};
-  const defenseParty = profile.gardenRaidDefenseParty;
+  const defenseParty = mode === "duel" ? profile.pvpDefenseParty : profile.gardenRaidDefenseParty;
   const rawMembers = Array.isArray(defenseParty?.adventurers)
     ? defenseParty.adventurers
     : (Array.isArray(defenseParty?.adventurerIds) ? defenseParty.adventurerIds : []);
   const adventurers = [];
   const errors = [];
+  if (mode === "duel" && defenseParty == null) errors.push("공개 결투 방어 편성이 없습니다. 편성을 직접 설정한 뒤 계산하세요.");
   if (profile.profileDetailsVisible === false && defenseParty == null) {
     errors.push("프로필 상세 정보가 비공개라 방어 파티를 확인할 수 없습니다.");
   }

@@ -7,8 +7,60 @@ const ml=e=>e?.filter(t=>!!t)??[];
 let it={};
 function EB(e){const t=e.charCodeAt(0);return t<44032||t>55203?!1:(t-44032)%28!==0}
 function Fy(e){return e.hp<=0&&!e.statusEffects.some(t=>t.type==="undying")};
-function jB(e,t,i,s){const a=Vi(e),g=[];for(const r of t){let u=0,n;const o=HI(r.effects,i),p=r.action.kind==="skill"&&r.action.skill.type==="attack_aoe_mp_burn"?VI(r.action.skill,e.mp):null;for(const l of r.effects)if(l.op==="atk_damage"){const h=a*(p??l.coefficient);if(l.target==="enemy_one"){const d=o??vb(e,i,h,s);d&&(u+=applyDamageMultiplier(ao(h,d)*s,d),n=d)}else u+=os(i,d=>applyDamageMultiplier(ao(h,d)*s,d))}else if(l.op==="hp"&&(l.flat??0)<0){const h=Math.abs(l.flat??0);if(l.target==="enemy_one"){const d=o??vb(e,i,h,s);d&&(u+=applyDamageMultiplier(h*s,d),n=d)}else u+=os(i,d=>applyDamageMultiplier(h*s,d))}u>0&&g.push({damage:u,action:{...r.action,enemyTarget:n}})}return g.length===0?null:(g.sort((r,u)=>u.damage-r.damage),g[0].action)};
-function MI(e){const t={s:e.seed|1},i=[],s=pb(e.ally),a=pb(e.enemy),g=[...s.units,...a.units];i.push({type:"battle_start",turn:0,allies:e.ally.units,enemies:e.enemy.units,snapshots:_e(g)});const r=e.rule==="ally_first_interleaved"||e.rule==="enemy_first_interleaved",n=e.rule==="ally_first"||e.rule==="ally_first_interleaved"?[s,a]:[a,s];let o=!1,p=0;for(let d=1;d<=RB;d++){p=d;const c=[];for(const v of g)v.statusEffects.some(m=>m.type==="frozen")||v.skills.forEach(m=>{const y=v.cooldowns[m.id];y&&(v.cooldowns[m.id]=y-1,c.push({unitId:v.id,skillId:m.id,newCd:y-1}))});c.length>0&&i.push({type:"turn_start",turn:d,cdChanges:c,snapshots:_e(g)});const f=r?DB(n):MB(n);for(const{actor:v,actorSide:m,opponentSide:y}of f){if(o||Fy(v))continue;if(ql(y)){o=!0;break}const S=v.statusEffects.some(P=>P.type==="frozen");if(v.statusEffects=ml(v.statusEffects.map(P=>P.turnsLeft<=0?null:S&&P.type!=="frozen"?P:{...P,turnsLeft:P.turnsLeft-1})),v.hp>0&&!S){for(const P of v.statusEffects){if(P.type==="burn"||P.type==="poison"){const E=YI(P,v);v.hp=Math.max(0,v.hp-E);const I=P.type==="burn"?"화상":"중독";i.push({type:"status_effect",turn:d,text:`${ky(v.name)} ${I}으로 ${Math.round(E)} 대미지!`,hpChanges:[{unitId:v.id,delta:-E,newHp:v.hp}],snapshots:_e(g)})}if(P.type==="regen"){const E=m9(P,v);E>0&&i.push({type:"status_effect",turn:d,text:`${v.name} 재생으로 HP ${Math.round(E)} 회복`,hpChanges:[{unitId:v.id,delta:E,newHp:v.hp}],snapshots:_e(g)})}if(P.type==="mp_regen"){const E=y9(P,v);E>0&&i.push({type:"status_effect",turn:d,text:`${v.name} 수맥으로 MP ${Math.round(E)} 회복`,hpChanges:[],mpChanges:[{unitId:v.id,delta:E,newMp:v.mp}],snapshots:_e(g)})}}if(v.hp<=0){if(gm(m,i,t,d,g),ql(m)){o=!0;break}continue}}if(v.statusEffects.find(P=>P.type==="frozen")){i.push({type:"status_effect",turn:d,text:`${v.name} 결빙 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="stun")){i.push({type:"status_effect",turn:d,text:`${v.name} 스턴 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="sleep")){i.push({type:"status_effect",turn:d,text:`${v.name} 수면 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="confusion")&&Ze(t)<.5){i.push({type:"status_effect",turn:d,text:`${v.name} 혼란 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(KB(v,m,y,1,t,i,d,m===a,g),gm(m,i,t,d,g),gm(y,i,t,d,g),ql(m)){o=!0;break}if(ql(y)){o=!0;break}}if(o)break}const l=ql(a);return i.push({type:"battle_end",turn:p,victory:l}),{victory:l,events:i,totalTurns:p,rngAfter:t.s}};
+// Production combat AI, verified against the 2026-10-07 release.
+function expectedDamage(effect, action, actor, target, multiplier) {
+  const mpCost = action.kind === "skill" ? wp(actor, action.skill.mpCost) : 0;
+  if ((mpCost > 0 && gb(target)) || (action.kind === "potion" && target.statusEffects.some(s => s.type === "potion_guard" && s.flat > 0))) return 0;
+  if (effect.op === "hp") return applyDamageMultiplier(Math.abs(target.maxHp * (effect.percent || 0) / 100 + (effect.flat || 0)) * multiplier, target);
+  const coefficient = action.kind === "skill" && action.skill.type === "attack_aoe_mp_burn"
+    ? VI(action.skill, actor.mp - mpCost) : effect.coefficient;
+  const hitChance = (actor.statusEffects.some(s => s.type === "blind") ? .5 : 1)
+    * (target.statusEffects.some(s => s.type === "evasion") ? .5 : 1);
+  return applyDamageMultiplier(g9(ao(Vi(actor) * coefficient, target, actor) * multiplier, target), target) * hitChance;
+}
+function damageTarget(actor, enemies, damage) {
+  const alive = enemies.filter(unit => unit.hp > 0);
+  if (!alive.length) return null;
+  const taunt = alive.find(unit => unit.id === Gy(actor));
+  if (taunt) return taunt;
+  const visible = alive.filter(unit => !unit.statusEffects.some(s => s.type === "stealth"));
+  const candidates = visible.length ? visible : alive;
+  const lethal = candidates.filter(unit => damage(unit) >= unit.hp);
+  if (lethal.length) return lethal.reduce((best, unit) => Sv(unit) > Sv(best) ? unit : best);
+  const damageable = candidates.filter(unit => damage(unit) > 0);
+  return (damageable.length ? damageable : candidates).reduce((best, unit) => unit.hp / unit.maxHp < best.hp / best.maxHp ? unit : best);
+}
+function jB(actor, candidates, enemies, multiplier) {
+  const scored = [];
+  for (const candidate of candidates) {
+    let damage = 0, target;
+    const dispelTarget = HI(candidate.effects, enemies);
+    for (const effect of candidate.effects) {
+      if (!(effect.op === "atk_damage" || (effect.op === "hp" && (effect.flat || 0) < 0))) continue;
+      const estimate = unit => expectedDamage(effect, candidate.action, actor, unit, multiplier);
+      if (effect.target === "enemy_one") {
+        target = dispelTarget || damageTarget(actor, enemies, estimate);
+        if (target) damage += estimate(target);
+      } else if (effect.target === "enemy_all") damage += os(enemies, estimate);
+    }
+    const damaging = candidate.effects.some(effect => effect.op === "atk_damage" || (effect.op === "hp" && (effect.flat || 0) < 0));
+    if (damage > 0 || (damaging && $I(candidate.effects, [], target ? [target] : enemies))) {
+      scored.push({ damage, action: { ...candidate.action, enemyTarget: target } });
+    }
+  }
+  scored.sort((a, b) => b.damage - a.damage);
+  return scored[0]?.action || null;
+}
+function advanceStatuses(unit) {
+  const frozen = unit.statusEffects.some(s => s.type === "frozen");
+  unit.statusEffects = ml(unit.statusEffects.map(s => s.turnsLeft <= 0 ? null
+    : frozen && s.type !== "frozen" ? s
+    : s.turnTiming === "starts_on_next_action" ? { ...s, turnTiming: "expires_before_action" }
+    : s.turnTiming === "expires_before_action" && s.turnsLeft === 1 ? null
+    : { ...s, turnsLeft: s.turnsLeft - 1 }));
+  return frozen;
+}
+function MI(e){const t={s:e.seed|1},i=[],s=pb(e.ally),a=pb(e.enemy),g=[...s.units,...a.units];i.push({type:"battle_start",turn:0,allies:e.ally.units,enemies:e.enemy.units,snapshots:_e(g)});const r=e.rule==="ally_first_interleaved"||e.rule==="enemy_first_interleaved",n=e.rule==="ally_first"||e.rule==="ally_first_interleaved"?[s,a]:[a,s];let o=!1,p=0;for(let d=1;d<=RB;d++){p=d;const c=[];for(const v of g)v.statusEffects.some(m=>m.type==="frozen")||v.skills.forEach(m=>{const y=v.cooldowns[m.id];y&&(v.cooldowns[m.id]=y-1,c.push({unitId:v.id,skillId:m.id,newCd:y-1}))});c.length>0&&i.push({type:"turn_start",turn:d,cdChanges:c,snapshots:_e(g)});const f=r?DB(n):MB(n);for(const{actor:v,actorSide:m,opponentSide:y}of f){if(o||Fy(v))continue;if(ql(y)){o=!0;break}const S=advanceStatuses(v);if(v.hp>0&&!S){for(const P of v.statusEffects){if(P.type==="burn"||P.type==="poison"){const E=YI(P,v);v.hp=Math.max(0,v.hp-E);const I=P.type==="burn"?"화상":"중독";i.push({type:"status_effect",turn:d,text:`${ky(v.name)} ${I}으로 ${Math.round(E)} 대미지!`,hpChanges:[{unitId:v.id,delta:-E,newHp:v.hp}],snapshots:_e(g)})}if(P.type==="regen"){const E=m9(P,v);E>0&&i.push({type:"status_effect",turn:d,text:`${v.name} 재생으로 HP ${Math.round(E)} 회복`,hpChanges:[{unitId:v.id,delta:E,newHp:v.hp}],snapshots:_e(g)})}if(P.type==="mp_regen"){const E=y9(P,v);E>0&&i.push({type:"status_effect",turn:d,text:`${v.name} 수맥으로 MP ${Math.round(E)} 회복`,hpChanges:[],mpChanges:[{unitId:v.id,delta:E,newMp:v.mp}],snapshots:_e(g)})}}if(v.hp<=0){if(gm(m,i,t,d,g),ql(m)){o=!0;break}continue}}if(v.statusEffects.find(P=>P.type==="frozen")){i.push({type:"status_effect",turn:d,text:`${v.name} 결빙 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="stun")){i.push({type:"status_effect",turn:d,text:`${v.name} 스턴 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="sleep")){i.push({type:"status_effect",turn:d,text:`${v.name} 수면 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(v.statusEffects.find(P=>P.type==="confusion")&&Ze(t)<.5){i.push({type:"status_effect",turn:d,text:`${v.name} 혼란 상태! 행동 불능`,hpChanges:[],snapshots:_e(g)});continue}if(KB(v,m,y,1,t,i,d,m===a,g),gm(m,i,t,d,g),gm(y,i,t,d,g),ql(m)){o=!0;break}if(ql(y)){o=!0;break}}if(o)break}const l=ql(a);return i.push({type:"battle_end",turn:p,victory:l}),{victory:l,events:i,totalTurns:p,rngAfter:t.s,...o?{}:{timedOut:!0}}};
 function gm(e,t,i,s,a){for(const g of e.units)g.hp<=0&&!kB(g.id,t)&&(!g.hasCrystalDivinationRevived&&Ze(i)<e.skills.crystalDivination*.05&&zy(g,.3)?(g.hasCrystalDivinationRevived=!0,t.push({type:"crystal_divination",turn:s,actorId:g.id,text:`${ky(g.name)} 부활!`,hpChanges:[{unitId:g.id,delta:g.hp,newHp:g.hp}]})):LB(g,t,s,a)||Fy(g)&&t.push({type:"defeat",turn:s,unitId:g.id,unitName:g.name}))};
 function m9(e,t){if(t.hp<=0||t.hp>=t.maxHp||t.statusEffects.some(a=>a.type==="heal_block"))return 0;const i=t.maxHp*e.percent/100+e.flat,s=t.hp;return t.hp=Math.min(t.maxHp,t.hp+i),t.hp-s};
 function y9(e,t){if(t.hp<=0||t.mp>=t.maxMp)return 0;const i=t.maxMp*e.percent/100+e.flat,s=t.mp;return t.mp=Math.min(t.maxMp,t.mp+i),t.mp-s};
@@ -22,7 +74,7 @@ function ql(e){return e.units.every(Fy)};
 function NI(e,t,i,s,a){const g=VB(e,t,i,s);if(g)return g;const r=YB(e,t);if(r)return r;const u=XB(e,t,i,s);if(u)return u;const n=_B(e,t);return n||jB(e,t,s,a)};
 function GI(e){return e.some(t=>t.op==="dispel"||t.op==="dispel_all")};
 function MB(e){const t=[];for(const i of e){const s=e.find(a=>a!==i);for(const a of i.units)t.push({actor:a,actorSide:i,opponentSide:s})}return t};
-function LB(e,t,i,s){const a=e.statusEffects.findIndex(r=>r.type==="afterimage");if(a<0)return!1;const g=e.statusEffects[a];return e.statusEffects=e.statusEffects.filter((r,u)=>u!==a),Uc(e,By({effectId:g.effectId+"_undying",type:"undying",casterId:g.casterId,turnsLeft:1})),t.push({type:"status_effect",turn:i,text:`${ky(e.name)} 잔상 발동! 불사 1턴`,hpChanges:[],snapshots:_e(s)}),!0};
+function LB(e,t,i,s){const a=e.statusEffects.findIndex(r=>r.type==="afterimage");if(a<0)return!1;const g=e.statusEffects[a];return e.statusEffects=e.statusEffects.filter((r,u)=>u!==a),Uc(e,By({effectId:g.effectId+"_undying",type:"undying",casterId:g.casterId,turnsLeft:1,turnTiming:"expires_before_action"})),t.push({type:"status_effect",turn:i,text:`${ky(e.name)} 잔상 발동! 불사 1턴`,hpChanges:[],snapshots:_e(s)}),!0};
 function vb(e,t,i,s){const a=t.filter(o=>o.hp>0);if(a.length===0)return null;const g=Gy(e);if(g){const o=a.find(p=>p.id===g);if(o)return o}const r=a.filter(o=>!o.statusEffects.some(p=>p.type==="stealth")),u=r.length>0?r:a,n=u.filter(o=>applyDamageMultiplier(ao(i,o)*s,o)>=o.hp);return n.length>0?n.reduce((o,p)=>Sv(p)>Sv(o)?p:o):u.reduce((o,p)=>p.hp/p.maxHp<o.hp/o.maxHp?p:o)};
 function kI(e,t,i,s,a,g,r,u,n,o=!1,q=!1){
   const p=[],l=[],h=[],d=[];
@@ -88,7 +140,7 @@ function kI(e,t,i,s,a,g,r,u,n,o=!1,q=!1){
           if(S.hp<=0)continue;
           if(IB.has(c.status)&&S.statusEffects.some(x=>x.type==="cc_immune")){d.push(`${S.name}(CC면역)`);continue}
           const b={effectId:c.effectId,type:c.status,percent:c.percent??0,flat:c.flat??0,coefficient:c.coefficient??0,casterAtk:Vi(t),casterId:t.id,turnsLeft:c.duration};
-          Uc(S,b);y.push(S.name);
+          Uc(S,q?{...b,turnTiming:S===t?"expires_before_action":"starts_on_next_action"}:b);y.push(S.name);
         }
         if(y.length>0){const S=Sm(c.target,f.length,n)??y.join(", ");d.push(`${S}(${v}${m} ${c.duration}턴)`)}
         break;
@@ -140,7 +192,7 @@ function gb(e){return e.statusEffects.some(t=>t.type==="anti_magic")};
 function consumePotionGuard(e){const t=e.statusEffects.find(i=>i.type==="potion_guard"&&(i.flat??0)>0);if(!t)return!1;return t.flat<=1?e.statusEffects=e.statusEffects.filter(i=>i!==t):e.statusEffects=e.statusEffects.map(i=>i===t?{...i,flat:i.flat-1}:i),!0};
 function applyBackflow(e,t){if(t<=0)return null;const i=e.statusEffects.find(s=>s.type==="backflow");if(!i)return null;const s=applyDamageMultiplier(t*(i.percent??0)/100,e);return e.hp=Math.max(0,e.hp-s),Xh(e,"backflow"),{hpChange:{unitId:e.id,delta:-s,newHp:e.hp},text:`${e.name}(역류 ${Math.round(s)})`}};
 function qB(e,t,i,s){const a=UI(e),g=t.potions.filter(u=>!u.used),r=[];for(const u of a)u.type!=="resurrect_aoe"&&u.type!=="resurrect_one"&&r.push({kind:"skill",skill:u});for(const u of g)XI(u,i.units)&&(GI(u.effects)&&!$I(u.effects,t.units,i.units)||r.push({kind:"potion",potion:u}));return r.length===0?null:r[Math.floor(Ze(s)*r.length)]};
-function UB(e,t,i,s){const a=t.units.filter(u=>u.hp>0),g=i.units.filter(u=>u.hp>0);if(g.length===0)return null;const r=[];for(const u of t.potions.filter(n=>!n.used)){if(u.itemCode==="rejuvenation_potion"){if(t.units.some(n=>n.hp<=0))return{kind:"potion",potion:u};continue}if(u.itemCode==="sunset_glow_potion"){if(t.units.some(n=>n.hp<=0))return{kind:"potion",potion:u};continue}if(u.itemCode==="sunset_potion"){if(t.potions.some(n=>n.used&&n.itemCode!=="sunset_potion"&&n.enhancement<=u.enhancement&&XI(n,i.units)))return{kind:"potion",potion:u};continue}if(u.itemCode==="encroachment_potion"){const n=$y(i.units);if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}if(u.itemCode==="nightmare_potion"){const n=Hy(i.units,"sleep");if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}if(u.itemCode==="contagion_potion"){const n=Ky(i.units,u.enhancement+1);if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}r.push({effects:u.effects,action:{kind:"potion",potion:u}})}return r.length===0?null:NI(e,r,a,g,s)};
+function UB(e,t,i,s){const a=t.units.filter(u=>u.hp>0),g=i.units.filter(u=>u.hp>0);if(g.length===0)return null;const r=[];for(const u of t.potions.filter(n=>!n.used&&XI(n,i.units))){if(u.itemCode==="rejuvenation_potion"){if(t.units.some(n=>n.hp<=0))return{kind:"potion",potion:u};continue}if(u.itemCode==="sunset_glow_potion"){if(t.units.some(n=>n.hp<=0))return{kind:"potion",potion:u};continue}if(u.itemCode==="sunset_potion"){if(t.potions.some(n=>n.used&&n.itemCode!=="sunset_potion"&&n.enhancement<=u.enhancement&&XI(n,i.units)))return{kind:"potion",potion:u};continue}if(u.itemCode==="encroachment_potion"){const n=$y(i.units);if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}if(u.itemCode==="nightmare_potion"){const n=Hy(i.units,"sleep");if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}if(u.itemCode==="contagion_potion"){const n=Ky(i.units,u.enhancement+1);if(n)return{kind:"potion",potion:u,enemyTarget:n};continue}r.push({effects:u.effects,action:{kind:"potion",potion:u}})}return r.length===0?null:NI(e,r,a,g,s)};
 function _h(e){return e.flat??0};
 function vm(e,t,i,s,a,g,r,u,n,o){
   switch(e.kind){
@@ -173,7 +225,7 @@ function vm(e,t,i,s,a,g,r,u,n,o){
   }
 };
 function LI(e,t,i,s,a,g){if(!t.units.some(u=>(u.engravedGems?.length??0)>0)&&!i.units.some(u=>(u.engravedGems?.length??0)>0))return;const r=new Set(e.filter(u=>u.delta<0).map(u=>u.unitId));if(r.size!==0)for(const u of r){const{unit:n,fromSide:o}=FI(u,t,i);if(!n||n.hp<=0)continue;const p=(n.engravedGems??[]).filter(l=>l.itemCode==="refined_fluorite");if(p.length!==0&&(n.fluorescence+=1,n.fluorescence>=mL)){n.fluorescence=0;const l=os(p,y=>GP(y.enhancement)),d=Vi(n)*l,f=(o===t?i:t).units.filter(y=>y.hp>0),v=[],m=[];for(const y of f){const S=applyDamageMultiplier(ao(d,y),y);y.hp=Math.max(0,y.hp-S),v.push({unitId:y.id,delta:-S,newHp:y.hp}),m.push(`${y.name}(${Math.round(S)})`)}m.length>0&&a.push({type:"skill",turn:s,actorId:n.id,skillId:"fluorescence_burst",text:`${n.name} 마력 폭발! ${m.join(", ")}`,hpChanges:v,mpChanges:[],cdChanges:[],snapshots:_e(g)})}}};
-function KB(e,t,i,s,a,g,r,u,n){if(e.smart){const o=e.skills.find(d=>d.type==="resurrect_aoe");if(o){const d=t.units.filter(f=>f!==e&&f.hp<=0),c=t.units.filter(f=>f!==e&&f.hp>0);if(d.length>0&&c.length===0&&$B(e,t,o,g,r,n))return}const p=e.skills.find(d=>d.type==="resurrect_one");if(p){const d=e.cooldowns[p.id]??0,c=t.units.filter(f=>f!==e&&f.hp<=0);if(d<=0&&c.length>0){const f=wp(e,p.mpCost);if(e.mp>=f&&HB(e,t,p,f,g,r,n))return}}const l=UB(e,t,i,s);l&&vm(l,e,t,i,s,a,g,r,u,n);const h=WB(e,t,i,s);h&&vm(h,e,t,i,s,a,g,r,u,n)}else{const o=qB(e,t,i,a);o&&vm(o,e,t,i,s,a,g,r,u,n)}};
+function KB(e,t,i,s,a,g,r,u,n){if(e.smart){const potion=UB(e,t,i,s);if(potion&&(vm(potion,e,t,i,s,a,g,r,u,n),Fy(e)))return;const o=e.skills.find(d=>d.type==="resurrect_aoe");if(o){const d=t.units.filter(f=>f!==e&&f.hp<=0),c=t.units.filter(f=>f!==e&&f.hp>0);if(d.length>0&&c.length===0&&$B(e,t,o,g,r,n))return}const p=e.skills.find(d=>d.type==="resurrect_one");if(p){const d=e.cooldowns[p.id]??0,c=t.units.filter(f=>f!==e&&f.hp<=0);if(d<=0&&c.length>0){const f=wp(e,p.mpCost);if(e.mp>=f&&HB(e,t,p,f,g,r,n))return}}const h=WB(e,t,i,s);h&&vm(h,e,t,i,s,a,g,r,u,n)}else{const o=qB(e,t,i,a);o&&vm(o,e,t,i,s,a,g,r,u,n)}};
 function DI(e){const t=e.baseDef;let i=0,s=0;return e.statusEffects.forEach(a=>{a.type==="def_buff"&&(i+=a.percent??0,s+=a.flat??0)}),t*(1+i/100)+s};
 function wp(e,t){if(t<=0)return 0;let i=0;for(const s of e.statusEffects)s.type==="mp_cost_reduce"&&(i+=s.percent);return Math.max(0,Math.round(t*(1-i/100)))};
 function _e(e){return e.map(t=>({unitId:t.id,name:t.name,spriteKey:t.spriteKey,rawAtk:t.rawAtk,rawDef:t.rawDef,baseAtk:t.baseAtk,equipmentItemCode:t.equipmentItemCode,baseDef:t.baseDef,effectiveAtk:Vi(t),effectiveDef:DI(t),hp:t.hp,maxHp:t.maxHp,mp:t.mp,maxMp:t.maxMp,statusEffects:t.statusEffects.map(i=>({type:i.type,percent:i.percent,flat:i.flat,turnsLeft:i.turnsLeft})),cooldowns:{...t.cooldowns},skills:t.skills.map(i=>({id:i.id,name:i.name,spriteKey:i.spriteKey,type:i.type,coefficient:i.coefficient,mpCost:i.mpCost,cooldown:i.cooldown}))}))};
@@ -193,7 +245,7 @@ function OI(e,t){
   e.statusEffects=[];
   return!0;
 };
-function Uc(e,t){const i=e.statusEffects.findIndex(s=>s.effectId===t.effectId);i>=0?e.statusEffects[i]=t:e.statusEffects.push(t)};
+function Uc(e,t){const i=e.statusEffects.findIndex(s=>s.effectId===t.effectId||s.type==="taunt"&&t.type==="taunt");i>=0?e.statusEffects[i]=t:e.statusEffects.push(t)};
 function rawStatusDamage(e,t){const i=e.coefficient>0?e.casterAtk*e.coefficient:t.maxHp*e.percent/100+e.flat;return e.type==="burn"?ao(i,t):i};
 function YI(e,t){return applyDamageMultiplier(rawStatusDamage(e,t),t)};
 function $I(e,t,i){return e.some(s=>s.op!=="dispel"&&s.op!=="dispel_all"?!1:(bv(s.target)?t:i).some(g=>g.hp>0&&Ny(s,g)))};
@@ -209,7 +261,7 @@ function p9(e){switch(e.type){case"atk_buff":case"def_buff":return(e.flat??0)<0|
 function PB(e){return e.charAt(e.length-1)};
 function et(e){if(!e||typeof e!="string")return null;const t=dd.get(e);if(t!==void 0)return t;const i=rB(e);return i!==null&&(dd.size>=oB&&dd.clear(),dd.set(e,i)),i};
 function lf(e){return e.percent??0};
-function zI(e,t,i,s,a,g,r,u,n,o,p,l){const h=it[e.itemCode].name;if(e.itemCode==="rejuvenation_potion"){const c=Math.min(1,(e.enhancement+1)*.1),f=i.units.find(v=>v.hp<=0);f&&zy(f,c)?r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} 사용! ${f.name} 부활! (HP ${Math.round(c*100)}%)`,hpChanges:[{unitId:f.id,delta:f.hp,newHp:f.hp}],mpChanges:[],cdChanges:[],snapshots:_e(l)}):r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — 부활 대상 없음`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)});return}if(e.itemCode==="sunset_glow_potion"){const c=i.units.filter(y=>y.hp<=0),f=os(c.map(y=>y.baseAtk)),v=(e.enhancement+1)*.25,m=Math.round(f*v);if(m>0){Uc(t,By({effectId:"sunset_glow_atk",type:"atk_buff",flat:m,casterId:t.id,turnsLeft:1}));const y=c.map(S=>S.name).join(", ");r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} 사용! ${y}의 빛을 이어받아 ATK +${m}`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)})}else r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — 쓰러진 아군 없음`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)});return}if(e.itemCode==="sunset_potion"){const c=i.potions.filter(f=>f.used&&f.itemCode!=="sunset_potion"&&f.enhancement<=e.enhancement&&XI(f,s.units));if(c.length>0){const f=c[Math.floor(Ze(g)*c.length)],v=it[f.itemCode].name;r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — ${v} 재발동!`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)}),zI(f,t,i,s,a,g,r,u,void 0,void 0,p,l)}else r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — 재발동할 포션 없음`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)});return}if(e.itemCode==="encroachment_potion"){zB(e,t,s,r,u,l);return}if(e.itemCode==="nightmare_potion"){NB(e,t,s,r,u,l);return}if(e.itemCode==="contagion_potion"){GB(e,t,s,r,u,l);return}const d=kI(e.effects,t,i,s,a,g,n,o,p,!1,!0);r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} 사용! ${d.texts.join(", ")}`,hpChanges:d.hpChanges,mpChanges:d.mpChanges,cdChanges:d.cdChanges,snapshots:_e(l)}),LI(d.hpChanges,i,s,u,r,l),BI(d.hpChanges,i,s,u,r,l)};
+function zI(e,t,i,s,a,g,r,u,n,o,p,l){const h=it[e.itemCode].name;if(e.itemCode==="rejuvenation_potion"){const c=Math.min(1,(e.enhancement+1)*.1),f=i.units.find(v=>v.hp<=0);f&&zy(f,c)?r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} 사용! ${f.name} 부활! (HP ${Math.round(c*100)}%)`,hpChanges:[{unitId:f.id,delta:f.hp,newHp:f.hp}],mpChanges:[],cdChanges:[],snapshots:_e(l)}):r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — 부활 대상 없음`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)});return}if(e.itemCode==="sunset_glow_potion"){const c=i.units.filter(y=>y.hp<=0),f=os(c.map(y=>y.baseAtk)),v=(e.enhancement+1)*.25,m=Math.round(f*v);if(m>0){Uc(t,By({effectId:"sunset_glow_atk",type:"atk_buff",flat:m,casterId:t.id,turnsLeft:1,turnTiming:"expires_before_action"}));const y=c.map(S=>S.name).join(", ");r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} 사용! ${y}의 빛을 이어받아 ATK +${m}`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)})}else r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — 쓰러진 아군 없음`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)});return}if(e.itemCode==="sunset_potion"){const c=i.potions.filter(f=>f.used&&f.itemCode!=="sunset_potion"&&f.enhancement<=e.enhancement&&XI(f,s.units));if(c.length>0){const f=c[Math.floor(Ze(g)*c.length)],v=it[f.itemCode].name;r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — ${v} 재발동!`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)}),zI(f,t,i,s,a,g,r,u,void 0,void 0,p,l)}else r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} — 재발동할 포션 없음`,hpChanges:[],mpChanges:[],cdChanges:[],snapshots:_e(l)});return}if(e.itemCode==="encroachment_potion"){zB(e,t,s,r,u,l);return}if(e.itemCode==="nightmare_potion"){NB(e,t,s,r,u,l);return}if(e.itemCode==="contagion_potion"){GB(e,t,s,r,u,l);return}const d=kI(e.effects,t,i,s,a,g,n,o,p,!1,!0);r.push({type:"potion_use",turn:u,actorId:t.id,itemCode:e.itemCode,text:`${t.name}: ${h} 사용! ${d.texts.join(", ")}`,hpChanges:d.hpChanges,mpChanges:d.mpChanges,cdChanges:d.cdChanges,snapshots:_e(l)}),LI(d.hpChanges,i,s,u,r,l),BI(d.hpChanges,i,s,u,r,l)};
 function Sm(e,t,i){return t<=1?null:e==="enemy_all"?i?"아군 전체":"적 전체":e==="ally_all"?i?"적 전체":"아군 전체":null};
 function XB(e,t,i,s){const a=[];for(const u of t){if(!u.effects.some(d=>d.op==="status"||Lb(d)||d.op==="cleanse"||d.op==="dispel"||d.op==="dispel_all")||ZB(u.effects)||QB(u.effects)||JB(u.effects)||u.effects.some(d=>d.op==="cooldown_reduce")||o9(u.effects,e,i,s)||GI(u.effects)&&!$I(u.effects,i,s))continue;const o=a9(u.effects,i,s,e),p=l9(u.effects,s,e),{allyTarget:l,enemyTarget:h}=n9(u.effects,i,s,e);a.push({value:o,canKill:p,action:{...u.action,allyTarget:l,enemyTarget:h}})}if(a.length===0)return null;if(a[0].action.kind==="potion")return a[0].action;const g=a.filter(u=>u.canKill),r=g.length>0?g:a;return r.length>1&&r.sort((u,n)=>n.value-u.value),r[0].action};
 function Xh(e,t){e.statusEffects=e.statusEffects.filter(i=>i.type!==t)};
@@ -337,15 +389,14 @@ export function simulateRaid(attacker, defender, gd, rule="enemy_first_interleav
   it=gd.items||{};
   const ally=buildRaidSide(attacker, gd, "raid_attacker_");
   const enemy=buildRaidSide(defender, gd, "raid_defender_");
-  const result=MI({seed:(seed>>>0)||1,ally,enemy,rule});
-  if(enemy.units.length) return result;
-  return {
-    ...result,
-    totalTurns:0,
-    events:result.events
-      .filter(event=>event.type==="battle_start"||event.type==="battle_end")
-      .map(event=>({...event,turn:0})),
-  };
+  if (!ally.units.length || !enemy.units.length) {
+    const victory = !enemy.units.length;
+    return { victory, totalTurns:0, rngAfter:seed|1, events:[
+      {type:"battle_start",turn:0,allies:ally.units,enemies:enemy.units,snapshots:[]},
+      {type:"battle_end",turn:0,victory},
+    ] };
+  }
+  return MI({seed:(seed>>>0)||1,ally,enemy,rule});
 }
 
 export function raidWinRate(attacker, defender, gd, rule="enemy_first_interleaved", trials=1000, seedBase=1){
@@ -374,3 +425,26 @@ export function raidWinRate(attacker, defender, gd, rule="enemy_first_interleave
   };
 }
 export { MI };
+
+// A duel uses the same seed for both alternating-initiative rounds. A split
+// result or a timeout is a draw, rather than a weighted raid win probability.
+export function duelOutcome(rounds) {
+  if (rounds.every(round => !round.timedOut && round.victory)) return "attack_win";
+  if (rounds.every(round => !round.timedOut && !round.victory)) return "defense_win";
+  return "draw";
+}
+export function simulateDuel(attacker, defender, gd, seed = 1) {
+  const rounds = ["ally_first_interleaved", "enemy_first_interleaved"]
+    .map(rule => simulateRaid(attacker, defender, gd, rule, seed));
+  return { rounds, outcome: duelOutcome(rounds) };
+}
+export function duelWinRate(attacker, defender, gd, trials = 1000, seedBase = 1) {
+  let wins = 0, losses = 0, draws = 0;
+  for (let i = 0; i < trials; i++) {
+    const result = simulateDuel(attacker, defender, gd, ((seedBase + i * 2654435761) >>> 0) || 1);
+    if (result.outcome === "attack_win") wins++;
+    else if (result.outcome === "defense_win") losses++;
+    else draws++;
+  }
+  return { trials, wins, losses, draws, rate: wins / trials, drawRate: draws / trials, lossRate: losses / trials };
+}

@@ -1623,7 +1623,7 @@ footer .credit-link:hover .credit-av { border-color: var(--accent); }
 .raid-rule-icon img { width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; }
 .raid-opening-row > b { font-size: 12.5px; }
 .raid-rules label { font-size: 12.5px; }
-.raid-rules select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font-size: 12px; }
+.raid-rules select, .raid-mode select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font-size: 12px; }
 .raid-opening-row .adv-enh[hidden] { display: none; }
 .raid-opening-rate { color: var(--muted); font-size: 11px; }
 .raid-rule-summary { display: flex; justify-content: flex-end; gap: 5px; flex-wrap: wrap; }
@@ -1862,3 +1862,5 @@ html[data-theme="light"] .adv-rec-applyg {
 html[data-theme="light"] .pl-share-in {
   background: #ffffff;
 }
+
+.raid-mode { display: flex; align-items: center; gap: 12px; font-weight: 700; }

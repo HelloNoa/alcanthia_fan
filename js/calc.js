@@ -22,7 +22,7 @@ export async function renderCalc(view, sub) {
     level: "🌱 레벨 계산",
     ev: "🎲 강화 기댓값",
     adv: "⚔️ 모험 시뮬",
-    raid: "🛡️ 습격 시뮬",
+    raid: "🛡️ PvP 시뮬",
   };
   const current = VIEWS[sub] ? sub : "brew";
   view.innerHTML = `<h2>🧮 계산기</h2>

@@ -1,5 +1,5 @@
 import { api, gamedata } from "./api.js";
-import { raidWinRate, simulateRaid } from "./battle.js";
+import { duelWinRate, raidWinRate, simulateRaid } from "./battle.js";
 import { escapeHtml, hydrateCombatIcons, renderCombatFlow } from "./combat_log.js";
 import {
   combineRaidRates,
@@ -53,17 +53,17 @@ function normalizeEditableParty(rawParty) {
   };
 }
 
-function readStoredSettings() {
+function readStoredSettings(key = RAID_STORE) {
   try {
-    const value = JSON.parse(localStorage.getItem(RAID_STORE) || "null");
+    const value = JSON.parse(localStorage.getItem(key) || "null");
     return value && typeof value === "object" ? value : {};
   } catch {
     return {};
   }
 }
 
-function writeStoredSettings(settings) {
-  try { localStorage.setItem(RAID_STORE, JSON.stringify(settings)); } catch {}
+function writeStoredSettings(settings, key = RAID_STORE) {
+  try { localStorage.setItem(key, JSON.stringify(settings)); } catch {}
 }
 
 function userQuery(query) {
@@ -90,7 +90,12 @@ function makeProfileErrorMarkup(errors) {
   </div>`;
 }
 
-export async function raidSim(body) {
+export async function raidSim(body, selectedMode) {
+  const mode = (selectedMode || readStoredSettings("alc_pvp_mode").mode) === "duel" ? "duel" : "raid";
+  const isDuel = mode === "duel";
+  const storeKey = isDuel ? "alc_duel_sim_v1" : RAID_STORE;
+  const battleLabel = isDuel ? "결투" : "습격";
+  let disposed = false;
   const gameData = await gamedata();
   const adventurerEntries = Object.entries(gameData.adventurers || {})
     .sort(([, left], [, right]) => (left.grade || 0) - (right.grade || 0)
@@ -130,7 +135,7 @@ export async function raidSim(body) {
   ];
   const potionChoices = potionCodes.map((code) => ({ code, label: itemName(code) }));
 
-  const stored = readStoredSettings();
+  const stored = readStoredSettings(storeKey);
   let attackerProfile = null;
   let defenderProfile = null;
   let attackerParty = { adventurers: [], potions: [] };
@@ -146,12 +151,16 @@ export async function raidSim(body) {
     <div class="raid-sim">
       <div class="raid-title-row">
         <div>
-          <h3>🛡️ 실제 유저 습격 시뮬레이터</h3>
+          <h3>🛡️ 실제 유저 PvP 시뮬레이터</h3>
           <p class="muted">양측 공개 파티를 불러와 편성과 강화도를 바꿔 테스트하세요. 변경은 시뮬레이터에만 적용됩니다.</p>
         </div>
         <span class="raid-readonly">가상 전투</span>
       </div>
 
+      <label class="raid-mode">전투 종류
+        <select id="raid-mode"><option value="raid" ${!isDuel ? "selected" : ""}>텃밭 습격</option><option value="duel" ${isDuel ? "selected" : ""}>술집 결투</option></select>
+      </label>
+      <p class="muted">${isDuel ? "결투 방어 편성을 불러옵니다. 같은 조건에서 선공을 바꿔 2회 전투하며, 모두 이기면 승리·모두 지면 패배·그 외에는 무승부입니다. 은신과 경계석은 적용하지 않습니다." : "텃밭 방어 편성을 불러옵니다. 은신·경계석에 따른 선공 확률로 승률을 계산합니다."}</p>
       <div class="raid-user-grid">
         <section class="raid-user-panel defender">
           <div class="raid-panel-head">
@@ -181,7 +190,7 @@ export async function raidSim(body) {
       </div>
 
       <section class="raid-rules">
-        <div class="raid-opening-settings">
+        <div class="raid-opening-settings" ${isDuel ? 'style="display:none"' : ""}>
           <div class="raid-opening-row">
             <span id="raid-stealth-icon" class="raid-rule-icon"></span>
             <label for="raid-stealth"><b>공격 은신포션</b></label>
@@ -213,9 +222,9 @@ export async function raidSim(body) {
         </div>
       </section>
 
-      <button id="raid-run" class="adv-run raid-run" type="button">🛡️ 습격 승률 계산 (선공별 ${RAID_TRIALS.toLocaleString("ko-KR")}회)</button>
+      <button id="raid-run" class="adv-run raid-run" type="button">🛡️ ${battleLabel} 승률 계산 (선공별 ${RAID_TRIALS.toLocaleString("ko-KR")}회)</button>
       <div id="raid-result"></div>
-      <div class="calc-note raid-note">실제 습격 가능 여부는 안내 정보로만 표시합니다. 보호 상태이거나 오늘 이미 습격한 대상이어도 가상 전투는 실행할 수 있습니다. 전리품과 1시간 생산량은 계산하지 않습니다.</div>
+      <div class="calc-note raid-note" ${isDuel ? 'style="display:none"' : ""}>실제 습격 가능 여부는 안내 정보로만 표시합니다. 보호 상태이거나 오늘 이미 습격한 대상이어도 가상 전투는 실행할 수 있습니다. 전리품과 1시간 생산량은 계산하지 않습니다.</div>
     </div>`;
 
   const query = (selector) => body.querySelector(selector);
@@ -235,7 +244,7 @@ export async function raidSim(body) {
     wardingOverride: defenderProfile ? wardingOverride : stored.wardingOverride,
     stealthEnhancement,
   });
-  const saveSettings = () => writeStoredSettings(settingsSnapshot());
+  const saveSettings = () => writeStoredSettings(settingsSnapshot(), storeKey);
   const markChanged = () => {
     lastResult = null;
     resultElement.innerHTML = `<div class="raid-result-empty">편성이 변경되었습니다. 승률을 다시 계산하세요.</div>`;
@@ -297,15 +306,15 @@ export async function raidSim(body) {
     }
     const availability = describeRaidAvailability(normalized.raidAvailability);
     const party = side === "attacker" ? attackerParty : defenderParty;
-    element.className = `raid-profile-state loaded${side === "defender" && availability.canRaid === false ? " blocked" : ""}`;
+    element.className = `raid-profile-state loaded${!isDuel && side === "defender" && availability.canRaid === false ? " blocked" : ""}`;
     element.innerHTML = `
       <div class="raid-profile-name">
         <b>${escapeHtml(normalized.nickname || "이름 없음")}</b>
         <span>모험가 ${party.adventurers.length} · 포션 ${party.potions.length}</span>
       </div>
-      ${side === "defender" ? `<div class="raid-availability ${availability.canRaid === true ? "open" : availability.canRaid === false ? "closed" : ""}">
+      ${!isDuel && side === "defender" ? `<div class="raid-availability ${availability.canRaid === true ? "open" : availability.canRaid === false ? "closed" : ""}">
         ${escapeHtml(availability.label)}
-      </div>` : `<div class="raid-import-note">공개 방어 파티를 공격 편성의 시작값으로 불러왔습니다.</div>`}
+      </div>` : `<div class="raid-import-note">${isDuel ? "공개 결투 방어 편성" : "공개 텃밭 방어 편성"}을 ${side === "attacker" ? "공격 편성의 시작값으로" : "방어 편성으로"} 불러왔습니다.</div>`}
       ${makeProfileErrorMarkup(normalized.errors)}`;
   };
 
@@ -323,11 +332,11 @@ export async function raidSim(body) {
         errors.push(...profile.errors);
       }
     }
-    if (stealthEnhancement != null && defenderProfile && !effectiveWarding()?.known) {
+    if (!isDuel && stealthEnhancement != null && defenderProfile && !effectiveWarding()?.known) {
       errors.push("방어 텃밭 정보가 없어 경계석 효과를 확인할 수 없습니다.");
     }
     if (!attackerParty.adventurers.length) errors.push("공격 모험가를 1명 이상 편성해야 합니다.");
-    if (!attackerParty.potions.length) errors.push("실제 습격 규칙상 공격 포션이 최소 1개 필요합니다.");
+    if (!isDuel && !attackerParty.potions.length) errors.push("실제 습격 규칙상 공격 포션이 최소 1개 필요합니다.");
     for (const [label, profile, party] of [
       ["공격", attackerProfile, attackerParty], ["방어", defenderProfile, defenderParty],
     ]) {
@@ -514,7 +523,7 @@ export async function raidSim(body) {
 
     const potionHeader = document.createElement("div");
     potionHeader.className = "raid-edit-section-head potion";
-    potionHeader.innerHTML = `<div><b>${label} 포션</b><span>${party.potions.length}/${profile.caps.potions}${isAttacker ? " · 최소 1개" : ""}</span></div>`;
+    potionHeader.innerHTML = `<div><b>${label} 포션</b><span>${party.potions.length}/${profile.caps.potions}${isAttacker && !isDuel ? " · 최소 1개" : ""}</span></div>`;
     const addPotionButton = document.createElement("button");
     addPotionButton.type = "button";
     addPotionButton.className = "adv-add";
@@ -531,7 +540,7 @@ export async function raidSim(body) {
 
     const potionList = document.createElement("div");
     potionList.className = "raid-edit-potions";
-    if (isAttacker && !party.potions.length) {
+    if (isAttacker && !isDuel && !party.potions.length) {
       potionList.innerHTML = `<div class="raid-required-warning">실행하려면 ${label} 포션을 1개 이상 추가하세요.</div>`;
     }
     party.potions.forEach((potion, potionIndex) => {
@@ -597,7 +606,7 @@ export async function raidSim(body) {
       const payload = await api.garden(userQuery(value));
       if (request !== imports[side].request) return;
       imports[side].pending = false;
-      const normalized = normalizeRaidProfile(payload, gameData);
+      const normalized = normalizeRaidProfile(payload, gameData, mode);
       if (side === "attacker") {
         attackerProfile = normalized;
         const canRestore = restoreDraft
@@ -652,7 +661,7 @@ export async function raidSim(body) {
     const sampleElement = query("#raid-sample-body");
     sampleElement.innerHTML = `
       <div class="adv-sample ${sample.victory ? "win" : "lose"}">
-        ${label}: ${sample.victory ? "공격 승리" : "방어 승리"} · ${sample.totalTurns ? `${sample.totalTurns}턴` : "전투 없음"}
+        ${label}: ${isDuel && sample.timedOut ? "무승부 (30턴 초과)" : sample.victory ? "공격 승리" : "방어 승리"} · ${sample.totalTurns ? `${sample.totalTurns}턴` : "전투 없음"}
       </div>
       ${flow.markup}
       ${rawLogMarkup(sample)}`;
@@ -665,7 +674,7 @@ export async function raidSim(body) {
     });
   };
 
-  const renderResult = (defenderFirst, attackerFirst, combined, attackerFirstChance, defenderSample, attackerSample) => {
+  const renderResult = (defenderFirst, attackerFirst, combined, attackerFirstChance, defenderSample, attackerSample, duelResult) => {
     const turnDistribution = Object.entries(combined.winTurnProbabilities)
       .sort((left, right) => Number(left[0]) - Number(right[0]));
     const distributionMarkup = turnDistribution.length
@@ -686,34 +695,34 @@ export async function raidSim(body) {
     resultElement.innerHTML = `
       <section class="raid-result-summary">
         <div class="raid-final-rate">
-          <span>최종 습격 승률</span>
-          <b>${percent(combined.rate)}</b>
-          <small>은신·경계석 반영 선공 확률 ${percent(attackerFirstChance)} 가중</small>
+          <span>최종 ${battleLabel} 승률</span>
+          <b>${percent(duelResult ? duelResult.rate : combined.rate)}</b>
+          <small>${duelResult ? `무승부 ${percent(duelResult.drawRate)} · 패배 ${percent(duelResult.lossRate)} · ${duelResult.trials.toLocaleString("ko-KR")}회 (각 2경기)` : `은신·경계석 반영 선공 확률 ${percent(attackerFirstChance)} 가중`}</small>
         </div>
         <div class="raid-conditional-grid">
           <article>
-            <span>방어 선공</span>
+            <span>방어 선공 ${isDuel ? "경기 승률" : ""}</span>
             <b>${percent(defenderFirst.rate)}</b>
             <small>${defenderFirst.wins.toLocaleString("ko-KR")}승 / ${defenderFirst.trials.toLocaleString("ko-KR")}회</small>
           </article>
           <article>
-            <span>공격 선공</span>
+            <span>공격 선공 ${isDuel ? "경기 승률" : ""}</span>
             <b>${percent(attackerFirst.rate)}</b>
             <small>${attackerFirst.wins.toLocaleString("ko-KR")}승 / ${attackerFirst.trials.toLocaleString("ko-KR")}회</small>
           </article>
           <article>
-            <span>승리 시 평균</span>
-            <b>${averageTurn(combined.avgTurnsOnWin)}</b>
-            <small>두 선공 조건 가중</small>
+            <span>${isDuel ? "무승부" : "승리 시 평균"}</span>
+            <b>${duelResult ? `${duelResult.draws}회` : averageTurn(combined.avgTurnsOnWin)}</b>
+            <small>${isDuel ? "1승 1패 또는 시간 초과 포함" : "두 선공 조건 가중"}</small>
           </article>
           <article>
-            <span>패배 시 평균</span>
-            <b>${averageTurn(combined.avgTurnsOnLoss)}</b>
+            <span>${isDuel ? "패배" : "패배 시 평균"}</span>
+            <b>${duelResult ? `${duelResult.losses}회` : averageTurn(combined.avgTurnsOnLoss)}</b>
             <small>최대 30턴</small>
           </article>
         </div>
       </section>
-      ${distributionMarkup}
+      ${isDuel ? "" : distributionMarkup}
       <section class="raid-representative">
         <div class="raid-result-section-head"><b>대표 전투</b><span>선공 조건별 고정 시드</span></div>
         <div id="raid-log-tabs" class="raid-log-tabs">
@@ -740,6 +749,7 @@ export async function raidSim(body) {
     resultElement.innerHTML = `<div class="raid-result-empty">양측 편성과 포션을 적용해 전투를 계산하고 있습니다.</div>`;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     try {
+      if (disposed) return;
       const currentErrors = editableErrors();
       if (currentErrors.length) {
         resultElement.innerHTML = `<div class="err-box"><b>시뮬레이션을 실행할 수 없습니다.</b>${currentErrors.map((error) => `<span>${escapeHtml(error)}</span>`).join("")}</div>`;
@@ -780,6 +790,7 @@ export async function raidSim(body) {
         "ally_first_interleaved",
         RAID_SEED,
       );
+      const duelResult = isDuel ? duelWinRate(attackerParty, defenderParty, gameData, RAID_TRIALS, RAID_SEED) : null;
       renderResult(
         defenderFirst,
         attackerFirst,
@@ -787,12 +798,13 @@ export async function raidSim(body) {
         attackerFirstChance,
         defenderSample,
         attackerSample,
+        duelResult,
       );
     } catch (error) {
       resultElement.innerHTML = `<div class="err-box">시뮬레이션 오류: ${escapeHtml(error.message)}</div>`;
     } finally {
       runButton.disabled = false;
-      runButton.textContent = `🛡️ 습격 승률 계산 (선공별 ${RAID_TRIALS.toLocaleString("ko-KR")}회)`;
+      runButton.textContent = `🛡️ ${battleLabel} 승률 계산 (선공별 ${RAID_TRIALS.toLocaleString("ko-KR")}회)`;
     }
   }
 
@@ -822,6 +834,14 @@ export async function raidSim(body) {
     markChanged();
   };
   query("#raid-run").onclick = runSimulation;
+  query("#raid-mode").onchange = (event) => {
+    saveSettings();
+    disposed = true;
+    imports.attacker.request++;
+    imports.defender.request++;
+    writeStoredSettings({ mode: event.target.value }, "alc_pvp_mode");
+    raidSim(body, event.target.value);
+  };
 
   updateOpeningRate();
   renderAllProfiles();

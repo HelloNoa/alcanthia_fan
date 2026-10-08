@@ -98,9 +98,9 @@ const ROUTE_METADATA = Object.freeze({
     indexable: true,
   },
   "calc/raid": {
-    title: "알칸시아 습격 시뮬레이터 | 이끼제리 팬페이지",
-    heading: "알칸시아 습격 시뮬레이터",
-    description: "알칸시아 공격·방어 파티 조건을 설정해 습격 전투 흐름과 예상 승률을 계산합니다.",
+    title: "알칸시아 PvP 습격·결투 시뮬레이터 | 이끼제리 팬페이지",
+    heading: "알칸시아 PvP 습격·결투 시뮬레이터",
+    description: "알칸시아 공격·방어 파티 조건을 설정해 습격·결투 전투 흐름과 예상 승률, 결투 무승부 확률을 계산합니다.",
     indexable: true,
   },
   "quests/goals": {

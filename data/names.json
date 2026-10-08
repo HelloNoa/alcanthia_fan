@@ -1,5 +1,9 @@
 {
 "plants": {
+"wheat": {
+"name": "밀",
+"sprite": "wheat_plant"
+},
 "herb": {
 "name": "약초",
 "sprite": "herb"
@@ -177,6 +181,7 @@
 "depletion_potion": "고갈포션",
 "backflow_potion": "역류포션",
 "veil_potion": "장막포션",
+"bread_oven": "화덕",
 "fairy_lantern": "요정 등불",
 "crystal_fountain": "수정 분수",
 "mana_sprayer": "마력 분사기",
@@ -187,18 +192,21 @@
 "star_music_box": "별조각 오르골",
 "whispering_tea_table": "속삭임 찻상",
 "starlight_garden_trophy": "별빛 정원 트로피",
+"test_tube_planter": "시험관 화분",
 "garden_contest_ticket": "텃밭 콘테스트 참가권",
 "garden_sign": "나무 표지판",
 "pedestal": "전시대",
 "telescope": "망원경",
+"merchant_stall": "작은 가판대",
 "working_shelf": "작업 선반",
 "hourglass": "모래시계",
 "storage_chest": "차원상자",
 "levitation_chest": "부유상자",
 "compost_bin": "퇴비함",
+"campfire": "모닥불",
 "town_teleporter": "마을 텔레포터",
 "deep_lens": "심층 렌즈",
-"campfire": "모닥불",
+"leyline_well": "회복샘",
 "flower_trellis_arch": "꽃 트렐리스 아치",
 "rustic_fence": "낡은 울타리",
 "root_barrier": "뿌리장벽",
@@ -248,15 +256,6 @@
 "refined_onyx": "가공된 오닉스",
 "recovery_catalyst": "회복 촉매",
 "earths_grace": "대지의 은총",
-"leyline_well": "회복샘",
-"record_fragment_1": "기록 조각 1",
-"record_fragment_2": "기록 조각 2",
-"record_fragment_3": "기록 조각 3",
-"record_fragment_4": "기록 조각 4",
-"record_fragment_5": "기록 조각 5",
-"record_fragment_6": "기록 조각 6",
-"record_fragment_7": "기록 조각 7",
-"record_fragment_8": "기록 조각 8",
 "hungry_wedge": "굶주린 쐐기",
 "dia_box_30": "구리 다이아 상자",
 "dia_box_200": "은제 다이아 상자",
@@ -295,8 +294,7 @@
 "beast_horn": "짐승뿔",
 "dia_scepter": "다이아 셉터",
 "dia_plate": "다이아 플레이트",
-"tablet_shield": "석판 방패",
-"merchant_stall": "작은 판매대"
+"tablet_shield": "석판 방패"
 },
 "skills": {
 "magic_scythe": "혼령낫",
@@ -337,6 +335,7 @@
 "bond_rune": "유대의 룬",
 "levitation": "부유술",
 "crystal_divination": "수정구 점술",
+"soul_confrontation": "영혼 대면",
 "garden_raid": "그림자 잠행",
 "return_portal": "귀환 마법진",
 "familiar_ground": "낯익은 터",
@@ -374,7 +373,9 @@
 "default": "기본",
 "cherry_blossom": "벚꽃",
 "night_sky": "밤하늘",
-"tropical_cove": "열대 해변"
+"tropical_cove": "열대 해변",
+"autumn": "가을 숲",
+"harvest_moon_preview": "수확달 축제"
 },
 "skins": {
 "crystal_succulent_opal": "crystal_succulent_opal",
@@ -525,6 +526,17 @@
 "moonlight_mushroom_potted": "달빛버섯 화분"
 },
 "itemVariantSprites": {
+"merchant_stall:moonlit": "merchant_stall_moonlit",
+"merchant_stall:mushroom": "merchant_stall_mushroom",
+"merchant_stall:pearl": "merchant_stall_pearl",
+"merchant_stall:swamp": "merchant_stall_swamp",
+"merchant_stall:cauldron": "merchant_stall_cauldron",
+"merchant_stall:mine": "merchant_stall_mine",
+"merchant_stall:lemonade": "merchant_stall_lemonade",
+"harvest_bread_basket": "bread_basket",
+"harvest_goddess_statue": "harvest_goddess_statue",
+"harvest_moon_lantern": "harvest_moon_lantern",
+"harvest_brazier": "harvest_brazier",
 "root_barrier:white_iron_blossom": "root_barrier_white_iron_blossom",
 "crystal_fountain:whale": "crystal_fountain_whale",
 "warding_stone:beacon": "warding_stone_beacon",
@@ -585,6 +597,61 @@
 "town_teleporter:cottage_well": "town_teleporter_cottage"
 },
 "itemVariants": {
+"merchant_stall:moonlit": {
+"itemCode": "merchant_stall",
+"name": "달빛 점술 가판대",
+"sprite": "merchant_stall_moonlit"
+},
+"merchant_stall:mushroom": {
+"itemCode": "merchant_stall",
+"name": "버섯 숲 가판대",
+"sprite": "merchant_stall_mushroom"
+},
+"merchant_stall:pearl": {
+"itemCode": "merchant_stall",
+"name": "조개 진주 가판대",
+"sprite": "merchant_stall_pearl"
+},
+"merchant_stall:swamp": {
+"itemCode": "merchant_stall",
+"name": "습지 가판대",
+"sprite": "merchant_stall_swamp"
+},
+"merchant_stall:cauldron": {
+"itemCode": "merchant_stall",
+"name": "가마솥 가판대",
+"sprite": "merchant_stall_cauldron"
+},
+"merchant_stall:mine": {
+"itemCode": "merchant_stall",
+"name": "광산 가판대",
+"sprite": "merchant_stall_mine"
+},
+"merchant_stall:lemonade": {
+"itemCode": "merchant_stall",
+"name": "레모네이드 가판대",
+"sprite": "merchant_stall_lemonade"
+},
+"harvest_bread_basket": {
+"itemCode": "levitation_chest",
+"name": "빵 바구니",
+"sprite": "bread_basket"
+},
+"harvest_goddess_statue": {
+"itemCode": "witch_scarecrow",
+"name": "풍요의 여신상",
+"sprite": "harvest_goddess_statue"
+},
+"harvest_moon_lantern": {
+"itemCode": "fairy_lantern",
+"name": "수확달 등불",
+"sprite": "harvest_moon_lantern"
+},
+"harvest_brazier": {
+"itemCode": "campfire",
+"name": "수확제 화로",
+"sprite": "harvest_brazier"
+},
 "root_barrier:white_iron_blossom": {
 "itemCode": "root_barrier",
 "name": "흰 철제 꽃덩굴 울타리",
@@ -1002,6 +1069,7 @@
 "depletion_potion": "depletion_potion",
 "backflow_potion": "backflow_potion",
 "veil_potion": "veil_potion",
+"bread_oven": "bread_oven",
 "fairy_lantern": "fairy_lantern",
 "crystal_fountain": "crystal_fountain",
 "mana_sprayer": "mana_sprayer",
@@ -1012,18 +1080,21 @@
 "star_music_box": "star_music_box",
 "whispering_tea_table": "whispering_tea_table",
 "starlight_garden_trophy": "starlight_garden_trophy",
+"test_tube_planter": "test_tube_planter",
 "garden_contest_ticket": "garden_contest_ticket",
 "garden_sign": "garden_sign",
 "pedestal": "equipment_pedestal",
 "telescope": "telescope",
+"merchant_stall": "merchant_stall",
 "working_shelf": "working_shelf",
 "hourglass": "hourglass",
 "storage_chest": "storage_chest",
 "levitation_chest": "levitation_chest",
 "compost_bin": "compost_bin",
+"campfire": "campfire",
 "town_teleporter": "town_teleporter",
 "deep_lens": "deep_lens",
-"campfire": "campfire",
+"leyline_well": "leyline_well",
 "flower_trellis_arch": "flower_trellis_arch",
 "rustic_fence": "rustic_fence",
 "root_barrier": "root_barrier",
@@ -1073,15 +1144,6 @@
 "refined_onyx": "refined_onyx",
 "recovery_catalyst": "recovery_catalyst",
 "earths_grace": "earths_grace",
-"leyline_well": "leyline_well",
-"record_fragment_1": "record_fragment",
-"record_fragment_2": "record_fragment",
-"record_fragment_3": "record_fragment",
-"record_fragment_4": "record_fragment",
-"record_fragment_5": "record_fragment",
-"record_fragment_6": "record_fragment",
-"record_fragment_7": "record_fragment",
-"record_fragment_8": "record_fragment",
 "hungry_wedge": "hungry_wedge",
 "dia_box_30": "dia_box_30",
 "dia_box_200": "dia_box_200",
@@ -1120,8 +1182,7 @@
 "beast_horn": "beast_horn",
 "dia_scepter": "dia_scepter",
 "dia_plate": "dia_plate",
-"tablet_shield": "tablet_shield",
-"merchant_stall": "merchant_stall"
+"tablet_shield": "tablet_shield"
 },
 "itemFolders": {
 "herb_seed": "plants/seeds",
@@ -1225,6 +1286,7 @@
 "depletion_potion": "potions",
 "backflow_potion": "potions",
 "veil_potion": "potions",
+"bread_oven": "items/ornament",
 "fairy_lantern": "items/ornament",
 "crystal_fountain": "items/ornament",
 "mana_sprayer": "items/ornament",
@@ -1235,18 +1297,21 @@
 "star_music_box": "items/ornament",
 "whispering_tea_table": "items/ornament",
 "starlight_garden_trophy": "items/ornament",
+"test_tube_planter": "items/ornament",
 "garden_contest_ticket": "items/materials",
 "garden_sign": "items/ornament",
 "equipment_pedestal": "items/ornament",
 "telescope": "items/ornament",
+"merchant_stall": "items/ornament",
 "working_shelf": "items/ornament",
 "hourglass": "items/ornament",
 "storage_chest": "items/ornament",
 "levitation_chest": "items/ornament",
 "compost_bin": "items/ornament",
+"campfire": "items/ornament",
 "town_teleporter": "items/ornament",
 "deep_lens": "items/ornament",
-"campfire": "items/ornament",
+"leyline_well": "items/ornament",
 "flower_trellis_arch": "items/ornament",
 "rustic_fence": "items/ornament",
 "root_barrier": "items/ornament",
@@ -1296,8 +1361,6 @@
 "refined_onyx": "items/materials",
 "recovery_catalyst": "items/materials",
 "earths_grace": "items/materials",
-"leyline_well": "items/ornament",
-"record_fragment": "items/materials",
 "hungry_wedge": "items/materials",
 "dia_box_30": "items/tools",
 "dia_box_200": "items/tools",
@@ -1339,6 +1402,17 @@
 "tablet_shield": "items/equipment",
 "default_cauldron": "items/cauldrons",
 "lucky_cauldron": "items/cauldrons",
+"merchant_stall_moonlit": "items/ornament",
+"merchant_stall_mushroom": "items/ornament",
+"merchant_stall_pearl": "items/ornament",
+"merchant_stall_swamp": "items/ornament",
+"merchant_stall_cauldron": "items/ornament",
+"merchant_stall_mine": "items/ornament",
+"merchant_stall_lemonade": "items/ornament",
+"bread_basket": "items/ornament",
+"harvest_goddess_statue": "items/ornament",
+"harvest_moon_lantern": "items/ornament",
+"harvest_brazier": "items/ornament",
 "root_barrier_white_iron_blossom": "items/ornament",
 "crystal_fountain_whale": "items/ornament",
 "warding_stone_beacon": "items/ornament",
@@ -1396,7 +1470,6 @@
 "storage_chest_picnic": "items/ornament",
 "hourglass_crystal_orb": "items/ornament",
 "town_teleporter_broom": "items/ornament",
-"town_teleporter_cottage": "items/ornament",
-"merchant_stall": "items/ornament"
+"town_teleporter_cottage": "items/ornament"
 }
 }

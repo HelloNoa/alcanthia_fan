@@ -529,10 +529,29 @@ function formatNumber(value) {
   return value == null || !Number.isFinite(Number(value)) ? "—" : Number(value).toLocaleString("ko-KR");
 }
 
+function readableMath(expression) {
+  const call = /Math\.(pow|floor|round)\(/.exec(expression);
+  if (!call) return expression;
+  const start = call.index + call[0].length;
+  let depth = 1, end = start, comma = -1;
+  for (; end < expression.length && depth; end++) {
+    const char = expression[end];
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (char === "," && depth === 1) comma = end;
+  }
+  if (depth) return expression;
+  const inner = readableMath(expression.slice(start, end - 1));
+  const formatted = call[1] === "pow" && comma >= 0
+    ? `${readableMath(expression.slice(start, comma))}^(${readableMath(expression.slice(comma + 1, end - 1)).trim()})`
+    : call[1] === "floor" ? `⌊${inner}⌋` : `반올림(${inner})`;
+  return expression.slice(0, call.index) + formatted + readableMath(expression.slice(end));
+}
+
 function formatFormula(value) {
   if (!value) return "—";
   return String(value)
-    .replace(/\$\{([^}]+)\}/g, (_, expression) => expression.replace(/\be\b/g, "Lv").replace(/\*/g, "×").trim())
+    .replace(/\$\{([^}]+)\}/g, (_, expression) => readableMath(expression).replace(/\be\b/g, "Lv").replace(/\*\*/g, "^").replace(/\*/g, "×").trim())
     .replace(/\|/g, "/");
 }
 

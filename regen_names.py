@@ -583,6 +583,9 @@ def parse_skills(s, stored=None):
     stored = stored or {}
     out = {}
     for skill_id, value in split_top(obj):
+        # The production learn handler still disables the postponed multi-squad skill.
+        if skill_id == "dominion" and re.search(r'if\(\w+==="dominion"\)return null', s):
+            continue
         if not re.fullmatch(r"[a-z_]+", skill_id or ""):
             continue
         name = js_string_field(value, "name")
@@ -1071,6 +1074,8 @@ def update_gamedata(s):
         return
     with open(GAMEDATA_OUT, "r", encoding="utf-8") as f:
         gd = json.load(f)
+    from combat_sync import sync_combat_data
+    sync_combat_data(s, gd)
     catalog = parse_item_catalog(s)
     stored_items = gd.setdefault("items", {})
     for code, item in catalog.items():
