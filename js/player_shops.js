@@ -1,4 +1,4 @@
-import { api, gamedata } from "./api.js";
+import { api, gamedata, names } from "./api.js";
 
 export function renderPlayerShops(view) {
   view.innerHTML = `<section class="player-shops">
@@ -47,6 +47,63 @@ export function renderPlayerShops(view) {
         card.append(heading, text("p", `판매자 · ${shop.nickname || "닉네임 없음"}`));
         card.append(text("p", `등록 상품 ${shop.offerCount ?? 0}개`, "shop-offers"));
         card.append(text("small", `가판대 #${shop.id}`, "muted"));
+        const detail = document.createElement("details");
+        detail.className = "shop-products";
+        detail.append(text("summary", "등록 상품 보기"));
+        const body = text("div", "", "shop-products-body");
+        body.setAttribute("aria-live", "polite");
+        detail.append(body);
+        let loaded = false, loading = false;
+        const loadProducts = async () => {
+          if (loading) return;
+          loading = true;
+          body.replaceChildren(text("p", "상품을 불러오는 중…", "muted"));
+          try {
+            const [result, labels] = await Promise.all([api.playerShop(shop.id), names()]);
+            if (!detail.isConnected) return;
+            body.replaceChildren();
+            if (!result.shop) {
+              body.append(text("p", "가판대를 찾을 수 없습니다. 목록을 새로고침해 주세요."));
+              loaded = true;
+              return;
+            }
+            if (!Array.isArray(result.shop.offers)) throw new Error("invalid shop offers");
+            if (result.shop.description) body.append(text("p", result.shop.description, "shop-description"));
+            const offers = result.shop.offers.filter(offer => offer.published);
+            if (!offers.length) body.append(text("p", "공개된 등록 상품이 없습니다.", "muted"));
+            const itemLabel = item => `${item.itemKey.replace(/[a-z][a-z0-9_]*/g, code => labels.items?.[code] || labels.plants?.[code] || code)} × ${item.count.toLocaleString()}`;
+            for (const offer of offers) {
+              const product = text("section", "", "shop-product");
+              product.append(text("h4", offer.title), text("small", offer.type === "vending" ? "즉시 구매" : "견적 거래 · 협의", "muted"));
+              if (offer.description) product.append(text("p", offer.description, "shop-description"));
+              if (offer.quote) {
+                product.append(text("p", "받는 상품", "shop-product-label"));
+                const delivery = document.createElement("ul");
+                for (const item of offer.quote.delivery) delivery.append(text("li", itemLabel(item)));
+                product.append(delivery, text("p", "지불 조건 (1회 거래 기준)", "shop-product-label"));
+                const payment = document.createElement("ul");
+                payment.append(text("li", `${offer.quote.paymentGold.toLocaleString()} 골드`));
+                for (const item of offer.quote.payment) payment.append(text("li", itemLabel(item)));
+                product.append(payment);
+                if (offer.quote.deliveryDays != null) product.append(text("p", `납기 · ${offer.quote.deliveryDays}일`));
+              } else {
+                product.append(text("p", "제공 상품과 지불 조건은 게임에서 판매자와 협의해 주세요.", "muted"));
+              }
+              body.append(product);
+            }
+            body.append(text("p", "재고와 구매 가능 여부는 게임에서 확인해 주세요.", "muted shops-note"));
+            loaded = true;
+          } catch {
+            if (!detail.isConnected) return;
+            body.replaceChildren(text("p", "상품을 불러오지 못했습니다."));
+            const again = text("button", "상품 다시 시도");
+            again.type = "button";
+            again.onclick = loadProducts;
+            body.append(again);
+          } finally { loading = false; }
+        };
+        detail.addEventListener("toggle", () => { if (detail.open && !loaded) loadProducts(); });
+        card.append(detail);
         list.append(card);
       }
       const total = Number.isInteger(data.shopsTotal) ? ` · 이 지역 검색 결과 ${data.shopsTotal.toLocaleString()}곳` : "";
