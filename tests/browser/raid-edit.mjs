@@ -49,6 +49,19 @@ try {
     assert.deepEqual((await stored())[`${side}Party`].adventurers, original);
     await panel.getByRole("button", {name: "모험가 제외", exact:true}).last().click();
   }
+  for (const side of ["attacker", "defender"]) {
+    const panel = page.locator(`#raid-${side}-party`);
+    await panel.getByRole("button", {name: "+ 포션", exact: true}).click();
+    const original = (await stored())[`${side}Party`].potions;
+    assert.equal(await panel.getByRole("button", {name: "포션 1 위로", exact:true}).isDisabled(), true);
+    await panel.getByRole("button", {name: "포션 1 아래로", exact:true}).click();
+    assert.deepEqual((await stored())[`${side}Party`].potions, [...original].reverse());
+    await mount();
+    assert.deepEqual((await stored())[`${side}Party`].potions, [...original].reverse());
+    await panel.getByRole("button", {name: "포션 2 위로", exact:true}).click();
+    assert.deepEqual((await stored())[`${side}Party`].potions, original);
+    await panel.getByRole("button", {name: "포션 제외", exact:true}).last().click();
+  }
   const defender = page.locator("#raid-defender-party");
   assert.equal(await page.locator("#raid-warding-enh").isVisible(), false);
   await defender.getByRole("button", { name: "+ 모험가", exact: true }).click();

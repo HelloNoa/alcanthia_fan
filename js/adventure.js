@@ -428,7 +428,15 @@ export async function advSim(body) {
         <span data-item-picker="pot"></span>
         <label class="adv-enh">+<input type="number" min="0" max="40" value="${p.enh}" data-i="${i}" data-f="enh" data-t="pot" class="adv-enh-in"></label>
         <button class="adv-x" data-i="${i}" data-t="pot">✕</button>`;
-      el.appendChild(row);
+      const entry = document.createElement("div");
+      entry.className = "potion-order-entry";
+      entry.append(partyOrderControls(pots, i, target => {
+        saveSettings();
+        q("#adv-result").textContent = "포션 순서가 변경되었습니다. 다시 출정해 주세요.";
+        renderPots();
+        el.querySelectorAll(".party-order-controls")[target]?.querySelector("button:not(:disabled)")?.focus();
+      }, "포션"), row);
+      el.appendChild(entry);
       row.querySelector('[data-item-picker="pot"]').replaceWith(createPicker({
         value: p.code,
         choices: potionChoices,

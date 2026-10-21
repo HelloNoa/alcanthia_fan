@@ -556,7 +556,14 @@ export async function raidSim(body, selectedMode) {
         <span data-picker="potion"></span>
         <label class="adv-enh">+<input type="number" min="0" max="40" value="${potion.enh}" aria-label="포션 강화도"></label>
         <button type="button" class="adv-x" aria-label="포션 제외" title="포션 제외">✕</button>`;
-      potionList.appendChild(row);
+      const entry = document.createElement("div");
+      entry.className = "potion-order-entry";
+      entry.append(partyOrderControls(party.potions, potionIndex, target => {
+        markChanged();
+        renderEditableParty(side);
+        element.querySelectorAll(".raid-edit-potions .party-order-controls")[target]?.querySelector("button:not(:disabled)")?.focus();
+      }, "포션"), row);
+      potionList.appendChild(entry);
       row.querySelector('[data-picker="potion"]').replaceWith(createSearchPicker({
         value: potion.code,
         choices: potionChoices,
