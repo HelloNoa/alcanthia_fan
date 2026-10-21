@@ -1,10 +1,11 @@
-import { api } from "./api.js";
+import { api, gamedata } from "./api.js";
 
 export function renderPlayerShops(view) {
   view.innerHTML = `<section class="player-shops">
     <h2>🏪 가판대</h2>
-    <p class="muted">마을 가판대를 찾아보세요. 상품 수는 등록된 거래 제안 수이며 재고 수량과는 다릅니다.</p>
+    <p class="muted">지역별 가판대를 찾아보세요. 상품 수는 등록된 거래 제안 수이며 재고 수량과는 다릅니다.</p>
     <form class="shops-search">
+      <label class="shops-zone-label" for="shops-zone">지역 <select id="shops-zone"><option value="town">안개마을</option></select></label>
       <label for="shops-query">가판대 검색</label>
       <div class="shops-search-row"><input id="shops-query" type="search" maxlength="40" placeholder="판매자 · 가판대명 · 아이템" autocomplete="off"><button type="submit">검색</button></div>
       <div class="shops-options"><label><input id="shops-open" type="checkbox" checked> 영업 중만</label><button type="button" id="shops-refresh">새로고침</button></div>
@@ -19,7 +20,7 @@ export function renderPlayerShops(view) {
   const $ = selector => root.querySelector(selector);
   const status = $(".shops-status"), list = $(".shops-list");
   const prev = $("#shops-prev"), next = $("#shops-next"), retry = $("#shops-retry");
-  let query = "", openOnly = true, offset = 0, request = 0;
+  let zone = "town", query = "", openOnly = true, offset = 0, request = 0;
   const limit = 20;
   const text = (tag, value, className) => {
     const node = document.createElement(tag);
@@ -36,7 +37,7 @@ export function renderPlayerShops(view) {
     $("#shops-page").textContent = `${offset / limit + 1}페이지`;
     status.textContent = "가판대 목록을 불러오는 중…";
     try {
-      const data = await api.playerShops({ q: query, openOnly, offset, limit, includeTotal: true });
+      const data = await api.playerShops({ zone, q: query, openOnly, offset, limit, includeTotal: true });
       if (current !== request || !root.isConnected) return;
       if (!Array.isArray(data.shops) || typeof data.hasMore !== "boolean") throw new Error("invalid response");
       for (const shop of data.shops) {
@@ -48,10 +49,10 @@ export function renderPlayerShops(view) {
         card.append(text("small", `가판대 #${shop.id}`, "muted"));
         list.append(card);
       }
-      const total = Number.isInteger(data.shopsTotal) ? ` · 전체 ${data.shopsTotal.toLocaleString()}곳` : "";
+      const total = Number.isInteger(data.shopsTotal) ? ` · 이 지역 검색 결과 ${data.shopsTotal.toLocaleString()}곳` : "";
       status.textContent = data.shops.length
         ? `${data.shops.length}곳 표시${total} · 조회 ${new Date().toLocaleTimeString("ko-KR")}`
-        : "조건에 맞는 가판대가 없습니다. 검색어나 영업 중 필터를 바꿔 보세요.";
+        : "조건에 맞는 가판대가 없습니다. 지역, 검색어나 영업 중 필터를 바꿔 보세요.";
       prev.disabled = offset === 0;
       next.disabled = !data.hasMore;
     } catch {
@@ -64,6 +65,20 @@ export function renderPlayerShops(view) {
       if (current === request && root.isConnected) list.setAttribute("aria-busy", "false");
     }
   }
+  // Use actual adventure regions; names.zones also contains cosmetic themes.
+  gamedata().then(data => {
+    if (!root.isConnected) return;
+    for (const [id, region] of Object.entries(data.zones || {})) {
+      const option = text("option", region.name || id);
+      option.value = id;
+      $("#shops-zone").append(option);
+    }
+  }).catch(() => {
+    status.textContent = "지역 목록을 불러오지 못했습니다. 페이지를 새로고침해 주세요.";
+  });
+  $("#shops-zone").addEventListener("change", event => {
+    zone = event.target.value; offset = 0; load();
+  });
   $("form").addEventListener("submit", event => {
     event.preventDefault(); query = $("#shops-query").value.trim(); offset = 0; load();
   });

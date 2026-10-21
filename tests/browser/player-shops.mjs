@@ -28,11 +28,16 @@ if(!process.env.SHOPS_URL){
  await page.locator('#shops-next').click();
  await page.getByText('가판대 #21',{exact:true}).waitFor();
  assert.equal(await page.locator('#shops-next').isDisabled(),true);
+ await page.locator('#shops-zone').selectOption('beginner_forest');
+ await page.getByText('가판대 #1',{exact:true}).waitFor();
+ assert.equal(requests.at(-1).searchParams.get('zone'),'beginner_forest');
+ assert.equal(requests.at(-1).searchParams.get('offset'),'0');
  await page.locator('#shops-query').fill('  물감  ');await page.locator('.shops-search').press('Enter');
  await page.getByRole('heading',{name:'물감',exact:true}).waitFor();
  assert.equal(requests.at(-1).searchParams.get('offset'),'0');
  await page.locator('#shops-open').uncheck();await page.getByText('영업 종료',{exact:true}).waitFor();
  assert.equal(requests.at(-1).searchParams.get('openOnly'),'false');
+ assert.equal(requests.at(-1).searchParams.get('zone'),'beginner_forest');
  mode='empty';await page.locator('#shops-refresh').click();await page.getByText(/조건에 맞는 가판대가 없습니다/).waitFor();
  mode='error';await page.locator('#shops-refresh').click();await page.locator('#shops-retry').waitFor();assert.equal(await page.locator('.shop-card').count(),0);
  mode='normal';await page.locator('#shops-retry').click();await page.locator('.shop-card').waitFor();

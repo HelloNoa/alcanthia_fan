@@ -40,7 +40,7 @@ const ROUTE_METADATA = Object.freeze({
   shops: {
     title: "알칸시아 가판대 목록·검색 | 이끼제리 팬페이지",
     heading: "알칸시아 가판대 목록",
-    description: "마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.",
+    description: "지역별 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.",
     indexable: false,
   },
   residents: {

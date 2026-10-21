@@ -1884,3 +1884,6 @@ html[data-theme="light"] .pl-share-in {
 .shop-offers { font-weight: 700; }
 .shops-pages { justify-content: center; margin: 20px 0; }
 .shops-note { font-size: 13px; line-height: 1.7; }
+
+.shops-zone-label { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.shops-zone-label select { flex: 1; min-width: 0; min-height: 44px; padding: 8px 12px; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
