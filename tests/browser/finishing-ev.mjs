@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:390,height:844}});
 const url=process.env.EV_URL||'http://localhost:8765/calc/ev/';
-await page.goto(url);await page.evaluate(()=>localStorage.setItem('alc_enhancement_ev_v1',JSON.stringify({item:'copper_cauldron',target:3,cauldron:0,wick:10,finish:0,craftCauldron:0,auto:true})));await page.reload();
+await page.goto(url);await page.locator("#ev-item").waitFor();await page.evaluate(()=>localStorage.setItem('alc_enhancement_ev_v1',JSON.stringify({item:'copper_cauldron',target:3,cauldron:0,wick:10,finish:0,craftCauldron:0,auto:true})));await page.reload();
 const cost=()=>page.locator('#ev-raw .ev-cost').innerText();
 const baseline=await cost();
 await page.locator('#ev-finish').fill('10');await page.locator('#ev-craft-cauldron').fill('9');
