@@ -1897,3 +1897,9 @@ html[data-theme="light"] .pl-share-in {
 .shop-product-label { font-weight: 700; margin-bottom: 6px; }
 .shop-product ul { padding-left: 20px; margin-top: 6px; line-height: 1.7; }
 .shops-list { align-items: start; }
+
+.shop-product ul:has(.shop-item-row) { list-style: none; padding-left: 0; }
+.shop-item-row { display: flex; align-items: center; gap: 9px; margin: 7px 0; }
+.shop-item-row > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.shop-item-icon { display: inline-flex; flex: 0 0 40px; width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 8px; background: var(--panel2); }
+.shop-item-image { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }

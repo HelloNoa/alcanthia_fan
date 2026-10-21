@@ -1,4 +1,6 @@
 import { api, gamedata, names } from "./api.js";
+import { itemIconURLs, loadImg } from "./sprites.js";
+import { parseItemKey } from "./item_key.js";
 
 export function renderPlayerShops(view) {
   view.innerHTML = `<section class="player-shops">
@@ -72,6 +74,19 @@ export function renderPlayerShops(view) {
             const offers = result.shop.offers.filter(offer => offer.published);
             if (!offers.length) body.append(text("p", "공개된 등록 상품이 없습니다.", "muted"));
             const itemLabel = item => `${item.itemKey.replace(/[a-z][a-z0-9_]*/g, code => labels.items?.[code] || labels.plants?.[code] || code)} × ${item.count.toLocaleString()}`;
+            const itemRow = item => {
+              const row = text("li", "", "shop-item-row");
+              const icon = text("span", "", "shop-item-icon");
+              icon.setAttribute("aria-hidden", "true");
+              row.append(icon, text("span", itemLabel(item)));
+              const code = parseItemKey(item.itemKey).code;
+              itemIconURLs(code).then(urls => {
+                const image = loadImg(icon, urls, text("span", "◇"), "shop-item-image");
+                image.alt = "";
+                image.width = image.height = 36;
+              });
+              return row;
+            };
             for (const offer of offers) {
               const product = text("section", "", "shop-product");
               product.append(text("h4", offer.title), text("small", offer.type === "vending" ? "즉시 구매" : "견적 거래 · 협의", "muted"));
@@ -79,11 +94,11 @@ export function renderPlayerShops(view) {
               if (offer.quote) {
                 product.append(text("p", "받는 상품", "shop-product-label"));
                 const delivery = document.createElement("ul");
-                for (const item of offer.quote.delivery) delivery.append(text("li", itemLabel(item)));
+                for (const item of offer.quote.delivery) delivery.append(itemRow(item));
                 product.append(delivery, text("p", "지불 조건 (1회 거래 기준)", "shop-product-label"));
                 const payment = document.createElement("ul");
                 payment.append(text("li", `${offer.quote.paymentGold.toLocaleString()} 골드`));
-                for (const item of offer.quote.payment) payment.append(text("li", itemLabel(item)));
+                for (const item of offer.quote.payment) payment.append(itemRow(item));
                 product.append(payment);
                 if (offer.quote.deliveryDays != null) product.append(text("p", `납기 · ${offer.quote.deliveryDays}일`));
               } else {
