@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:390,height:844}});
+const url=process.env.EV_URL||'http://localhost:8765/calc/ev/';
+await page.goto(url);await page.evaluate(()=>localStorage.setItem('alc_enhancement_ev_v1',JSON.stringify({item:'copper_cauldron',target:3,cauldron:0,wick:10,finish:0,craftCauldron:0,auto:true})));await page.reload();
+const cost=()=>page.locator('#ev-raw .ev-cost').innerText();
+const baseline=await cost();
+await page.locator('#ev-finish').fill('10');await page.locator('#ev-craft-cauldron').fill('9');
+assert.match(await page.locator('#ev-out').innerText(),/40.1%/);
+assert.notEqual(await cost(),baseline);
+assert.equal(await page.locator('#ev-cauldron').inputValue(),'0');
+const improved=await cost();await page.reload();assert.equal(await cost(),improved);assert.equal(await page.locator('#ev-craft-cauldron').inputValue(),'9');
+await page.locator('#ev-zone').selectOption('sunset_cliff');await page.locator('#ev-fog').check();
+assert.match(await page.locator('#ev-out').innerText(),/제작 산출 \+0 \/ \+1 \/ \+2/);
+assert.match(await page.locator('#ev-out').innerText(),/2.0%/);
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+await page.locator('#ev-out').scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/finish-ev-mobile.png'});
+// Potion brewing must not inherit the crafting-only bonus.
+await page.evaluate(()=>localStorage.setItem('alc_enhancement_ev_v1',JSON.stringify({item:'mana_potion',target:4,brew:2,finish:0,craftCauldron:0})));await page.reload();const potionCost=await cost();
+await page.locator('#ev-finish').fill('10');await page.locator('#ev-craft-cauldron').fill('99');assert.equal(await cost(),potionCost);
+console.log('PASS crafting cost, independent cauldrons, persistence, sunset stacking, potion exclusion, mobile');await browser.close();

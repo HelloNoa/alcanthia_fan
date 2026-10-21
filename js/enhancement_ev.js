@@ -1,5 +1,16 @@
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 
+export function finishingMasteryRate(level = 0, cauldron = 0) {
+  const skill = Math.min(10, Math.max(0, Math.floor(Number(level) || 0)));
+  const tool = Math.min(99, Math.max(0, Math.floor(Number(cauldron) || 0)));
+  return 1 - (1 - 0.005 * skill) ** (tool + 1);
+}
+
+export function craftingSourceDistribution(finishRate = 0, sunsetRate = 0) {
+  const f = clamp01(finishRate), s = clamp01(sunsetRate);
+  return [(1 - f) * (1 - s), f * (1 - s) + (1 - f) * s, f * s];
+}
+
 export function enhancementGoalForTarget(target) {
   return Math.max(0, Math.floor(Number(target) || 0)) === 0 ? "atLeast" : "exact";
 }
@@ -24,6 +35,7 @@ export function enhancementMaterialFlow({
   successRate,
   bonusRate = 0,
   sourceBonusRate = 0,
+  sourceDistribution,
   failureRestoreRate = 0,
   goal = "exact",
 }) {
@@ -48,9 +60,9 @@ export function enhancementMaterialFlow({
     else overshootYield += amount;
   };
 
-  // 제작·양조 산출도 석양절벽 발동 시 시작 강화도보다 1 높게 유입될 수 있다.
-  addOutput(start, 1 - sourceBonus);
-  addOutput(start + 1, sourceBonus);
+  // 제작은 마감 숙련과 석양이 중첩되어 +2까지, 양조는 석양으로 +1까지 유입된다.
+  const source = sourceDistribution || [1 - sourceBonus, sourceBonus];
+  source.forEach((rate, offset) => addOutput(start + offset, rate));
 
   for (let level = start; level < target; level++) {
     const available = supply[level - start];

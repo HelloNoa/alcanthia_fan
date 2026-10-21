@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultEnhancementMaterialPrice } from "../js/calc_prices.js";
 import {
+  finishingMasteryRate,
+  craftingSourceDistribution,
   enhancementGoalForTarget,
   enhancementMaterialFlow,
   enhancementResultBonusRate,
@@ -178,3 +180,17 @@ assert.equal(enhancementMaterialFlow({
 }).expectedInputs, Infinity);
 
 console.log("enhancement_ev tests passed");
+
+// Official crafting bonus: finish and sunset are independent, including +2 output.
+closeTo(finishingMasteryRate(10, 0), 0.05);
+closeTo(finishingMasteryRate(10, 9), 1 - 0.95 ** 10);
+closeTo(finishingMasteryRate(0, 99), 0);
+assert.deepEqual(craftingSourceDistribution(0.5, 0.5), [0.25, 0.5, 0.25]);
+const finishOnly = enhancementMaterialFlow({ target: 1, successRate: () => 0.5, sourceDistribution: [0.5, 0.5, 0] });
+closeTo(finishOnly.expectedInputs, 1.5);
+const bothBonuses = enhancementMaterialFlow({ target: 1, successRate: () => 0.5, sourceDistribution: [0.25, 0.5, 0.25] });
+closeTo(bothBonuses.expectedInputs, 12 / 7);
+closeTo(bothBonuses.overshootYield, 0.25);
+closeTo(enhancementMaterialFlow({ target: 0, goal: "atLeast", successRate: () => 0.5, sourceDistribution: [0.25, 0.5, 0.25] }).expectedInputs, 1);
+const intermediate = enhancementMaterialFlow({ target: 1, goal: "atLeast", successRate: () => 0.5, sourceDistribution: [0.25, 0.5, 0.25] });
+closeTo(intermediate.expectedInputs, 1.2);
