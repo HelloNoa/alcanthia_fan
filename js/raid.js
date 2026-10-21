@@ -1,3 +1,4 @@
+import { partyOrderControls } from "./party_order.js";
 import { api, gamedata } from "./api.js";
 import { duelWinRate, raidWinRate, simulateRaid } from "./battle.js";
 import { escapeHtml, hydrateCombatIcons, renderCombatFlow } from "./combat_log.js";
@@ -420,6 +421,11 @@ export async function raidSim(body, selectedMode) {
       member.engraved ||= [];
       const card = document.createElement("article");
       card.className = "raid-edit-member";
+      card.append(partyOrderControls(party.adventurers, memberIndex, target => {
+        markChanged();
+        renderEditableParty(side);
+        element.querySelectorAll(".party-order-controls")[target]?.querySelector("button:not(:disabled)")?.focus();
+      }));
       const main = document.createElement("div");
       main.className = "raid-edit-main";
       main.innerHTML = `

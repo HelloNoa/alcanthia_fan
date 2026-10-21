@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:390,height:844}});
+const base=process.env.SIM_TEST_URL||'http://localhost:8765';
+await page.goto(`${base}/calc/adv/`);
+const original=await page.evaluate(async()=>{
+ const g=await (await fetch(new URL('data/gamedata.json',document.baseURI))).json();
+ const ids=Object.keys(g.adventurers).slice(0,2);
+ const party=ids.map((id,i)=>({id,equip:'dia_scepter',equipEnh:9+i,engraved:[{itemCode:'refined_amber',enhancement:7+i}]}));
+ localStorage.setItem('alc_adv_sim_v1',JSON.stringify({party,pots:[],zoneId:'beginner_forest',nightmare:0}));return party;
+});
+await page.reload();
+const stored=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('alc_adv_sim_v1')).party);
+await page.getByRole('button',{name:'모험가 1 아래로',exact:true}).click();
+assert.deepEqual(await stored(),[...original].reverse());
+await page.reload();
+assert.deepEqual(await stored(),[...original].reverse());
+assert.equal(await page.getByRole('button',{name:'모험가 2 아래로',exact:true}).isDisabled(),true);
+await page.locator('#adv-run').click();await page.locator('#adv-result .adv-logbox').waitFor();
+await page.getByRole('button',{name:'모험가 2 위로',exact:true}).click();
+assert.deepEqual(await stored(),original);
+assert.match(await page.locator('#adv-result').innerText(),/순서가 변경/);
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+await page.screenshot({path:'/tmp/adv-order-mobile.png'});
+await browser.close();console.log('Adventure reorder, equipment/gems, persistence, simulation and mobile passed');

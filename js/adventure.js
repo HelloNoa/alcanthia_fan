@@ -1,3 +1,4 @@
+import { partyOrderControls } from "./party_order.js";
 // ⚔️ 모험 전투 시뮬레이터 (계산기 서브탭)
 import { gamedata } from "./api.js";
 import { adventureGemChoices } from "./adventure_gems.js";
@@ -342,6 +343,12 @@ export async function advSim(body) {
     party.forEach((p, i) => {
       p.engraved ||= [];
       const member = document.createElement("div"); member.className = "adv-member";
+      member.append(partyOrderControls(party, i, target => {
+        saveSettings();
+        q("#adv-result").textContent = "편성 순서가 변경되었습니다. 다시 출정해 주세요.";
+        renderParty();
+        el.querySelectorAll(".party-order-controls")[target]?.querySelector("button:not(:disabled)")?.focus();
+      }));
       const row = document.createElement("div"); row.className = "adv-row adv-member-main";
       row.innerHTML = `
         <span data-item-picker="adventurer"></span>
