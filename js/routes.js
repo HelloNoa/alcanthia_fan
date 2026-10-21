@@ -3,6 +3,7 @@ export const SITE_NAV_ITEMS = Object.freeze([
   { key: "watch", label: "🛡️ 이끼제리 방범대" },
   { key: "planner", label: "🌿 배치" },
   { key: "market", label: "💹 거래소" },
+  { key: "shops", label: "🏪 가판대" },
   { key: "residents", label: "🗺️ 거주민" },
   { key: "rank", label: "🏆 랭킹" },
   { key: "quests", label: "📋 의뢰" },

@@ -25,6 +25,7 @@ test("top-level navigation resolves to real directories", () => {
     "watch/",
     "planner/",
     "market/",
+    "shops/",
     "residents/",
     "rank/",
     "quests/",
@@ -58,7 +59,7 @@ test("legacy fragment routes map to their real-path destinations", () => {
 
 test("generated app route entries are complete and match committed files", () => {
   const homepage = readRepoFile("index.html");
-  assert.equal(APP_ROUTE_ENTRIES.length, 23);
+  assert.equal(APP_ROUTE_ENTRIES.length, 24);
   assert.equal(APP_ROUTE_DEFINITIONS.length, APP_ROUTE_ENTRIES.length);
   assert.equal(INDEXABLE_APP_ROUTE_DEFINITIONS.length, 18);
   assert.equal(new Set(APP_ROUTE_ENTRIES.map(({ path }) => path)).size, APP_ROUTE_ENTRIES.length);

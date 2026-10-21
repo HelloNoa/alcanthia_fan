@@ -1864,3 +1864,23 @@ html[data-theme="light"] .pl-share-in {
 }
 
 .raid-mode { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+
+/* Player shop directory */
+.player-shops { max-width: 1100px; margin: 0 auto; }
+.shops-search { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.shops-search-row, .shops-options, .shops-pages, .shop-heading { display: flex; align-items: center; gap: 12px; }
+.shops-search-row { margin-top: 8px; }
+.shops-search-row input { flex: 1; width: 0; min-width: 0; padding: 12px; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
+.player-shops button { min-height: 44px; padding: 8px 16px; }
+.player-shops button:disabled { opacity: .45; cursor: default; }
+.shops-options { justify-content: space-between; margin-top: 12px; }
+.shops-options label { display: flex; align-items: center; gap: 8px; }
+.shops-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+.shop-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow-wrap: anywhere; }
+.shop-heading { align-items: flex-start; justify-content: space-between; }
+.shop-heading h3 { margin: 0; font-size: 17px; }
+.shop-state { flex-shrink: 0; font-size: 12px; color: var(--muted); }
+.shop-state.is-open { color: var(--buy); }
+.shop-offers { font-weight: 700; }
+.shops-pages { justify-content: center; margin: 20px 0; }
+.shops-note { font-size: 13px; line-height: 1.7; }

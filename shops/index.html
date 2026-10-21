@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base href="../">
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-N6BJK6R8');</script>
+  <!-- End Google Tag Manager -->
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZNWWBTCSQG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-ZNWWBTCSQG');
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>알칸시아 가판대 목록·검색 | 이끼제리 팬페이지</title>
+  <meta name="description" content="마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.">
+  <meta name="google-site-verification" content="uCMjr2jFEn_XK5bCE-LDJAZExcH_6pJ8dDQF4C04oqQ">
+  <meta name="robots" content="noindex,follow">
+  <link rel="canonical" href="https://hellonoa.github.io/alcanthia_fan/shops/">
+  <meta property="og:title" content="알칸시아 가판대 목록·검색 | 이끼제리 팬페이지">
+  <meta property="og:description" content="마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://hellonoa.github.io/alcanthia_fan/shops/">
+  <meta property="og:locale" content="ko_KR">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="알칸시아 가판대 목록·검색 | 이끼제리 팬페이지">
+  <meta name="twitter:description" content="마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://hellonoa.github.io/alcanthia_fan/shops/#webpage","name":"알칸시아 가판대 목록·검색 | 이끼제리 팬페이지","url":"https://hellonoa.github.io/alcanthia_fan/shops/","inLanguage":"ko-KR","description":"마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.","isPartOf":{"@id":"https://hellonoa.github.io/alcanthia_fan/#website"},"about":{"@type":"VideoGame","name":"알칸시아","url":"https://www.alcanthia.com/"}}</script>
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <link rel="apple-touch-icon" href="./favicon.png">
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("alc_theme");
+        const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+        const theme = saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch {
+        document.documentElement.dataset.theme = "dark";
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body class="app-route-page" data-route="shops">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-N6BJK6R8"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header">
+    <h1><img src="./favicon.png" class="h-logo" alt=""> 알칸시아 공략·도감·계산기 <span>이끼제리 팬페이지</span></h1>
+    <div class="header-actions">
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="테마 전환">테마</button>
+      <button type="button" id="proxy" class="proxy-settings" aria-label="연결 설정">연결 설정</button>
+    </div>
+  </header>
+  <dialog id="proxy-dialog" class="proxy-dialog" aria-labelledby="proxy-dialog-title">
+    <form id="proxy-form" method="dialog">
+      <h2 id="proxy-dialog-title">연결 설정</h2>
+      <p>팬페이지가 데이터를 요청할 프록시 주소를 확인하거나 변경합니다.</p>
+      <label for="proxy-url">프록시 주소</label>
+      <input id="proxy-url" name="proxy-url" type="url" required autocomplete="url">
+      <div class="proxy-dialog-actions">
+        <button type="button" id="proxy-cancel">취소</button>
+        <button type="submit" class="primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+  <nav id="tabs" class="site-tabs" aria-label="주요 메뉴"></nav>
+  <aside class="community-banner" aria-label="알칸시아 사설 디스코드 안내">
+    <span class="community-icon" aria-hidden="true">💬</span>
+    <div class="community-copy">
+      <strong>알칸시아 사설 디스코드</strong>
+      <p>이끼제리에서 운영하는 비공식 커뮤니티예요. 공략과 게임 이야기를 함께 나눠요!</p>
+    </div>
+    <a class="community-join" href="https://discord.gg/tBz3KXSvR" target="_blank" rel="noopener noreferrer" aria-label="알칸시아 사설 디스코드 참여 (새 탭)">디스코드 참여 <span aria-hidden="true">↗</span></a>
+  </aside>
+  <main id="view">
+    <section class="route-seo-fallback" aria-labelledby="route-seo-title">
+      <p class="seo-eyebrow">알칸시아 공략 자료</p>
+      <h1 id="route-seo-title">알칸시아 가판대 목록</h1>
+      <p>마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.</p>
+      <nav aria-label="관련 알칸시아 자료">
+        <a href="./garden/">알칸시아 텃밭 조회</a>
+        <a href="./market/">알칸시아 거래소 시세 조회</a>
+        <a href="./residents/">알칸시아 지역별 거주민</a>
+        <a href="./rank/">알칸시아 랭킹 조회</a>
+        <a href="./watch/">이끼제리 방범대</a>
+      </nav>
+      <p class="muted">대화형 기능을 불러오는 중입니다.</p>
+    </section>
+  </main>
+  <footer>
+    <div class="coupang-ad">
+      <script src="https://ads-partners.coupang.com/g.js"></script>
+      <script>new PartnersCoupang.G({"id":995798,"template":"carousel","trackingCode":"AF8333904","width":"680","height":"140","tsource":""});</script>
+    </div>
+    <p class="coupang-disc">이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
+    비공식 팬 제작 · 만든이 <a href="https://github.com/HelloNoa" target="_blank" rel="noopener" class="credit-link"><img src="./credit/noa.png" class="credit-av" alt="노아"><b>노아</b></a> · 자문 <img src="./credit/kyarang.png" class="credit-av" alt="캬랑"><b>캬랑</b>
+  </footer>
+  <script type="module" src="./js/app.js?v=20260908-patch-notes"></script>
+</body>
+</html>

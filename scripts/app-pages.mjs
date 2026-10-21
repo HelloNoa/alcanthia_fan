@@ -37,6 +37,12 @@ const ROUTE_METADATA = Object.freeze({
     description: "알칸시아 아이템별 실시간 거래소 시세와 매수·매도 호가를 조회하는 팬 도구입니다.",
     indexable: false,
   },
+  shops: {
+    title: "알칸시아 가판대 목록·검색 | 이끼제리 팬페이지",
+    heading: "알칸시아 가판대 목록",
+    description: "마을 가판대의 판매자와 등록 상품 수, 영업 상태를 조회하고 검색합니다.",
+    indexable: false,
+  },
   residents: {
     title: "알칸시아 지역별 거주민 조회 | 이끼제리 팬페이지",
     heading: "알칸시아 지역별 거주민",
@@ -151,7 +157,7 @@ const CALC_ROUTES = Object.freeze(["calc", "calc/time", "calc/level", "calc/ev",
 const QUEST_ROUTES = Object.freeze(["quests", "quests/goals", "quests/required", "quests/none", "quests/weekly", "quests/all"]);
 const CODEX_ROUTES = Object.freeze(["codex/achievements", "codex/transmute"]);
 const TOOL_ROUTES = Object.freeze(["planner", "random", "skilltree", "calc", "quests"]);
-const LIVE_ROUTES = Object.freeze(["garden", "market", "residents", "rank", "watch"]);
+const LIVE_ROUTES = Object.freeze(["garden", "market", "shops", "residents", "rank", "watch"]);
 
 export { APP_ROUTE_ENTRIES };
 

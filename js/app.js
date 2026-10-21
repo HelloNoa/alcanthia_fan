@@ -1,6 +1,7 @@
 import { api, names, gamedata, progression } from "./api.js";
 import { PROXY_BASE, setProxy } from "./config.js";
 import { renderGarden } from "./garden.js";
+import { renderPlayerShops } from "./player_shops.js";
 import { renderMarket } from "./market.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { renderCodex } from "./codex.js?v=20260904-clean-routes";
@@ -560,6 +561,7 @@ const TAB_RUNNERS = {
   watch: tabWatch,
   planner: () => renderPlanner(view),
   market: tabMarket,
+  shops: () => renderPlayerShops(view),
   residents: tabResidents,
   rank: tabLeaderboard,
   quests: (sub) => tabQuests(sub),

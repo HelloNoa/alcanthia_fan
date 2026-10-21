@@ -18,6 +18,7 @@ export const api = {
   garden:     (q) => get("/", q.userId ? { userId: q.userId } : { nickname: q.nickname }),
   search:     (q) => get("/search", { q, limit: 20 }),
   residents:  (zoneId, opts = {}) => get("/residents", { zoneId, ...opts }),
+  playerShops: (opts = {}) => get("/player-shops", { zone: "town", limit: 20, ...opts }),
   leaderboard:() => get("/leaderboard"),
   itemRecords:() => get("/item-records"),
   price:      (itemKey) => get("/price", { itemKey }),
